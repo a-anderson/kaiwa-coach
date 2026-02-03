@@ -1,6 +1,15 @@
+<p align="center">
+  <img src="assets/logo/kaiwacoach_logo.png" alt="KaiwaCoach logo" width="200"/>
+</p>
+
+<p align="center">
+  <strong>KaiwaCoach</strong><br/>
+  An offline conversational language coach
+</p>
+
 # Kaiwa Coach
 
-Offline-first Japanese and French conversation coach (ASR + LLM + TTS) for Apple Silicon macOS.
+An offline conversational language coaching application for Japanese and French, designed to run locally on Apple Silicon macOS.
 
 ## Docs
 
@@ -42,11 +51,3 @@ poetry run python scripts/smoke_llm.py --language ja
 ```bash
 poetry run python -m kaiwacoach.app
 ```
-
-## Conventions
-
-Modular code under src/kaiwacoach/
-
-Prompts live in src/kaiwacoach/prompts/templates/
-
-No inline prompts in code
