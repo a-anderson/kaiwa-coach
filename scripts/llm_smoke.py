@@ -24,7 +24,8 @@ from pydantic import BaseModel, ValidationError
 from mlx_lm import load, generate
 from mlx_lm.sample_utils import make_sampler
 
-DEFAULT_MODEL_ID = "mlx-community/Qwen3-14B-bf16"
+# DEFAULT_MODEL_ID = "mlx-community/Qwen3-14B-bf16"
+DEFAULT_MODEL_ID = "mlx-community/Qwen3-14B-8bit"
 
 
 class ConversationReply(BaseModel):

@@ -6,7 +6,9 @@ authors = [
     {name = "Ashley Anderson"}
 ]
 readme = "README.md"
+requires-python = ">=3.11"
 
+[tool.poetry]
 packages = [
     { include = "kaiwacoach", from = "src" }
 ]

@@ -38,6 +38,9 @@ poetry install
 poetry run bash scripts/setup_macos.sh
 ```
 
+> KaiwaCoach uses the Hugging Face cache (typically ~/.cache/huggingface/) for model storage.
+> Models are prefetched via scripts/prefetch_models.py.
+
 ## Smoke tests
 
 ```bash
