@@ -1,0 +1,32 @@
+[project]
+name = "kaiwa-coach"
+version = "0.1.0"
+description = "A local-first conversational language coaching application."
+authors = [
+    {name = "Ashley Anderson"}
+]
+readme = "README.md"
+
+packages = [
+    { include = "kaiwacoach", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+mlx-lm = "^0.30.5"
+mlx-audio = "^0.3.1"
+numpy = "2.3.5"
+pydantic = "^2.12.5"
+soundfile = "^0.13.1"
+gradio = "^6.5.1"
+phonemizer-fork = "^3.3.2"
+misaki = {extras = ["ja"], version = "^0.9.4"}
+fugashi = "^1.5.2"
+unidic = "^1.1.0"
+espeakng-loader = "^0.2.4"
+num2words = "^0.5.14"
+spacy = "^3.8.11"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
