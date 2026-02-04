@@ -22,11 +22,11 @@ The application runs entirely on **Apple Silicon macOS**, requires **no internet
 - Support for **text and voice** conversations
 - Persistent conversation history including:
     - Raw user text input
-    - Raw user audio input
     - ASR transcript
     - Assistant reply text
-    - Assistant reply audio
     - Corrections and native reformulations
+- Audio is **session-only** (cached during active use, deleted on exit)
+- Optional **regenerate audio** on demand for any past turn or whole conversation
 - Explicit feedback per user turn:
     - Errors (if any)
     - Corrected form
@@ -102,7 +102,7 @@ The application runs entirely on **Apple Silicon macOS**, requires **no internet
 ┌───────────────▼─────────────────────────────────────────┐
 │                 Storage Layer                           │
 │  - SQLite (turns, corrections, metadata)                │
-│  - Filesystem (WAV audio blobs)                         │
+│  - Session audio cache (WAV, deleted on exit)           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -233,8 +233,8 @@ Each step is treated as a **pure function**.
 
 ## 8. Data Model (Revised)
 
-- **UserTurn**: raw input, ASR transcript
-- **AssistantTurn**: reply text and audio
+- **UserTurn**: raw input (text), ASR transcript
+- **AssistantTurn**: reply text (audio is session-only)
 - **Correction**: errors, corrected form, native form, explanation
 
 Corrections are first-class entities linked to user turns.
@@ -259,9 +259,9 @@ Corrections are first-class entities linked to user turns.
 
 ## 10. Caching Strategy
 
-- ASR cache by audio hash
+- ASR cache by audio hash (session-only)
 - LLM output cache by (prompt, role)
-- TTS cache by (text, voice, speed)
+- TTS cache by (text, voice, speed) (session-only)
 
 ---
 

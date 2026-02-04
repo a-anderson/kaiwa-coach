@@ -46,6 +46,10 @@ def test_schema_tables_and_columns_exist() -> None:
 
     assistant_columns = _column_names(connection, "assistant_turns")
     assert "conversation_id" in assistant_columns
+    assert "reply_audio_path" not in assistant_columns
+
+    user_turns_columns = _column_names(connection, "user_turns")
+    assert "input_audio_path" not in user_turns_columns
 
 
 def test_schema_triggers_exist() -> None:

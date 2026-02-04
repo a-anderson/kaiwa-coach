@@ -31,7 +31,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - `soundfile` / `scipy`
 - stdlib `sqlite3`
 
-✅ Add `.gitignore` (models, audio blobs, DB files)  
+✅ Add `.gitignore` (models, session audio cache, DB files)  
 ✅ Add `README.md` referencing PRD v2 and TDD
 
 ---
@@ -80,17 +80,18 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ---
 
-### 2.3 Audio Blob Storage
+### 2.3 Audio Cache (Session-only)
 
-⬜ Implement `storage/blobs.py`  
-⬜ Deterministic paths:
+⬜ Implement `storage/blobs.py` for **session-only** audio cache  
+⬜ Deterministic paths (session temp dir):
 
 - per conversation
 - per turn
 - hash-based filenames
 
 ⬜ WAV save/load helpers  
-⬜ Enforce sample rate consistency
+⬜ Enforce sample rate consistency  
+⬜ Delete session audio cache on app exit
 
 ---
 
@@ -106,7 +107,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - transcript
 - ASR metadata
 
-⬜ Cache ASR results by audio hash  
+⬜ Cache ASR results by audio hash (session-only)  
 ⬜ (Planned) Log confidence proxies
 
 ---
@@ -212,7 +213,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Implement `models/tts_kokoro.py`  
 ⬜ Load `mlx-community/Kokoro-82M-bf16`  
 ⬜ Generate WAV output  
-⬜ Cache TTS by `(text, voice, speed)`
+⬜ Cache TTS by `(text, voice, speed)` (session-only)
 
 ---
 
@@ -229,13 +230,13 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Persist `Correction`  
 ⬜ Normalise for TTS (JP)  
 ⬜ Generate TTS  
-⬜ Persist audio
+⬜ Cache audio for active session only (do not persist)
 
 ---
 
 ### Audio Turn Flow
 
-⬜ Persist raw audio  
+⬜ Cache raw audio for active session only  
 ⬜ Run ASR  
 ⬜ Persist transcript  
 ⬜ Continue text flow
@@ -246,7 +247,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Schema validation at every step  
 ⬜ Persist intermediates before side-effects  
-⬜ Graceful degradation on failure
+⬜ Graceful degradation on failure  
+⬜ Provide audio regeneration for a single turn  
+⬜ Provide audio regeneration for a full conversation
 
 ---
 
@@ -259,8 +262,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Text input
 - Microphone input
 - Send button
-- Per-turn audio playback
+- Per-turn audio playback (session cache)
 - Corrections panel
+⬜ Regenerate audio action for a single turn  
+⬜ Regenerate audio action for a full conversation
 
 ⬜ Session reset support  
 ⬜ Safe interaction with DB queue
@@ -269,9 +274,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 10. Caching and Performance
 
-⬜ ASR cache  
+⬜ ASR cache (session-only)  
 ⬜ LLM output cache  
-⬜ TTS cache
+⬜ TTS cache (session-only)
 
 ⬜ Per-step timing logs
 
@@ -296,7 +301,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### Storage Tests
 
 ⬜ DB insert/read round-trip  
-⬜ Audio save/load tests
+⬜ Session audio cache save/load tests  
 
 ---
 
@@ -315,7 +320,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Spoken JP conversation works end-to-end  
 ⬜ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
-⬜ Conversations persist across restarts  
+⬜ Conversations persist across restarts (text + corrections)  
+⬜ Audio can be regenerated on demand for a single turn or full conversation
 ⬜ Stable operation within ~22–26 GB RAM
 
 ---

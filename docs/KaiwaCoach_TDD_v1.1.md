@@ -18,7 +18,7 @@ This TDD describes the implementation approach for KaiwaCoach as specified in PR
 - ASR: `mlx-community/whisper-large-v3-turbo-asr-fp16`
 - LLM: `mlx-community/Qwen3-14B-8bit` (default), `mlx-community/Qwen3-14B-bf16` (optional)
 - TTS: `mlx-community/Kokoro-82M-bf16`
-- Persistent storage: SQLite + WAV files
+- Persistent storage: SQLite (text + metadata). Audio is session-only cache.
 
 ### Assumptions
 - Single-user process (no multi-user server)
@@ -38,7 +38,7 @@ kaiwacoach/
     db.py                     # SQLite access layer (single-writer)
     schema.sql                # Schema migrations
     models.py                 # Pydantic DB models
-    blobs.py                  # Audio file IO, paths, hashing
+    blobs.py                  # Session audio cache IO, paths, hashing
   models/
     asr_whisper.py            # Whisper MLX wrapper
     llm_qwen.py               # MLX-LM wrapper + schema enforcement
@@ -64,7 +64,7 @@ kaiwacoach/
       jp_normalisation_cases.json
       prompts/
   tools/
-    export_conversation.py     # Export markdown/json + audio zips
+    export_conversation.py     # Export markdown/json (audio regenerated on demand)
 ```
 
 ---
@@ -82,7 +82,7 @@ kaiwacoach/
 - `models.tts_id`: default Kokoro
 - `llm.max_context_tokens`: global cap
 - Per-role caps (see Section 5)
-- `storage.root_dir`: location for DB and audio blobs
+- `storage.root_dir`: location for DB (audio cache stored in a session temp dir)
 - `tts.voice`, `tts.speed`
 
 ---
@@ -96,13 +96,15 @@ Tables:
 - `assistant_turns(id, user_turn_id, created_at, reply_text, reply_audio_path, llm_meta_json)`
 - `corrections(id, user_turn_id, created_at, errors_json, corrected_text, native_text, explanation_text, prompt_hash)`
 - `artifacts(id, conversation_id, kind, path, meta_json)`
+Note: `*_audio_path` fields are optional and point to **session-only** cache files.
 
-### 4.2 Audio blobs
-- Stored as WAV files under `storage.root_dir/audio/{conversation_id}/{turn_id}/...`
-- Filenames include hash for caching:
+### 4.2 Audio blobs (Session-only)
+- Stored as WAV files under a **session temp dir** (not persisted across restarts).
+- Filenames include hash for caching during the session:
   - `user_{sha256}.wav`
   - `assistant_{sha256}.wav`
   - `tts_{sha256}.wav`
+- Session cache is deleted on app exit.
 
 ### 4.3 DB concurrency
 - Single-process app, but Gradio callbacks can overlap.
@@ -116,7 +118,7 @@ Tables:
 ## 5. Orchestrator Pipeline
 
 ### 5.1 Turn lifecycle (audio input)
-1. Persist raw user audio blob (WAV) + metadata
+1. Cache raw user audio blob (WAV) in **session audio cache**
 2. ASR transcribe (language forced) → `asr_text`
 3. Persist `asr_text` + ASR meta
 4. LLM conversation reply (schema: `{reply}`)
@@ -129,9 +131,12 @@ Tables:
    - (Planned mitigation) JP substring invariant check
    - Punctuation/pauses normalisation
    - Persist normalised text and meta
-9. TTS generate assistant audio (cached by text hash)
-10. Persist assistant audio path
-11. Return UI update with text + audio controls + correction pane content
+9. TTS generate assistant audio (cached by text hash in session cache)
+10. Return UI update with text + audio controls + correction pane content
+
+Regeneration:
+- When viewing history, audio can be regenerated on demand for a **single turn** or **entire conversation**.
+- Regenerated audio is written to the session cache only.
 
 ### 5.2 Turn lifecycle (text input)
 - Same as audio input but skip steps 1–3; `input_text` is stored and used as-is.
@@ -142,7 +147,7 @@ Each step is a function with explicit inputs/outputs:
 - `llm_converse(history, user_text, language) -> (reply, llm_meta)`
 - `llm_analyse(user_text, language) -> (errors, corrected, native, explanation, llm_meta)`
 - `jp_normalise_for_tts(text) -> (tts_text, norm_meta)`
-- `tts_synth(text, voice, speed) -> (wav_path, tts_meta)`
+- `tts_synth(text, voice, speed) -> (wav_path, tts_meta)`  # wav_path is session-only
 
 ### 5.4 Context assembly rules
 - Conversation prompt history is truncated to:
@@ -218,7 +223,7 @@ Mask and restore:
 
 ### 8.3 Smoke tests
 - End-to-end single-turn pipeline (text)
-- End-to-end single-turn pipeline (audio) with a short fixture audio sample
+- End-to-end single-turn pipeline (audio) with a short fixture audio sample (session-only audio cache)
 
 ---
 
@@ -231,9 +236,9 @@ Mask and restore:
   - normalise
   - TTS
 - Cache hits/misses for:
-  - ASR (audio hash)
+  - ASR (audio hash, session-only)
   - LLM (prompt hash)
-  - TTS (text hash)
+  - TTS (text hash, session-only)
 
 Target UX (initial):
 - Text turn: < 4s total on M1 Pro (best-effort)
@@ -247,7 +252,7 @@ Target UX (initial):
 - Storage layer + schema
 - ASR wrapper working with forced language
 - LLM wrapper with JSON enforcement
-- Kokoro TTS wrapper + caching
+- Kokoro TTS wrapper + session-only caching
 - Basic orchestrator + minimal Gradio UI
 
 ### Milestone B (MVP quality)

@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS user_turns (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   input_text TEXT,
-  input_audio_path TEXT,
   asr_text TEXT,
   asr_meta_json TEXT,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -38,7 +37,6 @@ CREATE TABLE IF NOT EXISTS assistant_turns (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   reply_text TEXT NOT NULL,
-  reply_audio_path TEXT,
   llm_meta_json TEXT,
   FOREIGN KEY (user_turn_id) REFERENCES user_turns(id) ON DELETE CASCADE,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
