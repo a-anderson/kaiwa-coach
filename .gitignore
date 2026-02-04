@@ -41,6 +41,10 @@ venv/
 .Trashes
 .fseventsd
 
+# VS Code
+.vscode/
+*.code-workspace
+
 # Logs
 *.log
 logs/
