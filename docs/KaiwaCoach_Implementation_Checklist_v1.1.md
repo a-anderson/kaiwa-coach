@@ -58,8 +58,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### 2.1 Database Schema
 
-⬜ Create `schema.sql`  
-⬜ Tables:
+✅ Create `schema.sql`  
+✅ Tables:
 
 - `conversations`
 - `user_turns`
@@ -67,7 +67,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - `corrections`
 - `artifacts`
 
-⬜ Add schema versioning
+✅ Add schema versioning
 
 ---
 
