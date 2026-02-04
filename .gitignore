@@ -1,5 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+*.egg-info/
+.eggs/
+build/
+dist/
+wheelhouse/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+pytest.xml
+.tox/
+.nox/
+.hypothesis/
+.pytype/
+.ipynb_checkpoints/
+
+# Virtual environments
 .venv/
+venv/
 
-.ruff_cache/, .mypy_cache/, .pytest_cache/
+# Environment files
+.env
+.env.*
 
-*.db, storage/, tmp/
+# macOS / Apple Silicon
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Logs
+*.log
+logs/
+
+# Project-specific data/artifacts
+tmp/
+artifacts/
+audio/
+exports/
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
