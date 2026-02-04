@@ -1,0 +1,26 @@
+# Example configuration for KaiwaCoach
+
+session:
+  language: "ja"  # or "fr"
+
+models:
+  asr_id: "mlx-community/whisper-large-v3-mlx"
+  llm_id: "mlx-community/Qwen3-14B-8bit"
+  tts_id: "mlx-community/Kokoro-82M-bf16"
+
+llm:
+  max_context_tokens: 4096
+  role_max_new_tokens:
+    conversation: 256
+    error_detection: 128
+    correction: 128
+    native_reformulation: 128
+    explanation: 192
+    jp_tts_normalisation: 192
+
+storage:
+  root_dir: "storage"
+
+tts:
+  voice: "default"
+  speed: 1.0

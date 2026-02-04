@@ -38,8 +38,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 1. Configuration Layer
 
-⬜ Implement `config.py`  
-⬜ Define defaults:
+✅ Implement `config.py`  
+✅ Define defaults:
 
 - Session language (`ja` / `fr`)
 - ASR model ID
@@ -49,8 +49,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - TTS voice and speed
 - Per-role token limits
 
-⬜ Support environment variable overrides  
-⬜ Validate configuration at startup
+✅ Support environment variable overrides  
+✅ Validate configuration at startup
 
 ---
 
@@ -322,6 +322,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 14. Post-MVP (Optional)
 
+🔁 Add support for other languages
 🔁 ASR confidence-based UX  
 🔁 Pronunciation scoring  
 🔁 Shadowing mode  
