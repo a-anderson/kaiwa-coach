@@ -6,7 +6,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ---
 
 ## Legend
+
 - ⬜ Not started
+- ⏳ In progress
 - ✅ Done
 - 🔁 Revisit later
 
@@ -14,11 +16,12 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 0. Project Setup (Foundational)
 
-⬜ Create repository structure per TDD  
-⬜ Set Python version to **3.11.x (tested baseline)**  
-⬜ Create virtual environment
-⬜ Run setup script to install UniDic assets (`python -m unidic download`)  
-⬜ Add dependency management (`pyproject.toml` or `requirements.txt`) including:
+✅ Create repository structure per TDD  
+✅ Set Python version to **3.11.x (tested baseline)**  
+✅ Create virtual environment
+✅ Run setup script to install UniDic assets (`python -m unidic download`)  
+✅ Add dependency management (`pyproject.toml` or `requirements.txt`) including:
+
 - `mlx`
 - `mlx-lm`
 - MLX Whisper package
@@ -28,8 +31,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - `soundfile` / `scipy`
 - stdlib `sqlite3`
 
-⬜ Add `.gitignore` (models, audio blobs, DB files)  
-⬜ Add `README.md` referencing PRD v2 and TDD  
+✅ Add `.gitignore` (models, audio blobs, DB files)  
+✅ Add `README.md` referencing PRD v2 and TDD
 
 ---
 
@@ -37,6 +40,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Implement `config.py`  
 ⬜ Define defaults:
+
 - Session language (`ja` / `fr`)
 - ASR model ID
 - LLM model ID (default 8-bit)
@@ -46,7 +50,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Per-role token limits
 
 ⬜ Support environment variable overrides  
-⬜ Validate configuration at startup  
+⬜ Validate configuration at startup
 
 ---
 
@@ -56,13 +60,14 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Create `schema.sql`  
 ⬜ Tables:
+
 - `conversations`
 - `user_turns`
 - `assistant_turns`
 - `corrections`
 - `artifacts`
 
-⬜ Add schema versioning  
+⬜ Add schema versioning
 
 ---
 
@@ -71,7 +76,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Implement `storage/db.py`  
 ⬜ Enforce single-writer queue  
 ⬜ Ensure all writes go through one connection  
-⬜ Safe concurrent reads for Gradio callbacks  
+⬜ Safe concurrent reads for Gradio callbacks
 
 ---
 
@@ -79,12 +84,13 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Implement `storage/blobs.py`  
 ⬜ Deterministic paths:
+
 - per conversation
 - per turn
 - hash-based filenames
 
 ⬜ WAV save/load helpers  
-⬜ Enforce sample rate consistency  
+⬜ Enforce sample rate consistency
 
 ---
 
@@ -93,14 +99,15 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Implement `models/asr_whisper.py`  
 ⬜ Load `mlx-community/whisper-large-v3-turbo-asr-fp16`  
 ⬜ Force language per session  
-⬜ Preserve English words in mixed-language utterances  
+⬜ Preserve English words in mixed-language utterances
 
 ⬜ Return:
+
 - transcript
 - ASR metadata
 
 ⬜ Cache ASR results by audio hash  
-⬜ (Planned) Log confidence proxies  
+⬜ (Planned) Log confidence proxies
 
 ---
 
@@ -112,10 +119,11 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Load `mlx-community/Qwen3-14B-8bit` by default (memory-safe, latency-optimised)  
 ⬜ Support optional BF16 mode  
 ⬜ Enforce:
+
 - max context tokens
 - per-call max tokens
 
-⬜ Capture timing and metadata  
+⬜ Capture timing and metadata
 
 ---
 
@@ -124,8 +132,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Implement first-valid-object JSON extraction
 ⬜ Ignore/log trailing content
 
-
 ⬜ Define Pydantic schemas for:
+
 - Conversation reply
 - Error detection
 - Corrected sentence
@@ -135,7 +143,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Strict JSON parsing  
 ⬜ One retry max via repair prompt  
-⬜ Safe fallback on failure  
+⬜ Safe fallback on failure
 
 ---
 
@@ -143,6 +151,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Create `prompts/` directory  
 ⬜ Add prompt files:
+
 - `conversation.md`
 - `detect_errors.md`
 - `correct_sentence.md`
@@ -152,11 +161,12 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - `repair_json.md`
 
 ⬜ Implement prompt loader:
+
 - markdown read
 - variable interpolation
 - SHA256 hash generation
 
-⬜ Store prompt hash per LLM call  
+⬜ Store prompt hash per LLM call
 
 ---
 
@@ -165,6 +175,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### 6.1 Protected Spans
 
 ⬜ Implement masking for:
+
 - URLs
 - file paths
 - emails
@@ -176,7 +187,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### 6.2 Katakana Conversion
 
 ⬜ Implement LLM-based rewrite (temp = 0)  
-⬜ Rewrite only non-Japanese spans  
+⬜ Rewrite only non-Japanese spans
 
 ---
 
@@ -184,7 +195,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Detect Japanese substrings  
 ⬜ Verify byte-identical preservation  
-⬜ Fallback + log on violation  
+⬜ Fallback + log on violation
 
 ---
 
@@ -192,7 +203,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Normalize sentence breaks  
 ⬜ Normalize repeated punctuation  
-⬜ Insert pauses for Kokoro  
+⬜ Insert pauses for Kokoro
 
 ---
 
@@ -201,13 +212,13 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Implement `models/tts_kokoro.py`  
 ⬜ Load `mlx-community/Kokoro-82M-bf16`  
 ⬜ Generate WAV output  
-⬜ Cache TTS by `(text, voice, speed)`  
+⬜ Cache TTS by `(text, voice, speed)`
 
 ---
 
 ## 8. Conversation Orchestrator
 
-⬜ Implement `orchestrator.py`  
+⬜ Implement `orchestrator.py`
 
 ### Text Turn Flow
 
@@ -218,7 +229,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Persist `Correction`  
 ⬜ Normalise for TTS (JP)  
 ⬜ Generate TTS  
-⬜ Persist audio  
+⬜ Persist audio
 
 ---
 
@@ -227,7 +238,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Persist raw audio  
 ⬜ Run ASR  
 ⬜ Persist transcript  
-⬜ Continue text flow  
+⬜ Continue text flow
 
 ---
 
@@ -235,7 +246,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Schema validation at every step  
 ⬜ Persist intermediates before side-effects  
-⬜ Graceful degradation on failure  
+⬜ Graceful degradation on failure
 
 ---
 
@@ -243,6 +254,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Implement `app.py`  
 ⬜ UI elements:
+
 - Chat transcript
 - Text input
 - Microphone input
@@ -251,7 +263,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Corrections panel
 
 ⬜ Session reset support  
-⬜ Safe interaction with DB queue  
+⬜ Safe interaction with DB queue
 
 ---
 
@@ -259,9 +271,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ ASR cache  
 ⬜ LLM output cache  
-⬜ TTS cache  
+⬜ TTS cache
 
-⬜ Per-step timing logs  
+⬜ Per-step timing logs
 
 ---
 
@@ -270,21 +282,21 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### Schema Tests
 
 ⬜ Validate all LLM schemas  
-⬜ Test repair prompt  
+⬜ Test repair prompt
 
 ---
 
 ### Japanese Normalisation Golden Tests (High Priority)
 
 ⬜ Create JP/EN mixed fixtures  
-⬜ Assert katakana conversion or invariant fallback  
+⬜ Assert katakana conversion or invariant fallback
 
 ---
 
 ### Storage Tests
 
 ⬜ DB insert/read round-trip  
-⬜ Audio save/load tests  
+⬜ Audio save/load tests
 
 ---
 
@@ -292,9 +304,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ Enforce context truncation  
 ⬜ Enforce token caps per role  
-⬜ Periodic memory logging  
+⬜ Periodic memory logging
 
-⬜ Manual session reset control  
+⬜ Manual session reset control
 
 ---
 
@@ -304,7 +316,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
 ⬜ Conversations persist across restarts  
-⬜ Stable operation within ~22–26 GB RAM  
+⬜ Stable operation within ~22–26 GB RAM
 
 ---
 
@@ -314,4 +326,4 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 🔁 Pronunciation scoring  
 🔁 Shadowing mode  
 🔁 Anki export  
-🔁 Desktop packaging  
+🔁 Desktop packaging
