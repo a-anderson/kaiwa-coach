@@ -82,16 +82,16 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### 2.3 Audio Cache (Session-only)
 
-⬜ Implement `storage/blobs.py` for **session-only** audio cache  
-⬜ Deterministic paths (session temp dir):
+✅ Implement `storage/blobs.py` for **session-only** audio cache  
+✅ Deterministic paths (session temp dir):
 
 - per conversation
 - per turn
 - hash-based filenames
 
-⬜ WAV save/load helpers  
-⬜ Enforce sample rate consistency  
-⬜ Delete session audio cache on app exit
+✅ WAV save/load helpers  
+✅ Enforce sample rate consistency  
+✅ Delete session audio cache on app exit
 
 ---
 
