@@ -73,10 +73,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### 2.2 SQLite Access
 
-⬜ Implement `storage/db.py`  
-⬜ Enforce single-writer queue  
-⬜ Ensure all writes go through one connection  
-⬜ Safe concurrent reads for Gradio callbacks
+✅ Implement `storage/db.py`  
+✅ Enforce single-writer queue  
+✅ Ensure all writes go through one connection  
+✅ Safe concurrent reads for Gradio callbacks
 
 ---
 
