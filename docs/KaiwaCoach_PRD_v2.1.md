@@ -6,7 +6,7 @@
 
 **Version note:** v2.1 incorporates validated implementation learnings (Python 3.11 environment, MLX-LM sampler usage, robust JSON extraction, Japanese TTS dependency preflight, and default 8-bit LLM selection).
 
-**KaiwaCoach** is a fully offline, local-first conversational language coaching application for **Japanese and French**, designed to help learners improve **spoken fluency, correctness, and naturalness** through real dialogue, automatic speech recognition, structured error detection, correction, native reformulation, and high-quality text-to-speech playback.
+**KaiwaCoach** is a fully offline, local-first conversational language coaching application for **Japanese, French, and English**, designed to help learners improve **spoken fluency, correctness, and naturalness** through real dialogue, automatic speech recognition, structured error detection, correction, native reformulation, and high-quality text-to-speech playback.
 
 The application runs entirely on **Apple Silicon macOS**, requires **no internet connection**, and prioritises **high-quality Japanese handling**, including accurate pronunciation of loanwords (外来語 / gairaigo), acronyms, and mixed-language utterances.
 

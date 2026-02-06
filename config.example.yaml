@@ -1,7 +1,7 @@
 # Example configuration for KaiwaCoach
 
 session:
-  language: "ja"  # or "fr"
+  language: "ja"  # or "fr" or "en"
 
 models:
   asr_id: "mlx-community/whisper-large-v3-mlx"

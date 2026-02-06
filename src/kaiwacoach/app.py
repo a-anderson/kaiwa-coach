@@ -7,6 +7,7 @@ import atexit
 from kaiwacoach.settings import load_config
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.llm_qwen import MlxLmBackend, QwenLLM
+from kaiwacoach.models.tts_kokoro import KokoroTTS
 from kaiwacoach.storage.blobs import SessionAudioCache
 
 
@@ -24,6 +25,10 @@ def main() -> None:
         max_context_tokens=config.llm.max_context_tokens,
         role_max_new_tokens=config.llm.role_max_new_tokens.__dict__,
         backend=llm_backend,
+    )
+    _ = KokoroTTS(
+        model_id=config.models.tts_id,
+        cache=audio_cache,
     )
     atexit.register(audio_cache.cleanup)
     # TODO: initialize UI and orchestrator.

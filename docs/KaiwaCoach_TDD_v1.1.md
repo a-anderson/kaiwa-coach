@@ -81,7 +81,7 @@ kaiwacoach/
 - Shared constants (e.g., `SUPPORTED_LANGUAGES`) live in `src/kaiwacoach/constants.py`.
 
 ### 3.2 Key settings
-- `session.language`: `"ja"` or `"fr"` (forced ASR language)
+- `session.language`: `"ja"`, `"fr"`, or `"en"` (forced ASR language)
 - `models.asr_id`: default Whisper turbo model id
 - `models.llm_id`: default Qwen3-14B-8bit
 - `models.tts_id`: default Kokoro

@@ -41,7 +41,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Implement `settings.py`  
 ✅ Define defaults:
 
-- Session language (`ja` / `fr`)
+- Session language (`ja` / `fr` / `en`)
 - ASR model ID
 - LLM model ID (default 8-bit)
 - TTS model ID
@@ -211,10 +211,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 7. TTS Module
 
-⬜ Implement `models/tts_kokoro.py`  
-⬜ Load `mlx-community/Kokoro-82M-bf16`  
-⬜ Generate WAV output  
-⬜ Cache TTS by `(text, voice, speed)` (session-only)
+✅ Implement `models/tts_kokoro.py`  
+✅ Load TTS model via `settings.py` (default set in `config/models.py`)  
+✅ Generate WAV output  
+✅ Cache TTS by `(text, voice, speed)` (session-only)
 
 ---
 
@@ -250,6 +250,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Persist intermediates before side-effects  
 ⬜ Graceful degradation on failure  
 ⬜ Store prompt hash per LLM call (orchestrator)  
+⬜ Pass session language into TTS synthesis by default  
 ⬜ Provide audio regeneration for a single turn  
 ⬜ Provide audio regeneration for a full conversation
 
