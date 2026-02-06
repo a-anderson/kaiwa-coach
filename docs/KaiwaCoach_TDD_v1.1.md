@@ -186,6 +186,11 @@ These are conservative defaults; adjust after profiling.
 - Outputs validated via Pydantic models per role.
 - Prompt hashes (SHA256 of rendered prompt) stored with each LLM call for reproducibility.
 
+LLM backend integration:
+- Implement MLX-LM integration inside `models/llm_qwen.py` (model load + generation hooks).
+- Define a lightweight backend protocol (prompt + max_tokens -> text) to keep the
+  wrapper testable and decouple model loading from generation.
+
 ---
 
 ## 7. Japanese TTS Normalisation Details

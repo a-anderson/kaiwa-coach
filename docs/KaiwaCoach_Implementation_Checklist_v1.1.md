@@ -116,15 +116,17 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### 4.1 Base Wrapper
 
-⬜ Implement `models/llm_qwen.py`  
-⬜ Load `mlx-community/Qwen3-14B-8bit` by default (memory-safe, latency-optimised)  
-⬜ Support optional BF16 mode  
-⬜ Enforce:
+✅ Implement `models/llm_qwen.py`  
+✅ Load LLM via `settings.py` (default set in `config/models.py`)  
+✅ Integrate MLX-LM backend in `models/llm_qwen.py`  
+🔁 Support optional BF16 mode  
+🔁 Use MLX tokenizer for prompt token counting  
+✅ Enforce:
 
 - max context tokens
 - per-call max tokens
 
-⬜ Capture timing and metadata
+✅ Capture timing and metadata
 
 ---
 
