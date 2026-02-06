@@ -174,9 +174,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 6. Japanese TTS Normalisation
 
-### 6.1 Protected Spans
+### 6.1 Protected Spans (`textnorm/protected_spans.py`)
 
-⬜ Implement masking for:
+✅ Implement masking for:
 
 - URLs
 - file paths
@@ -186,26 +186,27 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ---
 
-### 6.2 Katakana Conversion
+### 6.2 Katakana Conversion (`textnorm/jp_katakana.py`)
 
-⬜ Implement LLM-based rewrite (temp = 0)  
-⬜ Rewrite only non-Japanese spans
-
----
-
-### 6.3 Invariant Mitigation Hooks
-
-⬜ Detect Japanese substrings  
-⬜ Verify byte-identical preservation  
-⬜ Fallback + log on violation
+✅ Implement LLM-based rewrite (temp = 0)  
+✅ Rewrite only non-Japanese spans
+🔁 Implement LLM rewrite function for katakana conversion (uses `jp_tts_normalise.md`)
 
 ---
 
-### 6.4 Punctuation / Pause Normalisation
+### 6.3 Invariant Mitigation Hooks (`textnorm/invariants.py`)
 
-⬜ Normalize sentence breaks  
-⬜ Normalize repeated punctuation  
-⬜ Insert pauses for Kokoro
+✅ Detect Japanese substrings  
+✅ Verify byte-identical preservation  
+✅ Fallback + log on violation
+
+---
+
+### 6.4 Punctuation / Pause Normalisation (`textnorm/tts_punctuation.py`)
+
+✅ Normalize sentence breaks  
+✅ Normalize repeated punctuation  
+✅ Insert pauses for Kokoro
 
 ---
 
@@ -251,6 +252,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Graceful degradation on failure  
 ⬜ Store prompt hash per LLM call (orchestrator)  
 ⬜ Pass session language into TTS synthesis by default  
+⬜ Call katakana LLM rewrite step in the TTS normalisation pipeline  
 ⬜ Provide audio regeneration for a single turn  
 ⬜ Provide audio regeneration for a full conversation
 
