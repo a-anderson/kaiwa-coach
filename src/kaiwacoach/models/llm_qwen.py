@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Mapping, Optional, Protocol
 
+from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
+
 
 @dataclass(frozen=True)
 class LLMResult:
@@ -139,6 +141,34 @@ class QwenLLM:
         )
 
         return LLMResult(text=text, meta=meta)
+
+    def generate_json(
+        self,
+        prompt: str,
+        role: str,
+        max_new_tokens: Optional[int] = None,
+        repair_fn: Callable[[str], str] | None = None,
+    ) -> ParseResult:
+        """Generate and parse JSON output using the role schema.
+
+        Parameters
+        ----------
+        prompt : str
+            Prompt text to send to the model.
+        role : str
+            Logical role name for schema selection.
+        max_new_tokens : int | None
+            Optional override for max new tokens.
+        repair_fn : Callable[[str], str] | None
+            Optional repair function to attempt once on invalid JSON.
+
+        Returns
+        -------
+        ParseResult
+            Parsed model or error details.
+        """
+        result = self.generate(prompt=prompt, role=role, max_new_tokens=max_new_tokens)
+        return parse_with_schema(role=role, text=result.text, repair_fn=repair_fn)
 
     def _default_generator(self, **_: Any) -> tuple[str, Dict[str, Any]]:
         """Default generator hook (uses the configured backend).

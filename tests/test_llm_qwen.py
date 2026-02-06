@@ -7,6 +7,7 @@ from typing import Dict
 import pytest
 
 from kaiwacoach.models.llm_qwen import LLMResult, MlxLmBackend, QwenLLM
+from kaiwacoach.models.json_enforcement import ConversationReply
 
 
 class _Backend:
@@ -188,26 +189,46 @@ def test_mlx_backend_uses_generate_and_sampler() -> None:
     sys.modules["mlx_lm"] = _FakeModule
     sys.modules["mlx_lm.sample_utils"] = _FakeSampleUtils
 
-    backend = MlxLmBackend("model-x")
+    try:
+        backend = MlxLmBackend("model-x")
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"role": 3},
+            backend=backend,
+        )
+        result = llm.generate("prompt", role="role")
+
+        assert result.text == "output"
+        assert captured["model_id"] == "model-x"
+        assert captured["temp"] == 0.0
+        assert captured["generate"]["max_tokens"] == 3
+    finally:
+        if original_mlx_lm is not None:
+            sys.modules["mlx_lm"] = original_mlx_lm
+        else:
+            sys.modules.pop("mlx_lm", None)
+
+        if original_sample_utils is not None:
+            sys.modules["mlx_lm.sample_utils"] = original_sample_utils
+        else:
+            sys.modules.pop("mlx_lm.sample_utils", None)
+
+
+def test_generate_json_parses_schema() -> None:
+    """generate_json should parse role-specific schemas."""
+    class _JsonBackend:
+        def generate(self, prompt: str, max_tokens: int) -> str:
+            return '{"reply": "ok"}'
+
     llm = QwenLLM(
         model_id="model-x",
         max_context_tokens=100,
-        role_max_new_tokens={"role": 3},
-        backend=backend,
+        role_max_new_tokens={"conversation": 3},
+        backend=_JsonBackend(),
     )
-    result = llm.generate("prompt", role="role")
 
-    assert result.text == "output"
-    assert captured["model_id"] == "model-x"
-    assert captured["temp"] == 0.0
-    assert captured["generate"]["max_tokens"] == 3
-
-    if original_mlx_lm is not None:
-        sys.modules["mlx_lm"] = original_mlx_lm
-    else:
-        sys.modules.pop("mlx_lm", None)
-
-    if original_sample_utils is not None:
-        sys.modules["mlx_lm.sample_utils"] = original_sample_utils
-    else:
-        sys.modules.pop("mlx_lm.sample_utils", None)
+    result = llm.generate_json("prompt", role="conversation")
+    assert result.error is None
+    assert isinstance(result.model, ConversationReply)
+    assert result.model.reply == "ok"

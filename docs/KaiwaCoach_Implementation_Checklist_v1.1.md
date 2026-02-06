@@ -132,10 +132,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### 4.2 JSON Schema Enforcement
 
-⬜ Implement first-valid-object JSON extraction
-⬜ Ignore/log trailing content
+✅ Implement first-valid-object JSON extraction
+✅ Ignore/log trailing content
 
-⬜ Define Pydantic schemas for:
+✅ Define Pydantic schemas for:
 
 - Conversation reply
 - Error detection
@@ -144,9 +144,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Explanation
 - JP TTS normalisation
 
-⬜ Strict JSON parsing  
-⬜ One retry max via repair prompt  
-⬜ Safe fallback on failure
+✅ Strict JSON parsing  
+✅ One retry max via repair prompt  
+✅ Safe fallback on failure  
 
 ---
 
