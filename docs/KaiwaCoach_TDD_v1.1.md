@@ -143,6 +143,9 @@ Regeneration:
 - When viewing history, audio can be regenerated on demand for a **single turn** or **entire conversation**.
 - Regenerated audio is written to the session cache only.
 
+Prompt hashing:
+- Record the SHA256 hash of each rendered prompt alongside LLM metadata for reproducibility.
+
 ### 5.2 Turn lifecycle (text input)
 - Same as audio input but skip steps 1–3; `input_text` is stored and used as-is.
 

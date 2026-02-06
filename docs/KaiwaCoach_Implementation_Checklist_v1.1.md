@@ -152,8 +152,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 5. Prompt Management
 
-⬜ Create `prompts/` directory  
-⬜ Add prompt files:
+✅ Create `prompts/` directory  
+✅ Add prompt files:
 
 - `conversation.md`
 - `detect_errors.md`
@@ -163,13 +163,12 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - `jp_tts_normalise.md`
 - `repair_json.md`
 
-⬜ Implement prompt loader:
+✅ Implement prompt loader:
 
 - markdown read
 - variable interpolation
 - SHA256 hash generation
 
-⬜ Store prompt hash per LLM call
 
 ---
 
@@ -250,6 +249,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Schema validation at every step  
 ⬜ Persist intermediates before side-effects  
 ⬜ Graceful degradation on failure  
+⬜ Store prompt hash per LLM call (orchestrator)  
 ⬜ Provide audio regeneration for a single turn  
 ⬜ Provide audio regeneration for a full conversation
 
