@@ -20,6 +20,10 @@ This TDD describes the implementation approach for KaiwaCoach as specified in PR
 - TTS: `mlx-community/Kokoro-82M-bf16`
 - Persistent storage: SQLite (text + metadata). Audio is session-only cache.
 
+Implementation note (ASR):
+- Use `mlx-whisper` for the ASR backend to keep the dependency surface minimal and maintain
+  explicit control over decoding and language forcing.
+
 ### Assumptions
 - Single-user process (no multi-user server)
 - Single active conversation session in UI at a time
@@ -32,7 +36,7 @@ This TDD describes the implementation approach for KaiwaCoach as specified in PR
 ```
 kaiwacoach/
   app.py                      # Gradio entrypoint
-  config.py                   # Config loading + defaults
+  settings.py                 # Config loading + defaults
   orchestrator.py             # Turn pipeline coordinator
   storage/
     db.py                     # SQLite access layer (single-writer)
@@ -74,6 +78,7 @@ kaiwacoach/
 ### 3.1 Config file
 - `config.yaml` (optional) loaded at startup
 - Environment variables override config
+- Shared constants (e.g., `SUPPORTED_LANGUAGES`) live in `src/kaiwacoach/constants.py`.
 
 ### 3.2 Key settings
 - `session.language`: `"ja"` or `"fr"` (forced ASR language)
@@ -132,7 +137,7 @@ Note: `*_audio_path` fields are optional and point to **session-only** cache fil
    - Punctuation/pauses normalisation
    - Persist normalised text and meta
 9. TTS generate assistant audio (cached by text hash in session cache)
-10. Return UI update with text + audio controls + correction pane content
+10. Return UI update with text + audio controls (user + assistant) + correction pane content
 
 Regeneration:
 - When viewing history, audio can be regenerated on demand for a **single turn** or **entire conversation**.

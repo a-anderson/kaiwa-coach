@@ -7,9 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-
-DEFAULT_LANGUAGE = "ja"
-SUPPORTED_LANGUAGES = {"ja", "fr"}
+from kaiwacoach.constants import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES
 
 
 def _load_model_defaults() -> dict[str, str]:

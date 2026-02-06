@@ -64,7 +64,7 @@ The application runs entirely on **Apple Silicon macOS**, requires **no internet
 │  - Chat transcript                       │
 │  - Text input                            │
 │  - Microphone input                      │
-│  - Per-turn audio playback               │
+│  - Per-turn audio playback (user + assistant) │
 │  - Corrections / Native phrasing panel   │
 └───────────────────┬──────────────────────┘
                     │
@@ -116,6 +116,7 @@ The application runs entirely on **Apple Silicon macOS**, requires **no internet
 
 - ASR/TTS stack relies on `mlx-audio`.
 - Japanese TTS requires `phonemizer-fork` (not `phonemizer`) and UniDic assets installed via `python -m unidic download`.
+- Shared constants (e.g., supported languages) are defined in `src/kaiwacoach/constants.py`.
 
 **Model**
 

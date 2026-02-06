@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import atexit
 
-from kaiwacoach.config import load_config
+from kaiwacoach.settings import load_config
+from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.storage.blobs import SessionAudioCache
 
 
 def main() -> None:
     """Load and validate configuration, then start the application."""
-    _ = load_config()
+    config = load_config()
     audio_cache = SessionAudioCache()
+    _ = WhisperASR(
+        model_id=config.models.asr_id,
+        language=config.session.language,
+    )
     atexit.register(audio_cache.cleanup)
     # TODO: initialize UI and orchestrator.
 

@@ -38,7 +38,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 1. Configuration Layer
 
-✅ Implement `config.py`  
+✅ Implement `settings.py`  
 ✅ Define defaults:
 
 - Session language (`ja` / `fr`)
@@ -97,18 +97,18 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 3. ASR Module
 
-⬜ Implement `models/asr_whisper.py`  
-⬜ Load `mlx-community/whisper-large-v3-turbo-asr-fp16`  
-⬜ Force language per session  
-⬜ Preserve English words in mixed-language utterances
+✅ Implement `models/asr_whisper.py`  
+✅ Load ASR model via `settings.py` (default set in `config/models.py`)  
+🔁 Force language per session  
+🔁 Preserve English words in mixed-language utterances
 
-⬜ Return:
+✅ Return:
 
 - transcript
 - ASR metadata
 
-⬜ Cache ASR results by audio hash (session-only)  
-⬜ (Planned) Log confidence proxies
+✅ Cache ASR results by audio hash (session-only)  
+🔁 (Post-MVP) Log confidence proxies
 
 ---
 
@@ -262,10 +262,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Text input
 - Microphone input
 - Send button
-- Per-turn audio playback (session cache)
+- Per-turn audio playback (session cache, user + assistant)
 - Corrections panel
-⬜ Regenerate audio action for a single turn  
-⬜ Regenerate audio action for a full conversation
+  ⬜ Regenerate audio action for a single turn  
+  ⬜ Regenerate audio action for a full conversation
 
 ⬜ Session reset support  
 ⬜ Safe interaction with DB queue
@@ -301,7 +301,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### Storage Tests
 
 ⬜ DB insert/read round-trip  
-⬜ Session audio cache save/load tests  
+⬜ Session audio cache save/load tests
 
 ---
 
@@ -329,8 +329,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ## 14. Post-MVP (Optional)
 
 🔁 Add support for other languages
-🔁 ASR confidence-based UX  
 🔁 Pronunciation scoring  
+🔁 Download option for message audio
+🔁 ASR confidence-based UX  
 🔁 Shadowing mode  
 🔁 Anki export  
 🔁 Desktop packaging

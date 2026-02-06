@@ -28,6 +28,7 @@ unidic = "^1.1.0"
 espeakng-loader = "^0.2.4"
 num2words = "^0.5.14"
 spacy = "^3.8.11"
+mlx-whisper = "^0.4.3"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
