@@ -145,6 +145,8 @@ Regeneration:
 
 Prompt hashing:
 - Record the SHA256 hash of each rendered prompt alongside LLM metadata for reproducibility.
+- LLM metadata stored with `assistant_turns` intentionally omits backend generation details
+  to keep persistence minimal; this trades off observability for simpler storage.
 
 ### 5.2 Turn lifecycle (text input)
 - Same as audio input but skip steps 1–3; `input_text` is stored and used as-is.

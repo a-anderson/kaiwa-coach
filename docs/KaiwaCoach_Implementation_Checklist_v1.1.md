@@ -221,40 +221,41 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 8. Conversation Orchestrator
 
-⬜ Implement `orchestrator.py`
+✅ Implement `orchestrator.py`
 
 ### Text Turn Flow
 
-⬜ Persist `UserTurn`  
-⬜ Generate assistant reply  
-⬜ Persist `AssistantTurn`  
-⬜ Generate corrections  
-⬜ Persist `Correction`  
-⬜ Normalise for TTS (JP)  
-⬜ Generate TTS  
-⬜ Cache audio for active session only (do not persist)
+✅ Persist `UserTurn`  
+✅ Generate assistant reply  
+✅ Persist `AssistantTurn`  
+✅ Generate corrections  
+✅ Generate native reformulation  
+✅ Persist `Correction`  
+✅ Normalise for TTS (JP)  
+✅ Generate TTS  
+✅ Cache audio for active session only (do not persist)
 
 ---
 
 ### Audio Turn Flow
 
-⬜ Cache raw audio for active session only  
-⬜ Run ASR  
-⬜ Persist transcript  
-⬜ Continue text flow
+✅ Cache raw audio for active session only  
+✅ Run ASR  
+✅ Persist transcript  
+✅ Continue text flow
 
 ---
 
 ### Orchestrator Rules
 
-⬜ Schema validation at every step  
-⬜ Persist intermediates before side-effects  
-⬜ Graceful degradation on failure  
-⬜ Store prompt hash per LLM call (orchestrator)  
-⬜ Pass session language into TTS synthesis by default  
-⬜ Call katakana LLM rewrite step in the TTS normalisation pipeline  
-⬜ Provide audio regeneration for a single turn  
-⬜ Provide audio regeneration for a full conversation
+✅ Schema validation at every step  
+✅ Persist intermediates before side-effects  
+✅ Graceful degradation on failure  
+✅ Store prompt hash per LLM call (orchestrator)  
+✅ Pass session language into TTS synthesis by default  
+✅ Call katakana LLM rewrite step in the TTS normalisation pipeline  
+✅ Provide audio regeneration for a single turn  
+✅ Provide audio regeneration for a full conversation
 
 ---
 
@@ -272,6 +273,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
   ⬜ Regenerate audio action for a single turn  
   ⬜ Regenerate audio action for a full conversation
 
+⬜ Wire orchestrator with ASR + audio cache in `app.py` / UI setup  
 ⬜ Session reset support  
 ⬜ Safe interaction with DB queue
 
