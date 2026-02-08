@@ -21,6 +21,7 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
             llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
             storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
             tts=SimpleNamespace(voice="default", speed=1.0),
+            logging=SimpleNamespace(timing_logs=True),
         )
 
     class _ASR:
@@ -85,3 +86,4 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert calls.prompts.name == "prompts"
     assert calls.orchestrator["tts_voice"] == "default"
     assert calls.orchestrator["tts_speed"] == 1.0
+    assert calls.orchestrator["timing_logs_enabled"] is True

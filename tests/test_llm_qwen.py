@@ -13,9 +13,11 @@ from kaiwacoach.models.json_enforcement import ConversationReply
 class _Backend:
     def __init__(self) -> None:
         self.last_max_tokens: int | None = None
+        self.calls = 0
 
     def generate(self, prompt: str, max_tokens: int) -> str:
         self.last_max_tokens = max_tokens
+        self.calls += 1
         return "ok"
 
 
@@ -100,6 +102,8 @@ def test_generate_returns_metadata() -> None:
     assert result.meta["max_new_tokens"] == 3
     assert result.meta["prompt_tokens"] == 2
     assert result.meta["elapsed_seconds"] >= 0
+    assert result.meta["cache_hit"] is False
+    assert "prompt_hash" in result.meta
 
 
 def test_default_backend_requires_mlx_lm() -> None:
@@ -138,6 +142,7 @@ def test_generate_without_token_counter_allows_prompt() -> None:
     result = llm.generate("prompt", role="role")
     assert result.text == "ok"
     assert result.meta["prompt_tokens"] is None
+    assert result.meta["cache_hit"] is False
 
 
 def test_negative_max_new_tokens_uses_role_cap() -> None:
@@ -152,6 +157,9 @@ def test_negative_max_new_tokens_uses_role_cap() -> None:
 
     llm.generate("prompt", role="role", max_new_tokens=-10)
     assert backend.last_max_tokens == 5
+    assert backend.calls == 1
+    llm.generate("prompt", role="role", max_new_tokens=-10)
+    assert backend.calls == 1
 
 
 def test_mlx_backend_uses_generate_and_sampler() -> None:
@@ -232,3 +240,37 @@ def test_generate_json_parses_schema() -> None:
     assert result.error is None
     assert isinstance(result.model, ConversationReply)
     assert result.model.reply == "ok"
+
+
+def test_generate_uses_cache_for_identical_prompt() -> None:
+    backend = _Backend()
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"role": 5},
+        backend=backend,
+    )
+
+    first = llm.generate("prompt", role="role")
+    second = llm.generate("prompt", role="role")
+
+    assert backend.calls == 1
+    assert first.text == second.text == "ok"
+    assert first.meta["cache_hit"] is False
+    assert second.meta["cache_hit"] is True
+
+
+def test_generate_cache_separates_roles_and_caps() -> None:
+    backend = _Backend()
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"role_a": 5, "role_b": 5},
+        backend=backend,
+    )
+
+    llm.generate("prompt", role="role_a")
+    llm.generate("prompt", role="role_b")
+    llm.generate("prompt", role="role_a", max_new_tokens=3)
+
+    assert backend.calls == 3

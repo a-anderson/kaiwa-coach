@@ -62,6 +62,8 @@ class _FakeASR(WhisperASR):
     def __init__(self, text: str, meta: dict[str, object]) -> None:
         self._text = text
         self._meta = meta
+        self._model_id = "asr-model"
+        self._language = "ja"
 
     def transcribe(self, audio_path: str | Path) -> ASRResult:
         path = Path(audio_path)
@@ -71,8 +73,23 @@ class _FakeASR(WhisperASR):
 
 
 class _FailingASR:
+    def __init__(self) -> None:
+        self._model_id = "asr-model"
+        self._language = "ja"
+
     def transcribe(self, audio_path: str | Path) -> ASRResult:
         raise RuntimeError("ASR failed")
+
+
+class _CountingASR:
+    def __init__(self) -> None:
+        self.calls = 0
+        self._model_id = "asr-model"
+        self._language = "ja"
+
+    def transcribe(self, audio_path: str | Path) -> ASRResult:
+        self.calls += 1
+        return ASRResult(text="konnichiwa", meta={"backend": "fake"})
 
 
 def _setup_db(tmp_path: Path) -> SQLiteWriter:
@@ -812,6 +829,175 @@ def test_audio_turn_fallback_persists_failure(tmp_path: Path) -> None:
         db.close()
         cache.cleanup()
 
+
+def test_audio_turn_uses_asr_cache_for_same_audio(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    cache = SessionAudioCache(root_dir=tmp_path / "audio")
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend('{"reply": "hello"}'),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        asr = _CountingASR()
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompts,
+            language="ja",
+            asr=asr,
+            audio_cache=cache,
+        )
+
+        audio_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2)
+        pcm_bytes = b"\x00\x00" * 50
+        conversation_id = orch.create_conversation("Test")
+        first = orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+        second = orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+
+        assert asr.calls == 1
+        assert first.asr_text == "konnichiwa"
+        assert second.asr_text == "konnichiwa"
+        assert second.asr_meta["cache_hit"] is True
+        assert second.asr_meta["audio_hash"] == first.asr_meta["audio_hash"]
+    finally:
+        db.close()
+        cache.cleanup()
+
+
+def test_audio_turn_cache_cleared_on_reset(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    cache = SessionAudioCache(root_dir=tmp_path / "audio")
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend('{"reply": "hello"}'),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        asr = _CountingASR()
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompts,
+            language="ja",
+            asr=asr,
+            audio_cache=cache,
+        )
+
+        audio_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2)
+        pcm_bytes = b"\x00\x00" * 50
+        conversation_id = orch.create_conversation("Test")
+        orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+        orch.reset_session()
+        orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+
+        assert asr.calls == 2
+    finally:
+        db.close()
+        cache.cleanup()
+
+
+def test_text_turn_logs_timings(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    captured: list[dict[str, float]] = []
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={
+                "conversation": 5,
+                "error_detection": 5,
+                "correction": 5,
+                "native_reformulation": 5,
+                "explanation": 5,
+                "jp_tts_normalisation": 5,
+            },
+            backend=_Backend('{"reply": "hello"}'),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        tts = _FakeTTS()
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompts,
+            language="ja",
+            tts=tts,
+            tts_voice="default",
+            timing_logs_enabled=True,
+        )
+        orch._log_timings = lambda _label, timings: captured.append(dict(timings))  # type: ignore[attr-defined]
+
+        conversation_id = orch.create_conversation("Test")
+        orch.process_text_turn(conversation_id, "こんにちは", conversation_history="")
+
+        assert captured
+        timings = captured[0]
+        for key in (
+            "user_insert_seconds",
+            "prompt_render_seconds",
+            "llm_generate_seconds",
+            "assistant_insert_seconds",
+            "corrections_detect_seconds",
+            "corrections_correct_seconds",
+            "corrections_explain_seconds",
+            "corrections_native_seconds",
+            "corrections_insert_seconds",
+            "corrections_total_seconds",
+            "tts_normalise_seconds",
+            "tts_synthesize_seconds",
+            "tts_total_seconds",
+            "total_seconds",
+        ):
+            assert key in timings
+            assert timings[key] >= 0
+    finally:
+        db.close()
+
+
+def test_audio_turn_logs_timings_with_cache(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    cache = SessionAudioCache(root_dir=tmp_path / "audio")
+    captured: list[dict[str, float]] = []
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend('{"reply": "hello"}'),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        asr = _CountingASR()
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompts,
+            language="ja",
+            asr=asr,
+            audio_cache=cache,
+        )
+        orch._log_timings = lambda _label, timings: captured.append(dict(timings))  # type: ignore[attr-defined]
+
+        audio_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2)
+        pcm_bytes = b"\x00\x00" * 50
+        conversation_id = orch.create_conversation("Test")
+        orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+        orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
+
+        assert captured
+        first = captured[0]
+        second = captured[1]
+        assert "audio_save_seconds" in first
+        assert "asr_transcribe_seconds" in first
+        assert "asr_cache_seconds" in second
+        assert first["audio_save_seconds"] >= 0
+        assert second["asr_cache_seconds"] >= 0
+    finally:
+        db.close()
+        cache.cleanup()
 
 def test_regenerate_turn_audio_invokes_tts(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)

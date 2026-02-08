@@ -87,6 +87,14 @@ class WhisperASR:
             self._cache[audio_hash] = result
         return result
 
+    @property
+    def model_id(self) -> str:
+        return self._model_id
+
+    @property
+    def language(self) -> str:
+        return self._language
+
     @staticmethod
     def _hash_file(path: Path) -> str:
         hasher = hashlib.sha256()

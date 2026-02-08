@@ -25,3 +25,6 @@ storage:
 tts:
   voice: "default"
   speed: 1.0
+
+logging:
+  timing_logs: true

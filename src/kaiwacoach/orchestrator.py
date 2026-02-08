@@ -9,8 +9,11 @@ minimal; this trades off debugging/observability for simpler storage.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import re
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,6 +66,7 @@ class ConversationOrchestrator:
         tts_speed: float = 1.0,
         asr: WhisperASR | None = None,
         audio_cache: SessionAudioCache | None = None,
+        timing_logs_enabled: bool = True,
     ) -> None:
         self._db = db
         self._llm = llm
@@ -73,6 +77,9 @@ class ConversationOrchestrator:
         self._tts_speed = tts_speed
         self._asr = asr
         self._audio_cache = audio_cache
+        self._asr_cache: Dict[tuple[str, str, str], ASRResult] = {}
+        self._logger = logging.getLogger(__name__)
+        self._timing_logs_enabled = timing_logs_enabled
 
     def create_conversation(self, title: Optional[str] = None) -> str:
         conversation_id = str(uuid.uuid4())
@@ -96,6 +103,7 @@ class ConversationOrchestrator:
         user_text: str,
         conversation_history: str = "",
     ) -> TextTurnResult:
+        timings: Dict[str, float] = {}
         user_turn_id = str(uuid.uuid4())
 
         def _insert_user(conn) -> None:
@@ -108,14 +116,19 @@ class ConversationOrchestrator:
             )
             conn.commit()
 
+        start = time.perf_counter()
         self._db.run_write(_insert_user)
+        timings["user_insert_seconds"] = time.perf_counter() - start
 
         assistant_turn_id, reply_text, tts_result = self._process_text_flow(
             conversation_id=conversation_id,
             user_turn_id=user_turn_id,
             user_text=user_text,
             conversation_history=conversation_history,
+            timings=timings,
         )
+        self._finalize_timings(timings)
+        self._log_timings("text_turn", timings)
 
         return TextTurnResult(
             conversation_id=conversation_id,
@@ -135,7 +148,10 @@ class ConversationOrchestrator:
         if self._asr is None or self._audio_cache is None:
             raise ValueError("ASR and audio_cache must be configured for audio turns.")
 
+        timings: Dict[str, float] = {}
         user_turn_id = str(uuid.uuid4())
+        audio_hash = hashlib.sha256(pcm_bytes).hexdigest()
+        start = time.perf_counter()
         input_audio_path = self._audio_cache.save_audio(
             conversation_id=conversation_id,
             turn_id=user_turn_id,
@@ -143,10 +159,34 @@ class ConversationOrchestrator:
             pcm_bytes=pcm_bytes,
             meta=audio_meta,
         )
+        timings["audio_save_seconds"] = time.perf_counter() - start
         try:
-            asr_result = self._asr.transcribe(input_audio_path)
-            asr_meta = dict(asr_result.meta)
-            asr_meta["audio_path"] = str(input_audio_path)
+            model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
+            language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
+            cache_key = (audio_hash, str(model_id), str(language))
+            cached = self._asr_cache.get(cache_key)
+            if cached is not None:
+                timings["asr_cache_seconds"] = 0.0
+                asr_meta = dict(cached.meta)
+                asr_meta.update(
+                    {
+                        "audio_path": str(input_audio_path),
+                        "audio_hash": audio_hash,
+                        "cache_hit": True,
+                    }
+                )
+                asr_result = ASRResult(text=cached.text, meta=asr_meta)
+            else:
+                start = time.perf_counter()
+                asr_result = self._asr.transcribe(input_audio_path)
+                timings["asr_transcribe_seconds"] = time.perf_counter() - start
+                asr_meta = dict(asr_result.meta)
+                asr_meta.setdefault("audio_hash", audio_hash)
+                asr_meta.setdefault("cache_hit", False)
+                cached_meta = dict(asr_meta)
+                cached_meta.pop("audio_path", None)
+                self._asr_cache[cache_key] = ASRResult(text=asr_result.text, meta=cached_meta)
+                asr_meta["audio_path"] = str(input_audio_path)
             asr_meta_json = json.dumps(asr_meta, ensure_ascii=False)
 
             def _insert_user(conn) -> None:
@@ -159,14 +199,19 @@ class ConversationOrchestrator:
                 )
                 conn.commit()
 
+            start = time.perf_counter()
             self._db.run_write(_insert_user)
+            timings["user_insert_seconds"] = time.perf_counter() - start
 
             assistant_turn_id, reply_text, tts_result = self._process_text_flow(
                 conversation_id=conversation_id,
                 user_turn_id=user_turn_id,
                 user_text=asr_result.text,
                 conversation_history=conversation_history,
+                timings=timings,
             )
+            self._finalize_timings(timings)
+            self._log_timings("audio_turn", timings)
 
             return AudioTurnResult(
                 conversation_id=conversation_id,
@@ -214,7 +259,11 @@ class ConversationOrchestrator:
         user_turn_id: str,
         user_text: str,
         conversation_history: str,
+        timings: Dict[str, float] | None = None,
     ) -> tuple[str, str, TTSResult | None]:
+        if timings is None:
+            timings = {}
+        start = time.perf_counter()
         prompt = self._prompt_loader.render(
             "conversation.md",
             {
@@ -223,11 +272,14 @@ class ConversationOrchestrator:
                 "user_text": user_text,
             },
         )
+        timings["prompt_render_seconds"] = time.perf_counter() - start
+        start = time.perf_counter()
         raw_text, parsed, fallback_used = self._generate_with_repair(
             prompt=prompt.text,
             role="conversation",
             repair_schema='{"reply": "<assistant reply>"}',
         )
+        timings["llm_generate_seconds"] = time.perf_counter() - start
         if parsed.model is None and raw_text:
             parsed = self._extract_last_valid_reply(raw_text) or parsed
         salvage_used = False
@@ -268,9 +320,11 @@ class ConversationOrchestrator:
             )
             conn.commit()
 
+        start = time.perf_counter()
         self._db.run_write(_insert_assistant)
+        timings["assistant_insert_seconds"] = time.perf_counter() - start
 
-        self._process_corrections(user_turn_id=user_turn_id, user_text=user_text)
+        self._process_corrections(user_turn_id=user_turn_id, user_text=user_text, timings=timings)
         self._update_assistant_meta(
             assistant_turn_id,
             {"corrections_persisted": True},
@@ -279,15 +333,26 @@ class ConversationOrchestrator:
             conversation_id=conversation_id,
             assistant_turn_id=assistant_turn_id,
             reply_text=reply_text,
+            timings=timings,
         )
         return assistant_turn_id, reply_text, tts_result
 
-    def _process_corrections(self, user_turn_id: str, user_text: str) -> None:
+    def _process_corrections(
+        self,
+        user_turn_id: str,
+        user_text: str,
+        timings: Dict[str, float] | None = None,
+    ) -> None:
+        if timings is None:
+            timings = {}
+        start_total = time.perf_counter()
         detect_prompt = self._prompt_loader.render(
             "detect_errors.md",
             {"language": self._language, "user_text": user_text},
         )
+        start = time.perf_counter()
         detect_result = self._safe_generate_json(prompt=detect_prompt.text, role="error_detection")
+        timings["corrections_detect_seconds"] = time.perf_counter() - start
         errors = []
         if detect_result.model is not None:
             errors = list(getattr(detect_result.model, "errors", []))
@@ -296,7 +361,9 @@ class ConversationOrchestrator:
             "correct_sentence.md",
             {"language": self._language, "user_text": user_text},
         )
+        start = time.perf_counter()
         correction_result = self._safe_generate_json(prompt=correction_prompt.text, role="correction")
+        timings["corrections_correct_seconds"] = time.perf_counter() - start
         corrected_text = user_text
         if correction_result.model is not None:
             corrected_text = getattr(correction_result.model, "corrected", user_text)
@@ -305,7 +372,9 @@ class ConversationOrchestrator:
             "explain.md",
             {"language": self._language, "user_text": user_text, "corrected_text": corrected_text},
         )
+        start = time.perf_counter()
         explain_result = self._safe_generate_json(prompt=explain_prompt.text, role="explanation")
+        timings["corrections_explain_seconds"] = time.perf_counter() - start
         explanation_text = ""
         if explain_result.model is not None:
             explanation_text = getattr(explain_result.model, "explanation", "")
@@ -314,7 +383,9 @@ class ConversationOrchestrator:
             "native_rewrite.md",
             {"language": self._language, "user_text": user_text},
         )
+        start = time.perf_counter()
         native_result = self._safe_generate_json(prompt=native_prompt.text, role="native_reformulation")
+        timings["corrections_native_seconds"] = time.perf_counter() - start
         native_text = None
         if native_result.model is not None:
             native_text = getattr(native_result.model, "native", None)
@@ -341,24 +412,33 @@ class ConversationOrchestrator:
             )
             conn.commit()
 
+        start = time.perf_counter()
         self._db.run_write(_insert_correction)
+        timings["corrections_insert_seconds"] = time.perf_counter() - start
+        timings["corrections_total_seconds"] = time.perf_counter() - start_total
 
     def _process_tts(
         self,
         conversation_id: str,
         assistant_turn_id: str,
         reply_text: str,
+        timings: Dict[str, float] | None = None,
     ) -> TTSResult | None:
         if self._tts is None:
             return None
 
         try:
+            start_total = time.perf_counter()
+            start = time.perf_counter()
             normalised_text = self._normalise_for_tts(reply_text)
+            if timings is not None:
+                timings["tts_normalise_seconds"] = time.perf_counter() - start
             voice = self._tts_voice
             if voice == "default":
                 voice = None
 
-            return self._tts.synthesize(
+            start = time.perf_counter()
+            result = self._tts.synthesize(
                 conversation_id=conversation_id,
                 turn_id=assistant_turn_id,
                 text=normalised_text,
@@ -366,6 +446,10 @@ class ConversationOrchestrator:
                 speed=self._tts_speed,
                 language=self._language,
             )
+            if timings is not None:
+                timings["tts_synthesize_seconds"] = time.perf_counter() - start
+                timings["tts_total_seconds"] = time.perf_counter() - start_total
+            return result
         except Exception:
             return None
 
@@ -461,6 +545,28 @@ class ConversationOrchestrator:
         """Reset session-scoped state such as audio cache."""
         if self._audio_cache is not None:
             self._audio_cache.cleanup()
+        self._asr_cache.clear()
+        self._logger.info("session_reset")
+
+    def _log_timings(self, label: str, timings: Dict[str, float]) -> None:
+        if not self._timing_logs_enabled:
+            return
+        if not timings:
+            return
+        self._finalize_timings(timings)
+        ordered = ", ".join(f"{key}={timings[key]:.4f}s" for key in sorted(timings.keys()))
+        self._logger.info("timings.%s %s", label, ordered)
+
+    @staticmethod
+    def _finalize_timings(timings: Dict[str, float]) -> None:
+        if "total_seconds" in timings:
+            return
+        total = sum(
+            value
+            for key, value in timings.items()
+            if not key.endswith("_total_seconds") and key != "total_seconds"
+        )
+        timings["total_seconds"] = total
 
     def _normalise_for_tts(self, text: str) -> str:
         if self._language != "ja":

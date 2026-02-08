@@ -96,12 +96,18 @@ class TTSConfig:
 
 
 @dataclass(frozen=True)
+class LoggingConfig:
+    timing_logs: bool = True
+
+
+@dataclass(frozen=True)
 class AppConfig:
     session: SessionConfig
     models: ModelsConfig
     llm: LLMConfig
     storage: StorageConfig
     tts: TTSConfig
+    logging: LoggingConfig
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -127,6 +133,7 @@ class AppConfig:
                 "expected_sample_rate": self.storage.expected_sample_rate,
             },
             "tts": {"voice": self.tts.voice, "speed": self.tts.speed},
+            "logging": {"timing_logs": self.logging.timing_logs},
         }
 
 
@@ -227,6 +234,14 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
     def _to_float(value: str, env_key: str) -> float:
         return _coerce_float(value, f"env override {env_key}")
 
+    def _to_bool(value: str, env_key: str) -> bool:
+        lowered = str(value).strip().lower()
+        if lowered in {"1", "true", "yes", "y", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "n", "off"}:
+            return False
+        raise ValueError(f"env override {env_key} must be a boolean")
+
     mapping: dict[str, tuple[tuple[str, ...], Any]] = {
         "KAIWACOACH_SESSION_LANGUAGE": (("session", "language"), _to_lower_str),
         "KAIWACOACH_MODELS_ASR_ID": (("models", "asr_id"), _to_str),
@@ -264,6 +279,7 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
         ),
         "KAIWACOACH_TTS_VOICE": (("tts", "voice"), _to_str),
         "KAIWACOACH_TTS_SPEED": (("tts", "speed"), _to_float),
+        "KAIWACOACH_LOGGING_TIMING_LOGS": (("logging", "timing_logs"), _to_bool),
     }
 
     result = dict(config)
@@ -402,6 +418,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         },
         "storage": {"root_dir": str(repo_root / "storage"), "expected_sample_rate": 16000},
         "tts": {"voice": "default", "speed": 1.0},
+        "logging": {"timing_logs": True},
     }
     file_data = _parse_config_file(resolved_path)
     merged = _deep_merge(defaults, file_data)
@@ -447,6 +464,9 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         tts=TTSConfig(
             voice=str(merged["tts"]["voice"]),
             speed=_coerce_float(merged["tts"]["speed"], "tts.speed"),
+        ),
+        logging=LoggingConfig(
+            timing_logs=bool(merged.get("logging", {}).get("timing_logs", True)),
         ),
     )
 

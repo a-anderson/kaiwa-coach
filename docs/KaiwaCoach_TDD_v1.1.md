@@ -92,6 +92,7 @@ kaiwacoach/
   to disable validation (useful for permissive microphone input, but reduces early detection
   of mismatched sample rates).
 - `tts.voice`, `tts.speed`
+- `logging.timing_logs`: enable per-step timing logs in the orchestrator
 
 ---
 
@@ -113,6 +114,7 @@ Note: `*_audio_path` fields are optional and point to **session-only** cache fil
   - `assistant_{sha256}.wav`
   - `tts_{sha256}.wav`
 - Session cache is deleted on app exit.
+Note: ASR and LLM output caches are **in-memory only** and reset each session.
 
 ### 4.3 DB concurrency
 - Single-process app, but Gradio callbacks can overlap.

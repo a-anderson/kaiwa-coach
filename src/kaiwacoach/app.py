@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import atexit
+import logging
 from pathlib import Path
 
 from kaiwacoach.models.asr_whisper import WhisperASR
@@ -18,6 +19,10 @@ from kaiwacoach.ui.gradio_app import build_ui
 
 def main(launch_ui: bool = True) -> None:
     """Load and validate configuration, then start the application."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     config = load_config()
     storage_root = Path(config.storage.root_dir)
     storage_root.mkdir(parents=True, exist_ok=True)
@@ -54,6 +59,7 @@ def main(launch_ui: bool = True) -> None:
         tts_speed=config.tts.speed,
         asr=asr,
         audio_cache=audio_cache,
+        timing_logs_enabled=config.logging.timing_logs,
     )
     atexit.register(audio_cache.cleanup)
     if launch_ui:

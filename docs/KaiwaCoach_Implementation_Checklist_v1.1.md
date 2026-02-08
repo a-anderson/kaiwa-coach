@@ -281,11 +281,11 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 10. Caching and Performance
 
-⬜ ASR cache (session-only)  
-⬜ LLM output cache  
-⬜ TTS cache (session-only)
+✅ ASR cache (session-only)  
+✅ LLM output cache  
+✅ TTS cache (session-only)
 
-⬜ Per-step timing logs
+✅ Per-step timing logs
 
 ---
 
@@ -294,6 +294,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Improve turn-to-turn response quality (reduce repetition)  
 ⬜ Reduce assistant response latency after user submission  
 ⬜ Reduce end-to-end load time between input and reply (model warmup, caching, prompt prep)
+🔁 Reduce total turn time (including correction + TTS overhead)
 🔁 Enforce prompt strictness at decode level (stop sequences / tighter schema enforcement)
 
 ---
@@ -302,8 +303,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### Schema Tests
 
-⬜ Validate all LLM schemas  
-⬜ Test repair prompt
+⏳ Validate all LLM schemas  
+⏳ Test repair prompt
 
 ### Model Integration (Slow)
 
@@ -322,8 +323,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### Storage Tests
 
-⬜ DB insert/read round-trip  
-⬜ Session audio cache save/load tests
+✅ DB insert/read round-trip  
+✅ Session audio cache save/load tests
 
 ---
 
@@ -357,3 +358,4 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 🔁 Shadowing mode  
 🔁 Anki export  
 🔁 Desktop packaging
+🔁 Toggle to disable corrections (speed-focused mode)

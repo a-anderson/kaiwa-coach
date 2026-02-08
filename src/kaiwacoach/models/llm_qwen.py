@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, Protocol
+import hashlib
+from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple
 
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 
@@ -89,6 +90,7 @@ class QwenLLM:
         self._token_counter = token_counter
         self._backend = backend or MlxLmBackend(self._model_id)
         self._generator = self._default_generator
+        self._cache: Dict[Tuple[str, str, int], LLMResult] = {}
 
     def generate(self, prompt: str, role: str, max_new_tokens: Optional[int] = None) -> LLMResult:
         """Generate a response for a given role with enforced token limits.
@@ -125,6 +127,14 @@ class QwenLLM:
         else:
             effective_max_new_tokens = min(max_new_tokens, role_cap)
 
+        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        cache_key = (prompt_hash, role, effective_max_new_tokens)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            cached_meta = dict(cached.meta)
+            cached_meta["cache_hit"] = True
+            return LLMResult(text=cached.text, meta=cached_meta)
+
         start = time.perf_counter()
         text, meta = self._generator(prompt=prompt, max_new_tokens=effective_max_new_tokens)
         elapsed = time.perf_counter() - start
@@ -137,10 +147,13 @@ class QwenLLM:
                 "max_new_tokens": effective_max_new_tokens,
                 "prompt_tokens": prompt_tokens,
                 "elapsed_seconds": elapsed,
+                "prompt_hash": prompt_hash,
+                "cache_hit": False,
             }
         )
-
-        return LLMResult(text=text, meta=meta)
+        result = LLMResult(text=text, meta=meta)
+        self._cache[cache_key] = result
+        return result
 
     def generate_json(
         self,
