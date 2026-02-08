@@ -126,7 +126,6 @@ def test_handle_text_turn_sets_assistant_audio_only(tmp_path: Path) -> None:
         error_update,
         user_audio,
         assistant_audio,
-        errors,
         corrected,
         native,
         explanation,
@@ -137,10 +136,44 @@ def test_handle_text_turn_sets_assistant_audio_only(tmp_path: Path) -> None:
     assert assistant_audio == "/tmp/tts.wav"
     assert error_update == {"visible": False}
     assert history[-1]["role"] == "assistant"
-    assert errors == ["err"]
     assert corrected == "fixed"
     assert native == "native"
     assert explanation == "explain"
+
+
+def test_start_text_turn_sets_placeholder_and_states() -> None:
+    class _Orchestrator:
+        def create_conversation(self):
+            return "conv"
+
+        def persist_user_text_turn(
+            self, conversation_id: str, user_text: str, timings: dict | None = None
+        ):
+            return "turn-1"
+
+    orch = _Orchestrator()
+    (
+        history,
+        conversation_id,
+        _cleared_input,
+        user_turn_id,
+        display_history,
+        conversation_history,
+        user_text,
+        error_update,
+        skip_pipeline,
+        timings,
+    ) = ui_module._start_text_turn(orch, "hello", [], None)
+
+    assert conversation_id == "conv"
+    assert user_turn_id == "turn-1"
+    assert user_text == "hello"
+    assert history[-1]["content"] == "hello"
+    assert display_history[-1]["content"] == "hello"
+    assert "User: " not in conversation_history
+    assert error_update == {"visible": False}
+    assert skip_pipeline is False
+    assert isinstance(timings, dict)
 
 
 def test_handle_audio_turn_sets_both_audio_paths(tmp_path: Path) -> None:
@@ -172,7 +205,6 @@ def test_handle_audio_turn_sets_both_audio_paths(tmp_path: Path) -> None:
         error_update,
         user_audio,
         assistant_audio,
-        errors,
         corrected,
         native,
         explanation,
@@ -183,10 +215,96 @@ def test_handle_audio_turn_sets_both_audio_paths(tmp_path: Path) -> None:
     assert assistant_audio == "/tmp/tts.wav"
     assert error_update == {"visible": False}
     assert history[-1]["role"] == "assistant"
-    assert errors == ["err"]
     assert corrected == "fixed"
     assert native == "native"
     assert explanation == "explain"
+
+
+def test_start_audio_turn_returns_asr_text(tmp_path: Path) -> None:
+    class _Orchestrator:
+        def create_conversation(self):
+            return "conv"
+
+        def prepare_audio_turn(
+            self,
+            conversation_id: str,
+            pcm_bytes: bytes,
+            audio_meta: AudioMeta,
+            timings: dict | None = None,
+        ):
+            return SimpleNamespace(
+                user_turn_id="turn-1",
+                input_audio_path="/tmp/user.wav",
+                asr_text="konnichiwa",
+            )
+
+    orch = _Orchestrator()
+    audio = (16000, [0.0, 0.5, -0.5])
+    (
+        history,
+        conversation_id,
+        _cleared_input,
+        user_turn_id,
+        _display_history,
+        _conversation_history,
+        user_text,
+        error_update,
+        user_audio_path,
+        skip_pipeline,
+        timings,
+    ) = ui_module._start_audio_turn(orch, audio, [], None)
+
+    assert conversation_id == "conv"
+    assert user_turn_id == "turn-1"
+    assert user_text == "konnichiwa"
+    assert user_audio_path == "/tmp/user.wav"
+    assert history[-1]["content"] == "konnichiwa"
+    assert error_update == {"visible": False}
+    assert skip_pipeline is False
+    assert isinstance(timings, dict)
+
+
+def test_run_llm_reply_updates_history() -> None:
+    class _Orchestrator:
+        def generate_reply(
+            self,
+            conversation_id: str,
+            user_turn_id: str,
+            user_text: str,
+            conversation_history: str,
+            timings: dict | None = None,
+        ):
+            return "assistant-1", "hello"
+
+    orch = _Orchestrator()
+    chat_history = [{"role": "assistant", "content": "(Thinking...)"}]
+    updated, assistant_turn_id, reply_text, error_update = ui_module._run_llm_reply(
+        orch, "conv", "turn-1", "hello", "", chat_history, False
+    )
+
+    assert updated[-1]["content"] == "hello"
+    assert assistant_turn_id == "assistant-1"
+    assert reply_text == "hello"
+    assert error_update == {"visible": False}
+
+
+def test_run_corrections_noop_on_skip() -> None:
+    class _Orchestrator:
+        def run_corrections(self, user_turn_id: str, user_text: str, assistant_turn_id: str | None = None):
+            return {"errors": ["x"], "corrected": "c", "native": "n", "explanation": "e"}
+
+    orch = _Orchestrator()
+    result = ui_module._run_corrections(orch, None, "hello", None, True)
+    assert result == ("", "", "")
+
+
+def test_run_tts_noop_on_skip() -> None:
+    class _Orchestrator:
+        def run_tts(self, conversation_id: str, assistant_turn_id: str, reply_text: str):
+            return SimpleNamespace(audio_path="/tmp/tts.wav")
+
+    orch = _Orchestrator()
+    assert ui_module._run_tts(orch, None, None, "ok", True) is None
 
 
 def test_handle_reset_clears_state() -> None:

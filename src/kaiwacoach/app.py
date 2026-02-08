@@ -22,6 +22,7 @@ def main(launch_ui: bool = True) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        force=True,
     )
     config = load_config()
     storage_root = Path(config.storage.root_dir)

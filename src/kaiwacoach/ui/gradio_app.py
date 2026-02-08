@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import AudioMeta
 
@@ -82,6 +81,216 @@ def _normalize_history(chat_history: list[dict[str, str]] | list[tuple[str, str]
     return normalized
 
 
+def _replace_last_assistant(
+    history: list[dict[str, str]],
+    reply_text: str,
+) -> list[dict[str, str]]:
+    if not history:
+        return history
+    updated = list(history)
+    if updated[-1].get("role") == "assistant":
+        updated[-1] = {"role": "assistant", "content": reply_text}
+    else:
+        updated.append({"role": "assistant", "content": reply_text})
+    return updated
+
+
+def _start_text_turn(
+    orchestrator: ConversationOrchestrator,
+    user_text: str,
+    chat_history: list[dict[str, str]] | list[tuple[str, str]],
+    conversation_id: str | None,
+    timings: dict | None = None,
+):
+    if not user_text:
+        return (
+            chat_history,
+            conversation_id,
+            "",
+            None,
+            chat_history,
+            "",
+            "",
+            "",
+            {"visible": False},
+            False,
+            {},
+        )
+    if conversation_id is None:
+        conversation_id = orchestrator.create_conversation()
+    timings = dict(timings or {})
+    user_turn_id = orchestrator.persist_user_text_turn(
+        conversation_id,
+        user_text,
+        timings=timings,
+    )
+
+    normalized_history = _normalize_history(chat_history)
+    display_history = list(normalized_history)
+    display_history.append({"role": "user", "content": user_text})
+    conversation_history = _format_conversation_history(normalized_history)
+    return (
+        display_history,
+        conversation_id,
+        "",
+        user_turn_id,
+        display_history,
+        conversation_history,
+        user_text,
+        {"visible": False},
+        False,
+        timings,
+    )
+
+
+def _start_audio_turn(
+    orchestrator: ConversationOrchestrator,
+    audio,
+    chat_history: list[dict[str, str]] | list[tuple[str, str]],
+    conversation_id: str | None,
+    timings: dict | None = None,
+):
+    if conversation_id is None:
+        conversation_id = orchestrator.create_conversation()
+    try:
+        pcm_bytes, meta = _audio_to_pcm(audio)
+        timings = dict(timings or {})
+        result = orchestrator.prepare_audio_turn(
+            conversation_id=conversation_id,
+            pcm_bytes=pcm_bytes,
+            audio_meta=meta,
+            timings=timings,
+        )
+    except Exception as exc:
+        return (
+            chat_history,
+            conversation_id,
+            "",
+            None,
+            chat_history,
+            "",
+            "",
+            {"value": str(exc), "visible": True},
+            None,
+            True,
+            timings or {},
+        )
+
+    normalized_history = _normalize_history(chat_history)
+    display_history = list(normalized_history)
+    display_history.append({"role": "user", "content": result.asr_text})
+    conversation_history = _format_conversation_history(normalized_history)
+    return (
+        display_history,
+        conversation_id,
+        "",
+        result.user_turn_id,
+        display_history,
+        conversation_history,
+        result.asr_text,
+        {"visible": False},
+        result.input_audio_path,
+        False,
+        timings,
+    )
+
+
+def _run_llm_reply(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+    user_turn_id: str | None,
+    user_text: str,
+    conversation_history: str,
+    chat_history: list[dict[str, str]],
+    skip_pipeline: bool,
+    timings: dict | None = None,
+):
+    if skip_pipeline:
+        return (
+            chat_history,
+            None,
+            "",
+            {"visible": False},
+        )
+    if conversation_id is None or user_turn_id is None:
+        return (
+            chat_history,
+            None,
+            "",
+            {"visible": False},
+        )
+    if timings is None:
+        timings = {}
+    assistant_turn_id, reply_text = orchestrator.generate_reply(
+        conversation_id=conversation_id,
+        user_turn_id=user_turn_id,
+        user_text=user_text,
+        conversation_history=conversation_history,
+        timings=timings,
+    )
+    if not reply_text:
+        reply_text = "(No reply - invalid LLM response)"
+        error_update = {
+            "value": "LLM response was invalid JSON. See logs for details.",
+            "visible": True,
+        }
+    else:
+        error_update = {"visible": False}
+    updated_history = _replace_last_assistant(chat_history, reply_text)
+    return (
+        updated_history,
+        assistant_turn_id,
+        reply_text,
+        error_update,
+    )
+
+
+def _run_corrections(
+    orchestrator: ConversationOrchestrator,
+    user_turn_id: str | None,
+    user_text: str,
+    assistant_turn_id: str | None,
+    skip_pipeline: bool,
+    timings: dict | None = None,
+):
+    if skip_pipeline or user_turn_id is None:
+        return ("", "", "")
+    if timings is None:
+        timings = {}
+    corrections = orchestrator.run_corrections(
+        user_turn_id,
+        user_text,
+        assistant_turn_id=assistant_turn_id,
+        timings=timings,
+    )
+    return (
+        corrections["corrected"],
+        corrections["native"],
+        corrections["explanation"],
+    )
+
+
+def _run_tts(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+    assistant_turn_id: str | None,
+    reply_text: str,
+    skip_pipeline: bool,
+    timings: dict | None = None,
+):
+    if skip_pipeline or conversation_id is None or assistant_turn_id is None:
+        return None
+    if timings is None:
+        timings = {}
+    tts_result = orchestrator.run_tts(
+        conversation_id,
+        assistant_turn_id,
+        reply_text,
+        timings=timings,
+    )
+    return tts_result.audio_path if tts_result is not None else None
+
+
 def _handle_text_turn(
     orchestrator: ConversationOrchestrator,
     user_text: str,
@@ -133,7 +342,6 @@ def _handle_text_turn(
         error_update,
         None,
         result.tts_audio_path,
-        corrections["errors"],
         corrections["corrected"],
         corrections["native"],
         corrections["explanation"],
@@ -194,7 +402,6 @@ def _handle_audio_turn(
         error_update,
         result.input_audio_path,
         result.tts_audio_path,
-        corrections["errors"],
         corrections["corrected"],
         corrections["native"],
         corrections["explanation"],
@@ -210,10 +417,17 @@ def _handle_reset(orchestrator: ConversationOrchestrator):
         "",
         None,
         None,
+        "",
+        "",
+        "",
+        None,
         [],
         "",
         "",
         "",
+        None,
+        False,
+        {},
     )
 
 
@@ -248,13 +462,6 @@ def build_ui(orchestrator: ConversationOrchestrator):
             with gr.Column(scale=1, min_width=280):
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
-                errors_output = gr.Dataframe(
-                    headers=["Errors"],
-                    datatype=["str"],
-                    row_count=0,
-                    column_count=1,
-                    label="Errors",
-                )
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")
@@ -262,90 +469,287 @@ def build_ui(orchestrator: ConversationOrchestrator):
 
         conversation_id_state = gr.State(None)
         history_state = gr.State([])
+        user_turn_id_state = gr.State(None)
+        assistant_turn_id_state = gr.State(None)
+        conversation_history_state = gr.State("")
+        user_text_state = gr.State("")
+        reply_text_state = gr.State("")
+        skip_pipeline_state = gr.State(False)
+        timings_state = gr.State({})
 
         def _on_send(
             user_text: str,
             chat_history: list[dict[str, str]] | list[tuple[str, str]],
             conversation_id: str | None,
+            timings: dict,
         ):
-            result = _handle_text_turn(orchestrator, user_text, chat_history, conversation_id)
-            error_update = result[3]
+            result = _start_text_turn(orchestrator, user_text, chat_history, conversation_id, timings)
+            error_update = result[7]
             if isinstance(error_update, dict):
                 error_update = gr.update(**error_update)
-            return result[:3] + (error_update,) + result[4:]
+            return result[:7] + (error_update,) + result[8:]
 
         def _on_audio(
             audio,
             chat_history: list[dict[str, str]] | list[tuple[str, str]],
             conversation_id: str | None,
+            timings: dict,
         ):
-            result = _handle_audio_turn(orchestrator, audio, chat_history, conversation_id)
+            result = _start_audio_turn(orchestrator, audio, chat_history, conversation_id, timings)
+            error_update = result[7]
+            if isinstance(error_update, dict):
+                error_update = gr.update(**error_update)
+            return result[:7] + (error_update,) + result[8:]
+
+        def _llm_reply_wrapper(
+            conversation_id: str | None,
+            user_turn_id: str | None,
+            user_text: str,
+            conversation_history: str,
+            chat_history: list[dict[str, str]],
+            skip_pipeline: bool,
+            timings: dict,
+        ):
+            timings = dict(timings or {})
+            result = _run_llm_reply(
+                orchestrator,
+                conversation_id,
+                user_turn_id,
+                user_text,
+                conversation_history,
+                chat_history,
+                skip_pipeline,
+                timings=timings,
+            )
             error_update = result[3]
             if isinstance(error_update, dict):
                 error_update = gr.update(**error_update)
-            return result[:3] + (error_update,) + result[4:]
+            return result[:3] + (error_update,) + (timings,)
+
+        def _corrections_wrapper(
+            user_turn_id: str | None,
+            user_text: str,
+            assistant_turn_id: str | None,
+            skip_pipeline: bool,
+            timings: dict,
+        ):
+            timings = dict(timings or {})
+            result = _run_corrections(
+                orchestrator,
+                user_turn_id,
+                user_text,
+                assistant_turn_id,
+                skip_pipeline,
+                timings=timings,
+            )
+            return result + (timings,)
+
+        def _tts_wrapper(
+            conversation_id: str | None,
+            assistant_turn_id: str | None,
+            reply_text: str,
+            skip_pipeline: bool,
+            timings: dict,
+        ):
+            timings = dict(timings or {})
+            result = _run_tts(
+                orchestrator,
+                conversation_id,
+                assistant_turn_id,
+                reply_text,
+                skip_pipeline,
+                timings=timings,
+            )
+            return result, timings
 
         send_btn.click(
             _on_send,
-            inputs=[user_input, history_state, conversation_id_state],
+            inputs=[user_input, history_state, conversation_id_state, timings_state],
             outputs=[
                 chat,
                 conversation_id_state,
                 user_input,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
                 error_output,
-                user_audio_output,
-                assistant_audio_output,
-                errors_output,
-                corrected_output,
-                native_output,
-                explanation_output,
+                skip_pipeline_state,
+                timings_state,
             ],
         ).then(
-            lambda h: h,
-            inputs=chat,
-            outputs=history_state,
+            _llm_reply_wrapper,
+            inputs=[
+                conversation_id_state,
+                user_turn_id_state,
+                user_text_state,
+                conversation_history_state,
+                history_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[
+                chat,
+                assistant_turn_id_state,
+                reply_text_state,
+                error_output,
+                timings_state,
+            ],
+        ).then(
+            _tts_wrapper,
+            inputs=[
+                conversation_id_state,
+                assistant_turn_id_state,
+                reply_text_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[assistant_audio_output, timings_state],
+        ).then(
+            _corrections_wrapper,
+            inputs=[
+                user_turn_id_state,
+                user_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[corrected_output, native_output, explanation_output, timings_state],
+        ).then(
+            lambda h, t: (h, t),
+            inputs=[chat, timings_state],
+            outputs=[history_state, timings_state],
+        ).then(
+            lambda t: orchestrator.finalize_and_log_timings("text_turn", t),
+            inputs=[timings_state],
+            outputs=[],
         )
 
         user_input.submit(
             _on_send,
-            inputs=[user_input, history_state, conversation_id_state],
+            inputs=[user_input, history_state, conversation_id_state, timings_state],
             outputs=[
                 chat,
                 conversation_id_state,
                 user_input,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
                 error_output,
-                user_audio_output,
-                assistant_audio_output,
-                errors_output,
-                corrected_output,
-                native_output,
-                explanation_output,
+                skip_pipeline_state,
+                timings_state,
             ],
         ).then(
-            lambda h: h,
-            inputs=chat,
-            outputs=history_state,
+            _llm_reply_wrapper,
+            inputs=[
+                conversation_id_state,
+                user_turn_id_state,
+                user_text_state,
+                conversation_history_state,
+                history_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[
+                chat,
+                assistant_turn_id_state,
+                reply_text_state,
+                error_output,
+                timings_state,
+            ],
+        ).then(
+            _tts_wrapper,
+            inputs=[
+                conversation_id_state,
+                assistant_turn_id_state,
+                reply_text_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[assistant_audio_output, timings_state],
+        ).then(
+            _corrections_wrapper,
+            inputs=[
+                user_turn_id_state,
+                user_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[corrected_output, native_output, explanation_output, timings_state],
+        ).then(
+            lambda h, t: (h, t),
+            inputs=[chat, timings_state],
+            outputs=[history_state, timings_state],
+        ).then(
+            lambda t: orchestrator.finalize_and_log_timings("text_turn", t),
+            inputs=[timings_state],
+            outputs=[],
         )
 
         audio_btn.click(
             _on_audio,
-            inputs=[audio_input, history_state, conversation_id_state],
+            inputs=[audio_input, history_state, conversation_id_state, timings_state],
             outputs=[
                 chat,
                 conversation_id_state,
                 user_input,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
                 error_output,
                 user_audio_output,
-                assistant_audio_output,
-                errors_output,
-                corrected_output,
-                native_output,
-                explanation_output,
+                skip_pipeline_state,
+                timings_state,
             ],
         ).then(
-            lambda h: h,
-            inputs=chat,
-            outputs=history_state,
+            _llm_reply_wrapper,
+            inputs=[
+                conversation_id_state,
+                user_turn_id_state,
+                user_text_state,
+                conversation_history_state,
+                history_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[
+                chat,
+                assistant_turn_id_state,
+                reply_text_state,
+                error_output,
+                timings_state,
+            ],
+        ).then(
+            _tts_wrapper,
+            inputs=[
+                conversation_id_state,
+                assistant_turn_id_state,
+                reply_text_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[assistant_audio_output, timings_state],
+        ).then(
+            _corrections_wrapper,
+            inputs=[
+                user_turn_id_state,
+                user_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+            outputs=[corrected_output, native_output, explanation_output, timings_state],
+        ).then(
+            lambda h, t: (h, t),
+            inputs=[chat, timings_state],
+            outputs=[history_state, timings_state],
+        ).then(
+            lambda t: orchestrator.finalize_and_log_timings("audio_turn", t),
+            inputs=[timings_state],
+            outputs=[],
         )
 
         reset_btn.click(
@@ -358,10 +762,17 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 error_output,
                 user_audio_output,
                 assistant_audio_output,
-                errors_output,
                 corrected_output,
                 native_output,
                 explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
             ],
         ).then(
             lambda h: h,
