@@ -10,10 +10,12 @@ Notes
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import AudioMeta
 
+_logger = logging.getLogger(__name__)
 
 def _format_conversation_history(chat_history: list[dict[str, str]] | list[tuple[str, str]]) -> str:
     lines: list[str] = []
@@ -162,6 +164,7 @@ def _start_audio_turn(
             timings=timings,
         )
     except Exception as exc:
+        _logger.warning("audio_turn.start_failed: %s", exc)
         return (
             chat_history,
             conversation_id,
@@ -170,7 +173,7 @@ def _start_audio_turn(
             chat_history,
             "",
             "",
-            {"value": str(exc), "visible": True},
+            {"visible": False},
             None,
             True,
             timings or {},
@@ -230,10 +233,8 @@ def _run_llm_reply(
     )
     if not reply_text:
         reply_text = "(No reply - invalid LLM response)"
-        error_update = {
-            "value": "LLM response was invalid JSON. See logs for details.",
-            "visible": True,
-        }
+        _logger.warning("llm_reply.invalid_json")
+        error_update = {"visible": False}
     else:
         error_update = {"visible": False}
     updated_history = _replace_last_assistant(chat_history, reply_text)
