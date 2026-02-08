@@ -86,6 +86,7 @@ class LLMConfig:
 @dataclass(frozen=True)
 class StorageConfig:
     root_dir: str
+    expected_sample_rate: int | None = 16000
 
 
 @dataclass(frozen=True)
@@ -121,7 +122,10 @@ class AppConfig:
                     "jp_tts_normalisation": self.llm.role_max_new_tokens.jp_tts_normalisation,
                 },
             },
-            "storage": {"root_dir": self.storage.root_dir},
+            "storage": {
+                "root_dir": self.storage.root_dir,
+                "expected_sample_rate": self.storage.expected_sample_rate,
+            },
             "tts": {"voice": self.tts.voice, "speed": self.tts.speed},
         }
 
@@ -217,6 +221,9 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
     def _to_int(value: str, env_key: str) -> int:
         return _coerce_int(value, f"env override {env_key}")
 
+    def _to_optional_int(value: str, env_key: str) -> int | None:
+        return _coerce_optional_int(value, f"env override {env_key}")
+
     def _to_float(value: str, env_key: str) -> float:
         return _coerce_float(value, f"env override {env_key}")
 
@@ -251,6 +258,10 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
             _to_int,
         ),
         "KAIWACOACH_STORAGE_ROOT_DIR": (("storage", "root_dir"), _to_str),
+        "KAIWACOACH_STORAGE_EXPECTED_SAMPLE_RATE": (
+            ("storage", "expected_sample_rate"),
+            _to_optional_int,
+        ),
         "KAIWACOACH_TTS_VOICE": (("tts", "voice"), _to_str),
         "KAIWACOACH_TTS_SPEED": (("tts", "speed"), _to_float),
     }
@@ -320,6 +331,33 @@ def _coerce_float(value: Any, field: str) -> float:
         raise ValueError(f"{field} must be a float") from exc
 
 
+def _coerce_optional_int(value: Any, field: str) -> int | None:
+    """Convert a value to int or None with a field-specific error message.
+
+    Parameters
+    ----------
+    value : Any
+        Input value to convert.
+    field : str
+        Field name for error reporting.
+
+    Returns
+    -------
+    int | None
+        Converted integer value, or None if the input is None or empty.
+
+    Raises
+    ------
+    ValueError
+        If the value cannot be converted.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    return _coerce_int(value, field)
+
+
 def load_config(config_path: str | Path | None = None) -> AppConfig:
     """Load configuration from defaults, optional file, and environment overrides.
 
@@ -362,7 +400,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
                 "jp_tts_normalisation": 192,
             },
         },
-        "storage": {"root_dir": str(repo_root / "storage")},
+        "storage": {"root_dir": str(repo_root / "storage"), "expected_sample_rate": 16000},
         "tts": {"voice": "default", "speed": 1.0},
     }
     file_data = _parse_config_file(resolved_path)
@@ -399,7 +437,13 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
                 ),
             ),
         ),
-        storage=StorageConfig(root_dir=str(merged["storage"]["root_dir"])),
+        storage=StorageConfig(
+            root_dir=str(merged["storage"]["root_dir"]),
+            expected_sample_rate=_coerce_optional_int(
+                merged["storage"].get("expected_sample_rate"),
+                "storage.expected_sample_rate",
+            ),
+        ),
         tts=TTSConfig(
             voice=str(merged["tts"]["voice"]),
             speed=_coerce_float(merged["tts"]["speed"], "tts.speed"),
@@ -439,3 +483,5 @@ def _validate_config(config: AppConfig) -> None:
         raise ValueError("tts.speed must be > 0")
     if not config.storage.root_dir:
         raise ValueError("storage.root_dir must be set")
+    if config.storage.expected_sample_rate is not None and config.storage.expected_sample_rate <= 0:
+        raise ValueError("storage.expected_sample_rate must be > 0 or null")

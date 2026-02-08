@@ -254,15 +254,15 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Store prompt hash per LLM call (orchestrator)  
 ✅ Pass session language into TTS synthesis by default  
 ✅ Call katakana LLM rewrite step in the TTS normalisation pipeline  
-✅ Provide audio regeneration for a single turn  
-✅ Provide audio regeneration for a full conversation
+🔁 Provide audio regeneration for a single turn  
+🔁 Provide audio regeneration for a full conversation
 
 ---
 
 ## 9. Gradio UI
 
-⬜ Implement `app.py`  
-⬜ UI elements:
+✅ Implement `app.py`  
+✅ UI elements:
 
 - Chat transcript
 - Text input
@@ -270,12 +270,12 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Send button
 - Per-turn audio playback (session cache, user + assistant)
 - Corrections panel
-  ⬜ Regenerate audio action for a single turn  
-  ⬜ Regenerate audio action for a full conversation
+  🔁 Regenerate audio action for a single turn  
+  🔁 Regenerate audio action for a full conversation
 
-⬜ Wire orchestrator with ASR + audio cache in `app.py` / UI setup  
-⬜ Session reset support  
-⬜ Safe interaction with DB queue
+✅ Wire orchestrator with ASR + audio cache in `app.py` / UI setup  
+✅ Session reset support  
+✅ Safe interaction with DB queue
 
 ---
 
@@ -289,12 +289,27 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ---
 
+### LLM UX Performance (Revisit Later)
+
+⬜ Improve turn-to-turn response quality (reduce repetition)  
+⬜ Reduce assistant response latency after user submission  
+⬜ Reduce end-to-end load time between input and reply (model warmup, caching, prompt prep)
+🔁 Enforce prompt strictness at decode level (stop sequences / tighter schema enforcement)
+
+---
+
 ## 11. Testing
 
 ### Schema Tests
 
 ⬜ Validate all LLM schemas  
 ⬜ Test repair prompt
+
+### Model Integration (Slow)
+
+⬜ ASR integration test (real model, marked `@pytest.mark.slow`)  
+⬜ Core LLM integration test (real model, marked `@pytest.mark.slow`)  
+⬜ TTS integration test (real model, marked `@pytest.mark.slow`)  
 
 ---
 

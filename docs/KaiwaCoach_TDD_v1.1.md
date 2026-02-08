@@ -88,6 +88,9 @@ kaiwacoach/
 - `llm.max_context_tokens`: global cap
 - Per-role caps (see Section 5)
 - `storage.root_dir`: location for DB (audio cache stored in a session temp dir)
+- `storage.expected_sample_rate`: expected audio sample rate for cached audio. Set to `null`
+  to disable validation (useful for permissive microphone input, but reduces early detection
+  of mismatched sample rates).
 - `tts.voice`, `tts.speed`
 
 ---

@@ -225,7 +225,89 @@ def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
             ).fetchone()
 
         meta = json.loads(row[0])
+        assert meta.get("raw_output") == "not json"
         assert "error" in meta
+    finally:
+        db.close()
+
+
+def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
+    class _RepairBackend:
+        def generate(self, prompt: str, max_tokens: int) -> str:
+            if "JSON Repair" in prompt:
+                return "{\"reply\": \"fixed\"}"
+            return "not json"
+
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={
+                "conversation": 5,
+                "error_detection": 5,
+                "correction": 5,
+                "native_reformulation": 5,
+                "explanation": 5,
+            },
+            backend=_RepairBackend(),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language="ja")
+
+        conversation_id = orch.create_conversation("Test")
+        result = orch.process_text_turn(conversation_id, "こんにちは", conversation_history="")
+
+        assert result.reply_text == "fixed"
+        with db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT llm_meta_json FROM assistant_turns WHERE id = ?",
+                (result.assistant_turn_id,),
+            ).fetchone()
+
+        meta = json.loads(row[0])
+        assert meta.get("fallback_used") is True
+        assert meta.get("repaired") is True
+        assert meta.get("raw_output") == "not json"
+    finally:
+        db.close()
+
+
+def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
+    class _SalvageBackend:
+        def generate(self, prompt: str, max_tokens: int) -> str:
+            return 'thinking... "reply": "こんにちは" trailing'
+
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={
+                "conversation": 5,
+                "error_detection": 5,
+                "correction": 5,
+                "native_reformulation": 5,
+                "explanation": 5,
+            },
+            backend=_SalvageBackend(),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language="ja")
+
+        conversation_id = orch.create_conversation("Test")
+        result = orch.process_text_turn(conversation_id, "こんにちは", conversation_history="")
+
+        assert result.reply_text == "こんにちは"
+        with db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT llm_meta_json FROM assistant_turns WHERE id = ?",
+                (result.assistant_turn_id,),
+            ).fetchone()
+
+        meta = json.loads(row[0])
+        assert meta.get("salvage_used") is True
+        assert meta.get("raw_output") == 'thinking... "reply": "こんにちは" trailing'
     finally:
         db.close()
 

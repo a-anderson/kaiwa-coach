@@ -20,6 +20,7 @@ llm:
 
 storage:
   root_dir: "storage"
+  expected_sample_rate: 16000  # set null to disable validation
 
 tts:
   voice: "default"

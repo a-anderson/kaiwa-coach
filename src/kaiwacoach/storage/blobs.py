@@ -33,7 +33,7 @@ class SessionAudioCache:
     def __init__(
         self,
         root_dir: str | Path | None = None,
-        expected_sample_rate: int = 16000,
+        expected_sample_rate: int | None = 16000,
         max_cache_bytes: int | None = None,
     ) -> None:
         """Initialize the session audio cache.
@@ -42,8 +42,8 @@ class SessionAudioCache:
         ----------
         root_dir : str | pathlib.Path | None
             Root directory for the session cache. If None, a temp directory is created.
-        expected_sample_rate : int
-            Expected sample rate for all cached audio.
+        expected_sample_rate : int | None
+            Expected sample rate for all cached audio. If None, accept any rate.
         max_cache_bytes : int | None
             Optional maximum size for the session cache in bytes.
 
@@ -121,7 +121,7 @@ class SessionAudioCache:
         self._validate_token("conversation_id", conversation_id)
         self._validate_token("turn_id", turn_id)
         self._validate_token("kind", kind)
-        self._validate_sample_rate(meta.sample_rate)
+        self._validate_sample_rate(meta.sample_rate, kind)
         self._validate_pcm(pcm_bytes, meta)
         blob_hash = self._hash_bytes(pcm_bytes)
         path = self._audio_path(conversation_id, turn_id, kind, blob_hash)
@@ -144,13 +144,15 @@ class SessionAudioCache:
         """
         return self._read_wav(Path(path))
 
-    def _validate_sample_rate(self, sample_rate: int) -> None:
-        """Validate that the sample rate matches the expected value.
+    def _validate_sample_rate(self, sample_rate: int, kind: str) -> None:
+        """Validate that the sample rate matches the expected value for user audio.
 
         Parameters
         ----------
         sample_rate : int
             Sample rate to validate.
+        kind : str
+            Audio kind (e.g., user, assistant, tts).
 
         Returns
         -------
@@ -159,8 +161,12 @@ class SessionAudioCache:
         Raises
         ------
         ValueError
-            If the sample rate does not match the expected value.
+            If the sample rate does not match the expected value for user audio.
         """
+        if kind != "user":
+            return
+        if self._expected_sample_rate is None:
+            return
         if sample_rate != self._expected_sample_rate:
             raise ValueError(
                 f"Unexpected sample rate {sample_rate}. Expected {self._expected_sample_rate}."

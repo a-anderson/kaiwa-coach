@@ -47,6 +47,15 @@ def test_sample_rate_validation(tmp_path: Path) -> None:
         cache.save_audio("conv_1", "turn_1", "user", b"\x00\x01" * 100, meta)
 
 
+def test_sample_rate_validation_skipped_for_tts(tmp_path: Path) -> None:
+    """Non-user audio should not enforce the expected sample rate."""
+    cache = SessionAudioCache(root_dir=tmp_path, expected_sample_rate=16000)
+    meta = AudioMeta(sample_rate=44100, channels=1, sample_width=2)
+
+    path = cache.save_audio("conv_1", "turn_1", "tts", b"\x00\x01" * 100, meta)
+    assert path.exists()
+
+
 def test_pcm_alignment_validation(tmp_path: Path) -> None:
     """PCM byte length must align with channels * sample_width."""
     cache = SessionAudioCache(root_dir=tmp_path, expected_sample_rate=16000)

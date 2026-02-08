@@ -10,13 +10,14 @@ minimal; this trades off debugging/observability for simpler storage.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
-from kaiwacoach.models.json_enforcement import ParseResult
+from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.tts_kokoro import KokoroTTS, TTSResult
 from kaiwacoach.prompts.loader import PromptLoader
@@ -222,14 +223,31 @@ class ConversationOrchestrator:
                 "user_text": user_text,
             },
         )
-        parsed = self._safe_generate_json(prompt=prompt.text, role="conversation")
+        raw_text, parsed, fallback_used = self._generate_with_repair(
+            prompt=prompt.text,
+            role="conversation",
+            repair_schema='{"reply": "<assistant reply>"}',
+        )
+        if parsed.model is None and raw_text:
+            parsed = self._extract_last_valid_reply(raw_text) or parsed
+        salvage_used = False
+        if parsed.model is None and raw_text:
+            salvaged = self._salvage_reply_from_text(raw_text)
+            if salvaged is not None:
+                parsed = salvaged
+                salvage_used = True
         reply_text = ""
         if parsed.model is not None:
             reply_text = getattr(parsed.model, "reply", "")
         llm_meta: Dict[str, Any] = {
             "role": "conversation",
             "schema_valid": parsed.model is not None,
+            "raw_output": raw_text,
         }
+        if fallback_used:
+            llm_meta["fallback_used"] = True
+        if salvage_used:
+            llm_meta["salvage_used"] = True
         if parsed.error:
             llm_meta["error"] = parsed.error
         if parsed.repaired:
@@ -407,6 +425,43 @@ class ConversationOrchestrator:
             results.append(result)
         return results
 
+    def get_latest_corrections(self, user_turn_id: str) -> Dict[str, Any]:
+        """Fetch corrections for a user turn."""
+        def _fetch(conn) -> Dict[str, Any]:
+            row = conn.execute(
+                """
+                SELECT errors_json, corrected_text, native_text, explanation_text
+                FROM corrections
+                WHERE user_turn_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (user_turn_id,),
+            ).fetchone()
+            if row is None:
+                return {"errors": [], "corrected": "", "native": "", "explanation": ""}
+            errors_json, corrected, native, explanation = row
+            errors = []
+            if errors_json:
+                try:
+                    errors = json.loads(errors_json)
+                except Exception:
+                    errors = []
+            return {
+                "errors": errors,
+                "corrected": corrected or "",
+                "native": native or "",
+                "explanation": explanation or "",
+            }
+
+        with self._db.read_connection() as conn:
+            return _fetch(conn)
+
+    def reset_session(self) -> None:
+        """Reset session-scoped state such as audio cache."""
+        if self._audio_cache is not None:
+            self._audio_cache.cleanup()
+
     def _normalise_for_tts(self, text: str) -> str:
         if self._language != "ja":
             return text
@@ -422,11 +477,109 @@ class ConversationOrchestrator:
         candidate, _ = enforce_japanese_invariant(text, katakana_result.text)
         return normalize_for_tts(candidate)
 
-    def _safe_generate_json(self, prompt: str, role: str) -> ParseResult:
+    def _safe_generate_json(
+        self,
+        prompt: str,
+        role: str,
+        repair_schema: str | None = None,
+    ) -> ParseResult:
         try:
-            return self._llm.generate_json(prompt=prompt, role=role)
+            if repair_schema is None:
+                return self._llm.generate_json(prompt=prompt, role=role)
+
+            def _repair(raw_output: str) -> str:
+                return self._repair_json_output(role=role, schema=repair_schema, raw_output=raw_output)
+
+            return self._llm.generate_json(prompt=prompt, role=role, repair_fn=_repair)
         except Exception as exc:
             return ParseResult(model=None, raw_json=None, error=str(exc), repaired=False)
+
+    def _generate_with_repair(
+        self,
+        prompt: str,
+        role: str,
+        repair_schema: str | None = None,
+    ) -> tuple[str, ParseResult, bool]:
+        try:
+            llm_result = self._llm.generate(prompt=prompt, role=role)
+            raw_text = llm_result.text
+            if raw_text.strip() == "":
+                llm_result = self._llm.generate(prompt=prompt, role=role)
+                raw_text = llm_result.text
+                if raw_text.strip() == "":
+                    return raw_text, ParseResult(model=None, raw_json=None, error="empty_response", repaired=False), False
+            repair_fn = None
+            if repair_schema is not None:
+                repair_fn = lambda raw: self._repair_json_output(role=role, schema=repair_schema, raw_output=raw)
+            parsed = parse_with_schema(role=role, text=raw_text, repair_fn=repair_fn)
+            trimmed_used = False
+            if parsed.model is None and raw_text:
+                idx = raw_text.find("{")
+                if idx != -1:
+                    trimmed = raw_text[idx:]
+                    parsed_trimmed = parse_with_schema(role=role, text=trimmed)
+                    if parsed_trimmed.model is not None:
+                        parsed = parsed_trimmed
+                        trimmed_used = True
+            fallback_used = parsed.repaired or trimmed_used
+            return raw_text, parsed, fallback_used
+        except Exception as exc:
+            return "", ParseResult(model=None, raw_json=None, error=str(exc), repaired=False), False
+
+    def _extract_last_valid_reply(self, text: str) -> ParseResult | None:
+        decoder = json.JSONDecoder()
+        idx = 0
+        best: ParseResult | None = None
+        while idx < len(text):
+            try:
+                obj, end = decoder.raw_decode(text, idx)
+            except json.JSONDecodeError:
+                idx += 1
+                continue
+            if isinstance(obj, dict) and "reply" in obj:
+                candidate = parse_with_schema(role="conversation", text=json.dumps(obj, ensure_ascii=False))
+                if candidate.model is not None:
+                    reply = getattr(candidate.model, "reply", "")
+                    if isinstance(reply, str) and reply.strip():
+                        best = candidate
+            idx = end
+        return best
+
+    def _salvage_reply_from_text(self, text: str) -> ParseResult | None:
+        marker_idx = text.rfind('"reply"')
+        if marker_idx == -1:
+            return None
+        tail = text[marker_idx + len('"reply"') :]
+        match = re.search(r':\s*"', tail)
+        if match is None:
+            return None
+        start = marker_idx + len('"reply"') + match.end()
+        snippet = text[start:]
+        for token in ("<|endoftext|>", "\nHuman:", "\n\nHuman:", "\nSystem:", "</think>"):
+            pos = snippet.find(token)
+            if pos != -1:
+                snippet = snippet[:pos]
+        end_quote = snippet.find('"')
+        if end_quote != -1:
+            reply = snippet[:end_quote]
+        else:
+            reply = snippet.strip()
+        reply = reply.strip()
+        if not reply:
+            return None
+        manual_json = json.dumps({"reply": reply}, ensure_ascii=False)
+        parsed = parse_with_schema(role="conversation", text=manual_json)
+        if parsed.model is not None:
+            return parsed
+        return None
+
+    def _repair_json_output(self, role: str, schema: str, raw_output: str) -> str:
+        repair_prompt = self._prompt_loader.render(
+            "repair_json.md",
+            {"json_schema": schema, "raw_output": raw_output},
+        )
+        result = self._llm.generate(prompt=repair_prompt.text, role=role)
+        return result.text
 
     def _update_assistant_meta(self, assistant_turn_id: str, updates: Dict[str, Any]) -> None:
         def _update(conn) -> None:
