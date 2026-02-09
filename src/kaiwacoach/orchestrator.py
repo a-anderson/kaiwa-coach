@@ -120,11 +120,23 @@ class ConversationOrchestrator:
         self._db.run_write(_insert_user)
         timings["user_insert_seconds"] = time.perf_counter() - start
 
-        assistant_turn_id, reply_text, tts_result = self._process_text_flow(
+        assistant_turn_id, reply_text = self.generate_reply(
             conversation_id=conversation_id,
             user_turn_id=user_turn_id,
             user_text=user_text,
             conversation_history=conversation_history,
+            timings=timings,
+        )
+        corrections = self.run_corrections(
+            user_turn_id,
+            user_text,
+            assistant_turn_id=assistant_turn_id,
+            timings=timings,
+        )
+        tts_result = self.run_tts(
+            conversation_id=conversation_id,
+            assistant_turn_id=assistant_turn_id,
+            reply_text=reply_text,
             timings=timings,
         )
         self._finalize_timings(timings)
@@ -203,11 +215,23 @@ class ConversationOrchestrator:
             self._db.run_write(_insert_user)
             timings["user_insert_seconds"] = time.perf_counter() - start
 
-            assistant_turn_id, reply_text, tts_result = self._process_text_flow(
+            assistant_turn_id, reply_text = self.generate_reply(
                 conversation_id=conversation_id,
                 user_turn_id=user_turn_id,
                 user_text=asr_result.text,
                 conversation_history=conversation_history,
+                timings=timings,
+            )
+            corrections = self.run_corrections(
+                user_turn_id,
+                asr_result.text,
+                assistant_turn_id=assistant_turn_id,
+                timings=timings,
+            )
+            tts_result = self.run_tts(
+                conversation_id=conversation_id,
+                assistant_turn_id=assistant_turn_id,
+                reply_text=reply_text,
                 timings=timings,
             )
             self._finalize_timings(timings)
@@ -253,14 +277,196 @@ class ConversationOrchestrator:
                 tts_audio_path=None,
             )
 
-    def _process_text_flow(
+    def persist_user_text_turn(
+        self,
+        conversation_id: str,
+        user_text: str,
+        timings: Dict[str, float] | None = None,
+    ) -> str:
+        """Persist a text-only user turn and return its ID.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        user_text : str
+            Raw user input text.
+        timings : dict[str, float] | None
+            Optional timings accumulator.
+
+        Returns
+        -------
+        str
+            Generated user turn ID.
+        """
+        if timings is None:
+            timings = {}
+        user_turn_id = str(uuid.uuid4())
+
+        def _insert_user(conn) -> None:
+            conn.execute(
+                """
+                INSERT INTO user_turns (id, conversation_id, input_text)
+                VALUES (?, ?, ?)
+                """,
+                (user_turn_id, conversation_id, user_text),
+            )
+            conn.commit()
+
+        start = time.perf_counter()
+        self._db.run_write(_insert_user)
+        timings["user_insert_seconds"] = time.perf_counter() - start
+        return user_turn_id
+
+    def prepare_audio_turn(
+        self,
+        conversation_id: str,
+        pcm_bytes: bytes,
+        audio_meta: AudioMeta,
+        timings: Dict[str, float] | None = None,
+    ) -> AudioTurnResult:
+        """Persist audio input, run ASR, and store user turn metadata.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        pcm_bytes : bytes
+            Raw PCM audio bytes.
+        audio_meta : AudioMeta
+            Audio metadata describing the PCM bytes.
+        timings : dict[str, float] | None
+            Optional timings accumulator.
+
+        Returns
+        -------
+        AudioTurnResult
+            Partial audio turn result containing ASR output and audio path.
+        """
+        if self._asr is None or self._audio_cache is None:
+            raise ValueError("ASR and audio_cache must be configured for audio turns.")
+        if timings is None:
+            timings = {}
+        user_turn_id = str(uuid.uuid4())
+        audio_hash = hashlib.sha256(pcm_bytes).hexdigest()
+        start = time.perf_counter()
+        input_audio_path = self._audio_cache.save_audio(
+            conversation_id=conversation_id,
+            turn_id=user_turn_id,
+            kind="user",
+            pcm_bytes=pcm_bytes,
+            meta=audio_meta,
+        )
+        timings["audio_save_seconds"] = time.perf_counter() - start
+        try:
+            model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
+            language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
+            cache_key = (audio_hash, str(model_id), str(language))
+            cached = self._asr_cache.get(cache_key)
+            if cached is not None:
+                timings["asr_cache_seconds"] = 0.0
+                asr_meta = dict(cached.meta)
+                asr_meta.update(
+                    {
+                        "audio_path": str(input_audio_path),
+                        "audio_hash": audio_hash,
+                        "cache_hit": True,
+                    }
+                )
+                asr_result = ASRResult(text=cached.text, meta=asr_meta)
+            else:
+                start = time.perf_counter()
+                asr_result = self._asr.transcribe(input_audio_path)
+                timings["asr_transcribe_seconds"] = time.perf_counter() - start
+                asr_meta = dict(asr_result.meta)
+                asr_meta.setdefault("audio_hash", audio_hash)
+                asr_meta.setdefault("cache_hit", False)
+                cached_meta = dict(asr_meta)
+                cached_meta.pop("audio_path", None)
+                self._asr_cache[cache_key] = ASRResult(text=asr_result.text, meta=cached_meta)
+                asr_meta["audio_path"] = str(input_audio_path)
+            asr_meta_json = json.dumps(asr_meta, ensure_ascii=False)
+
+            def _insert_user(conn) -> None:
+                conn.execute(
+                    """
+                    INSERT INTO user_turns (id, conversation_id, input_text, asr_text, asr_meta_json)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (user_turn_id, conversation_id, None, asr_result.text, asr_meta_json),
+                )
+                conn.commit()
+
+            start = time.perf_counter()
+            self._db.run_write(_insert_user)
+            timings["user_insert_seconds"] = time.perf_counter() - start
+            return AudioTurnResult(
+                conversation_id=conversation_id,
+                user_turn_id=user_turn_id,
+                assistant_turn_id="",
+                reply_text="",
+                input_audio_path=str(input_audio_path),
+                asr_text=asr_result.text,
+                asr_meta=asr_meta,
+                tts_audio_path=None,
+            )
+        except Exception as exc:  # pragma: no cover - exercised in tests via fake ASR
+            asr_meta = {
+                "audio_path": str(input_audio_path),
+                "error": str(exc),
+            }
+            asr_meta_json = json.dumps(asr_meta, ensure_ascii=False)
+
+            def _insert_user_failed(conn) -> None:
+                conn.execute(
+                    """
+                    INSERT INTO user_turns (id, conversation_id, input_text, asr_text, asr_meta_json)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (user_turn_id, conversation_id, None, None, asr_meta_json),
+                )
+                conn.commit()
+
+            self._db.run_write(_insert_user_failed)
+            return AudioTurnResult(
+                conversation_id=conversation_id,
+                user_turn_id=user_turn_id,
+                assistant_turn_id="",
+                reply_text="",
+                input_audio_path=str(input_audio_path),
+                asr_text="",
+                asr_meta=asr_meta,
+                tts_audio_path=None,
+            )
+
+    def generate_reply(
         self,
         conversation_id: str,
         user_turn_id: str,
         user_text: str,
         conversation_history: str,
         timings: Dict[str, float] | None = None,
-    ) -> tuple[str, str, TTSResult | None]:
+    ) -> tuple[str, str]:
+        """Generate and persist the assistant reply.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        user_turn_id : str
+            User turn identifier.
+        user_text : str
+            Text to respond to.
+        conversation_history : str
+            Prior conversation history.
+        timings : dict[str, float] | None
+            Optional timings accumulator.
+
+        Returns
+        -------
+        tuple[str, str]
+            Assistant turn ID and reply text.
+        """
         if timings is None:
             timings = {}
         start = time.perf_counter()
@@ -323,26 +529,33 @@ class ConversationOrchestrator:
         start = time.perf_counter()
         self._db.run_write(_insert_assistant)
         timings["assistant_insert_seconds"] = time.perf_counter() - start
+        return assistant_turn_id, reply_text
 
-        self._process_corrections(user_turn_id=user_turn_id, user_text=user_text, timings=timings)
-        self._update_assistant_meta(
-            assistant_turn_id,
-            {"corrections_persisted": True},
-        )
-        tts_result = self._process_tts(
-            conversation_id=conversation_id,
-            assistant_turn_id=assistant_turn_id,
-            reply_text=reply_text,
-            timings=timings,
-        )
-        return assistant_turn_id, reply_text, tts_result
-
-    def _process_corrections(
+    def run_corrections(
         self,
         user_turn_id: str,
         user_text: str,
+        assistant_turn_id: str | None = None,
         timings: Dict[str, float] | None = None,
-    ) -> None:
+    ) -> Dict[str, Any]:
+        """Generate and persist correction artifacts for a user turn.
+
+        Parameters
+        ----------
+        user_turn_id : str
+            User turn identifier.
+        user_text : str
+            Raw user text.
+        assistant_turn_id : str | None
+            Assistant turn to annotate once corrections persist.
+        timings : dict[str, float] | None
+            Optional timings accumulator.
+
+        Returns
+        -------
+        dict[str, Any]
+            Correction payload (errors, corrected, native, explanation).
+        """
         if timings is None:
             timings = {}
         start_total = time.perf_counter()
@@ -416,14 +629,43 @@ class ConversationOrchestrator:
         self._db.run_write(_insert_correction)
         timings["corrections_insert_seconds"] = time.perf_counter() - start
         timings["corrections_total_seconds"] = time.perf_counter() - start_total
+        if assistant_turn_id is not None:
+            self._update_assistant_meta(
+                assistant_turn_id,
+                {"corrections_persisted": True},
+            )
+        return {
+            "errors": errors,
+            "corrected": corrected_text,
+            "native": native_text or "",
+            "explanation": explanation_text,
+        }
 
-    def _process_tts(
+    def run_tts(
         self,
         conversation_id: str,
         assistant_turn_id: str,
         reply_text: str,
         timings: Dict[str, float] | None = None,
     ) -> TTSResult | None:
+        """Generate and cache TTS audio for an assistant reply.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        assistant_turn_id : str
+            Assistant turn identifier.
+        reply_text : str
+            Reply text to synthesize.
+        timings : dict[str, float] | None
+            Optional timings accumulator.
+
+        Returns
+        -------
+        TTSResult | None
+            TTS result if synthesis succeeded, otherwise None.
+        """
         if self._tts is None:
             return None
 
@@ -469,7 +711,7 @@ class ConversationOrchestrator:
 
         with self._db.read_connection() as conn:
             conversation_id, reply_text = _fetch(conn)
-        result = self._process_tts(
+        result = self.run_tts(
             conversation_id=conversation_id,
             assistant_turn_id=assistant_turn_id,
             reply_text=reply_text,
@@ -499,7 +741,7 @@ class ConversationOrchestrator:
             turns = _fetch(conn)
         results: list[TTSResult] = []
         for turn_id, reply_text in turns:
-            result = self._process_tts(
+            result = self.run_tts(
                 conversation_id=conversation_id,
                 assistant_turn_id=turn_id,
                 reply_text=reply_text,
@@ -567,6 +809,11 @@ class ConversationOrchestrator:
             if not key.endswith("_total_seconds") and key != "total_seconds"
         )
         timings["total_seconds"] = total
+
+    def finalize_and_log_timings(self, label: str, timings: Dict[str, float]) -> None:
+        """Finalize and log timings for async UI pipelines."""
+        self._finalize_timings(timings)
+        self._log_timings(label, timings)
 
     def _normalise_for_tts(self, text: str) -> str:
         if self._language != "ja":
