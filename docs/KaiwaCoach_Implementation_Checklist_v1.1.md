@@ -146,7 +146,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ✅ Strict JSON parsing  
 ✅ One retry max via repair prompt  
-✅ Safe fallback on failure  
+✅ Safe fallback on failure
 
 ---
 
@@ -168,7 +168,6 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - markdown read
 - variable interpolation
 - SHA256 hash generation
-
 
 ---
 
@@ -310,7 +309,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ⬜ ASR integration test (real model, marked `@pytest.mark.slow`)  
 ⬜ Core LLM integration test (real model, marked `@pytest.mark.slow`)  
-⬜ TTS integration test (real model, marked `@pytest.mark.slow`)  
+⬜ TTS integration test (real model, marked `@pytest.mark.slow`)
 
 ---
 
@@ -351,7 +350,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 14. Post-MVP (Optional)
 
-🔁 Add support for other languages
+✅ Add support for other languages
 🔁 Pronunciation scoring  
 🔁 Download option for message audio
 🔁 ASR confidence-based UX  
