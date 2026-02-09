@@ -66,6 +66,7 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         Button=_Component,
         Dataframe=_Component,
         Dropdown=_Component,
+        Checkbox=_Component,
         Row=_Blocks,
         Column=_Blocks,
         State=_Component,
@@ -99,6 +100,26 @@ def test_handle_language_change_resets_state() -> None:
     assert orch.reset_called is True
     assert orch.updated == ("conv-1", "fr")
     assert result[0] == []
+
+
+def test_run_corrections_skips_when_toggle_off() -> None:
+    class _Orchestrator:
+        def run_corrections(self, *args, **kwargs):
+            raise AssertionError("run_corrections should not be called")
+
+    orch = _Orchestrator()
+    corrected, native, explanation = ui_module._run_corrections(
+        orch,
+        user_turn_id="turn-1",
+        user_text="text",
+        assistant_turn_id="assistant-1",
+        skip_pipeline=False,
+        corrections_enabled=False,
+    )
+
+    assert corrected == ""
+    assert native == ""
+    assert explanation == ""
 
 
 def test_audio_to_pcm_from_array(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -325,7 +346,7 @@ def test_run_corrections_noop_on_skip() -> None:
             return {"errors": ["x"], "corrected": "c", "native": "n", "explanation": "e"}
 
     orch = _Orchestrator()
-    result = ui_module._run_corrections(orch, None, "hello", None, True)
+    result = ui_module._run_corrections(orch, None, "hello", None, True, True)
     assert result == ("", "", "")
 
 

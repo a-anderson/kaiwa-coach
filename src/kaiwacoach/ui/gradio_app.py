@@ -261,9 +261,10 @@ def _run_corrections(
     user_text: str,
     assistant_turn_id: str | None,
     skip_pipeline: bool,
+    corrections_enabled: bool,
     timings: dict | None = None,
 ):
-    if skip_pipeline or user_turn_id is None:
+    if skip_pipeline or user_turn_id is None or not corrections_enabled:
         return ("", "", "")
     if timings is None:
         timings = {}
@@ -502,6 +503,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
             with gr.Column(scale=1, min_width=280):
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
+                corrections_toggle = gr.Checkbox(value=True, label="Corrections")
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")
@@ -594,6 +596,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
             user_text: str,
             assistant_turn_id: str | None,
             skip_pipeline: bool,
+            corrections_enabled: bool,
             timings: dict,
         ):
             timings = dict(timings or {})
@@ -603,6 +606,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_text,
                 assistant_turn_id,
                 skip_pipeline,
+                corrections_enabled,
                 timings=timings,
             )
             return result + (timings,)
@@ -675,6 +679,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_text_state,
                 assistant_turn_id_state,
                 skip_pipeline_state,
+                corrections_toggle,
                 timings_state,
             ],
             outputs=[corrected_output, native_output, explanation_output, timings_state],
@@ -738,6 +743,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_text_state,
                 assistant_turn_id_state,
                 skip_pipeline_state,
+                corrections_toggle,
                 timings_state,
             ],
             outputs=[corrected_output, native_output, explanation_output, timings_state],
@@ -802,6 +808,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_text_state,
                 assistant_turn_id_state,
                 skip_pipeline_state,
+                corrections_toggle,
                 timings_state,
             ],
             outputs=[corrected_output, native_output, explanation_output, timings_state],

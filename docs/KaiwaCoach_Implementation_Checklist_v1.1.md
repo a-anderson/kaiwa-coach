@@ -290,11 +290,18 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### LLM UX Performance (Revisit Later)
 
-⬜ Improve turn-to-turn response quality (reduce repetition)  
-⬜ Reduce assistant response latency after user submission  
-⬜ Reduce end-to-end load time between input and reply (model warmup, caching, prompt prep)
-🔁 Reduce total turn time (including correction + TTS overhead)
-🔁 Enforce prompt strictness at decode level (stop sequences / tighter schema enforcement)
+✅ Improve turn-to-turn response quality
+
+- Reduce repetition across turns
+- Enforce response language
+- Avoid generic filler
+- Ground responses in conversation history
+- Keep replies concise unless user asks for more
+
+✅ Reduce assistant response latency after user submission  
+✅ Reduce end-to-end load time between input and reply (model warmup, caching, prompt prep)
+✅ Reduce total turn time (including correction + TTS overhead)
+✅ Enforce prompt strictness at decode level (stop sequences / tighter schema enforcement)
 
 ---
 
@@ -302,8 +309,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### Schema Tests
 
-⏳ Validate all LLM schemas  
-⏳ Test repair prompt
+✅ Validate all LLM schemas  
+✅ Test repair prompt
 
 ### Model Integration (Slow)
 
@@ -357,4 +364,5 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 🔁 Shadowing mode  
 🔁 Anki export  
 🔁 Desktop packaging
-🔁 Toggle to disable corrections (speed-focused mode)
+✅ Toggle to disable corrections (speed-focused mode)
+🔁 Evaluate smaller LLM variants (e.g., 4-bit) for latency

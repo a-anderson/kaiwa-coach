@@ -587,8 +587,11 @@ class ConversationOrchestrator:
             {"language": self._language, "user_text": user_text, "corrected_text": corrected_text},
         )
         start = time.perf_counter()
-        explain_result = self._safe_generate_json(prompt=explain_prompt.text, role="explanation")
+        explain_raw, explain_result, _ = self._generate_with_repair(
+            prompt=explain_prompt.text, role="explanation"
+        )
         timings["corrections_explain_seconds"] = time.perf_counter() - start
+        _ = explain_raw
         explanation_text = ""
         if explain_result.model is not None:
             explanation_text = getattr(explain_result.model, "explanation", "")
@@ -789,6 +792,8 @@ class ConversationOrchestrator:
         if self._audio_cache is not None:
             self._audio_cache.cleanup()
         self._asr_cache.clear()
+        if hasattr(self._llm, "clear_cache"):
+            self._llm.clear_cache()
         self._logger.info("session_reset")
 
     @property

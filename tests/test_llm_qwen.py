@@ -15,7 +15,7 @@ class _Backend:
         self.last_max_tokens: int | None = None
         self.calls = 0
 
-    def generate(self, prompt: str, max_tokens: int) -> str:
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
         self.last_max_tokens = max_tokens
         self.calls += 1
         return "ok"
@@ -81,7 +81,7 @@ def test_max_new_tokens_uses_role_default() -> None:
 def test_generate_returns_metadata() -> None:
     """Metadata should include timing, role, model_id, and token info."""
     class _MetaBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             return "hello"
 
     llm = QwenLLM(
@@ -226,7 +226,7 @@ def test_mlx_backend_uses_generate_and_sampler() -> None:
 def test_generate_json_parses_schema() -> None:
     """generate_json should parse role-specific schemas."""
     class _JsonBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             return '{"reply": "ok"}'
 
     llm = QwenLLM(

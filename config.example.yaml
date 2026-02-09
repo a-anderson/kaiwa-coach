@@ -12,10 +12,10 @@ llm:
   max_context_tokens: 4096
   role_max_new_tokens:
     conversation: 256
-    error_detection: 128
-    correction: 128
-    native_reformulation: 128
-    explanation: 192
+    error_detection: 48
+    correction: 48
+    native_reformulation: 48
+    explanation: 72
     jp_tts_normalisation: 192
 
 storage:

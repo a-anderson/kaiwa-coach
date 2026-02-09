@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+import inspect
 import hashlib
 from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple
 
@@ -23,7 +24,7 @@ class LLMBackend(Protocol):
     max token count, returning a decoded string.
     """
 
-    def generate(self, prompt: str, max_tokens: int) -> str: ...
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str: ...
 
 
 class MlxLmBackend:
@@ -43,17 +44,17 @@ class MlxLmBackend:
         self._tokenizer = tokenizer
         self._generate_fn = generate
         self._sampler = make_sampler(temp=0.0)
+        self._supports_extra_eos = "extra_eos_token" in inspect.signature(self._generate_fn).parameters
 
-    def generate(self, prompt: str, max_tokens: int) -> str:
-        return str(
-            self._generate_fn(
-                self._model,
-                self._tokenizer,
-                prompt=prompt,
-                max_tokens=max_tokens,
-                sampler=self._sampler,
-            )
-        )
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        kwargs: Dict[str, Any] = {
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "sampler": self._sampler,
+        }
+        if self._supports_extra_eos and extra_eos_tokens:
+            kwargs["extra_eos_token"] = list(extra_eos_tokens)
+        return str(self._generate_fn(self._model, self._tokenizer, **kwargs))
 
 
 class QwenLLM:
@@ -136,7 +137,11 @@ class QwenLLM:
             return LLMResult(text=cached.text, meta=cached_meta)
 
         start = time.perf_counter()
-        text, meta = self._generator(prompt=prompt, max_new_tokens=effective_max_new_tokens)
+        text, meta = self._generator(
+            prompt=prompt,
+            max_new_tokens=effective_max_new_tokens,
+            role=role,
+        )
         elapsed = time.perf_counter() - start
 
         meta = dict(meta)
@@ -198,4 +203,13 @@ class QwenLLM:
         """
         prompt = _["prompt"]
         max_tokens = _["max_new_tokens"]
-        return self._backend.generate(prompt=prompt, max_tokens=max_tokens), {"backend": "mlx_lm"}
+        role = _["role"]
+        extra_eos = ["}"] if role == "conversation" else None
+        return (
+            self._backend.generate(prompt=prompt, max_tokens=max_tokens, extra_eos_tokens=extra_eos),
+            {"backend": "mlx_lm"},
+        )
+
+    def clear_cache(self) -> None:
+        """Clear the in-memory response cache."""
+        self._cache.clear()

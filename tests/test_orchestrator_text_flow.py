@@ -18,7 +18,7 @@ class _Backend:
     def __init__(self, reply_text: str) -> None:
         self._reply_text = reply_text
 
-    def generate(self, prompt: str, max_tokens: int) -> str:
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
         if "Error Detection" in prompt:
             return "{\"errors\": [\"err1\"]}"
         if "Corrected Sentence" in prompt:
@@ -172,7 +172,7 @@ def test_create_conversation_persists_language(tmp_path: Path) -> None:
 
 def test_corrections_empty_errors(tmp_path: Path) -> None:
     class _NoErrorBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Error Detection" in prompt:
                 return "{\"errors\": []}"
             if "Corrected Sentence" in prompt:
@@ -211,7 +211,7 @@ def test_corrections_empty_errors(tmp_path: Path) -> None:
 
 def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
     class _BadJsonBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             return "not json"
 
     db = _setup_db(tmp_path)
@@ -250,7 +250,7 @@ def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
 
 def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
     class _RepairBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "JSON Repair" in prompt:
                 return "{\"reply\": \"fixed\"}"
             return "not json"
@@ -292,7 +292,7 @@ def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
 
 def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
     class _SalvageBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             return 'thinking... "reply": "こんにちは" trailing'
 
     db = _setup_db(tmp_path)
@@ -331,7 +331,7 @@ def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
 
 def test_native_reformulation_invalid_falls_back_to_none(tmp_path: Path) -> None:
     class _NativeInvalidBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Error Detection" in prompt:
                 return "{\"errors\": [\"err1\"]}"
             if "Corrected Sentence" in prompt:
@@ -374,7 +374,7 @@ def test_native_reformulation_invalid_falls_back_to_none(tmp_path: Path) -> None
 
 def test_native_reformulation_empty_string_persists(tmp_path: Path) -> None:
     class _NativeEmptyBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Error Detection" in prompt:
                 return "{\"errors\": []}"
             if "Corrected Sentence" in prompt:
@@ -450,7 +450,7 @@ def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
 
 def test_normalises_and_synthesises_tts(tmp_path: Path) -> None:
     class _TtsBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"すごい！！！本当？？\"}"
             if "Error Detection" in prompt:
@@ -506,7 +506,7 @@ def test_normalises_and_synthesises_tts(tmp_path: Path) -> None:
 
 def test_skips_tts_when_not_configured(tmp_path: Path) -> None:
     class _ReplyOnlyBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             return "{\"reply\": \"ok\"}"
 
     db = _setup_db(tmp_path)
@@ -536,7 +536,7 @@ def test_skips_tts_when_not_configured(tmp_path: Path) -> None:
 
 def test_non_japanese_language_bypasses_normalisation(tmp_path: Path) -> None:
     class _FrenchBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"Bonjour...\"}"
             return "{\"reply\": \"ok\"}"
@@ -578,7 +578,7 @@ def test_non_japanese_language_bypasses_normalisation(tmp_path: Path) -> None:
 
 def test_invariant_violation_falls_back(tmp_path: Path) -> None:
     class _InvariantBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"こんにちは\"}"
             if "Japanese TTS Normalisation" in prompt:
@@ -623,7 +623,7 @@ def test_invariant_violation_falls_back(tmp_path: Path) -> None:
 
 def test_tts_uses_explicit_voice(tmp_path: Path) -> None:
     class _ReplyBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"hello\"}"
             return "{\"reply\": \"ok\"}"
@@ -666,7 +666,7 @@ def test_tts_uses_explicit_voice(tmp_path: Path) -> None:
 
 def test_llm_failure_falls_back_and_persists_error(tmp_path: Path) -> None:
     class _FailingBackend:
-        def generate(self, prompt: str, max_tokens: int) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
             raise RuntimeError("LLM failure")
 
     db = _setup_db(tmp_path)

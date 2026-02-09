@@ -70,10 +70,10 @@ class ModelsConfig:
 @dataclass(frozen=True)
 class LLMRoleCaps:
     conversation: int = 256
-    error_detection: int = 128
-    correction: int = 128
-    native_reformulation: int = 128
-    explanation: int = 192
+    error_detection: int = 48
+    correction: int = 48
+    native_reformulation: int = 48
+    explanation: int = 72
     jp_tts_normalisation: int = 192
 
 
@@ -409,10 +409,10 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
             "max_context_tokens": 4096,
             "role_max_new_tokens": {
                 "conversation": 256,
-                "error_detection": 128,
-                "correction": 128,
-                "native_reformulation": 128,
-                "explanation": 192,
+                "error_detection": 48,
+                "correction": 48,
+                "native_reformulation": 48,
+                "explanation": 72,
                 "jp_tts_normalisation": 192,
             },
         },
