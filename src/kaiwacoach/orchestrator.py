@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.llm_qwen import QwenLLM
@@ -789,6 +790,49 @@ class ConversationOrchestrator:
             self._audio_cache.cleanup()
         self._asr_cache.clear()
         self._logger.info("session_reset")
+
+    @property
+    def language(self) -> str:
+        return self._language
+
+    def set_language(self, language: str) -> None:
+        """Update the session language and keep ASR in sync.
+
+        Parameters
+        ----------
+        language : str
+            New language code for the session (e.g., "ja", "fr", "en").
+        """
+        if language == self._language:
+            return
+        self._language = language
+        if self._asr is not None:
+            setter = getattr(self._asr, "set_language", None)
+            if callable(setter):
+                setter(language)
+            elif hasattr(self._asr, "_language"):
+                setattr(self._asr, "_language", language)
+
+    def update_conversation_language(self, conversation_id: str, language: str) -> None:
+        """Persist the language for an existing conversation.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        language : str
+            Language code to store for the conversation.
+        """
+        if language not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language: {language}. Must be one of {SUPPORTED_LANGUAGES}.")
+
+        def _update(conn) -> None:
+            conn.execute(
+                "UPDATE conversations SET language = ? WHERE id = ?",
+                (language, conversation_id),
+            )
+
+        self._db.run_write(_update)
 
     def _log_timings(self, label: str, timings: Dict[str, float]) -> None:
         if not self._timing_logs_enabled:

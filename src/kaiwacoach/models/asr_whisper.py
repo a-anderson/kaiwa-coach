@@ -95,6 +95,21 @@ class WhisperASR:
     def language(self) -> str:
         return self._language
 
+    def set_language(self, language: str) -> None:
+        """Update the forced language and clear the ASR cache.
+
+        Parameters
+        ----------
+        language : str
+            New forced language code (e.g., "ja", "fr", "en").
+        """
+        if language not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language: {language}. Must be one of {SUPPORTED_LANGUAGES}.")
+        if language == self._language:
+            return
+        self._language = language
+        self._cache.clear()
+
     @staticmethod
     def _hash_file(path: Path) -> str:
         hasher = hashlib.sha256()

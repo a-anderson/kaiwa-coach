@@ -52,6 +52,9 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         def submit(self, *args, **kwargs):
             return self
 
+        def change(self, *args, **kwargs):
+            return self
+
     fake_gr = SimpleNamespace(
         Blocks=_Blocks,
         Markdown=_Component,
@@ -62,6 +65,7 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         Image=_Component,
         Button=_Component,
         Dataframe=_Component,
+        Dropdown=_Component,
         Row=_Blocks,
         Column=_Blocks,
         State=_Component,
@@ -70,6 +74,31 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
     demo = ui_module.build_ui(orchestrator=SimpleNamespace())
     assert isinstance(demo, _Blocks)
+
+
+def test_handle_language_change_resets_state() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+            self.reset_called = False
+            self.updated = None
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+        def update_conversation_language(self, conversation_id: str, language: str) -> None:
+            self.updated = (conversation_id, language)
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    orch = _Orchestrator()
+    result = ui_module._handle_language_change(orch, "fr", "conv-1")
+
+    assert orch.language == "fr"
+    assert orch.reset_called is True
+    assert orch.updated == ("conv-1", "fr")
+    assert result[0] == []
 
 
 def test_audio_to_pcm_from_array(monkeypatch: pytest.MonkeyPatch) -> None:

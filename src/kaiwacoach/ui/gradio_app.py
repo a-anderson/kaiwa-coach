@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 
+from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import AudioMeta
 
@@ -440,8 +441,29 @@ def _handle_reset(orchestrator: ConversationOrchestrator):
     )
 
 
+def _handle_language_change(
+    orchestrator: ConversationOrchestrator, language: str, conversation_id: str | None
+):
+    orchestrator.set_language(language)
+    if conversation_id is not None:
+        orchestrator.update_conversation_language(conversation_id, language)
+    return _handle_reset(orchestrator)
+
+
 def build_ui(orchestrator: ConversationOrchestrator):
     import gradio as gr  # type: ignore
+    language_choices = [
+        ("🇯🇵 Japanese", "ja"),
+        ("🇫🇷 French", "fr"),
+        ("🇺🇸 English", "en"),
+        ("🇪🇸 Spanish", "es"),
+        ("🇮🇹 Italian", "it"),
+        ("🇧🇷 Portuguese (Brazil)", "pt-br"),
+    ]
+    for _, value in language_choices:
+        if value not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language in UI choices: {value}")
+    default_language = getattr(orchestrator, "language", "ja")
 
     with gr.Blocks(
         css="""
@@ -450,13 +472,22 @@ def build_ui(orchestrator: ConversationOrchestrator):
 #text-input, #audio-input {min-height: 200px;}
 #text-input textarea {min-height: 140px;}
 #audio-input .wrap {min-height: 140px;}
-#header-row {align-items: center; justify-content: flex-start; gap: 0;}
-#header-row > div:last-child {flex: 0 0 auto;}
+#header-row {align-items: center; justify-content: space-between; gap: 0;}
 #header-row h1 {margin: 0; text-align: left;}
+#header-left {display: flex; align-items: center;}
+#header-right {display: flex; justify-content: flex-end;}
 """
     ) as demo:
         with gr.Row(elem_id="header-row"):
-            gr.Markdown("# KaiwaCoach")
+            with gr.Column(elem_id="header-left"):
+                gr.Markdown("# KaiwaCoach")
+            with gr.Column(elem_id="header-right"):
+                language_dropdown = gr.Dropdown(
+                    choices=language_choices,
+                    value=default_language,
+                    interactive=True,
+                    show_label=False,
+                )
         error_output = gr.Markdown(visible=False)
         with gr.Row():
             with gr.Column(scale=2, min_width=360):
@@ -474,7 +505,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")
-                reset_btn = gr.Button("Reset Session")
+        reset_btn = gr.Button("Reset Session")
 
         conversation_id_state = gr.State(None)
         history_state = gr.State([])
@@ -485,6 +516,29 @@ def build_ui(orchestrator: ConversationOrchestrator):
         reply_text_state = gr.State("")
         skip_pipeline_state = gr.State(False)
         timings_state = gr.State({})
+        language_dropdown.change(
+            lambda lang, cid: _handle_language_change(orchestrator, lang, cid),
+            inputs=[language_dropdown, conversation_id_state],
+            outputs=[
+                chat,
+                conversation_id_state,
+                user_input,
+                error_output,
+                user_audio_output,
+                assistant_audio_output,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+            ],
+        )
 
         def _on_send(
             user_text: str,
