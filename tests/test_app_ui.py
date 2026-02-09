@@ -73,6 +73,7 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_audio_to_pcm_from_array(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gradio supplies microphone audio as (sample_rate, numpy_array)."""
     import numpy as np
 
     audio = (16000, np.array([0.0, 0.5, -0.5], dtype=np.float32))
@@ -83,6 +84,7 @@ def test_audio_to_pcm_from_array(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_audio_to_pcm_from_wave_file(tmp_path: Path) -> None:
+    """Gradio supplies uploaded audio as a file path (str/Path)."""
     import wave
 
     path = tmp_path / "test.wav"

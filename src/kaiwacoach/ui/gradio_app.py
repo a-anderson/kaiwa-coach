@@ -36,6 +36,14 @@ def _format_conversation_history(chat_history: list[dict[str, str]] | list[tuple
 
 
 def _audio_to_pcm(audio) -> tuple[bytes, AudioMeta]:
+    """Normalize Gradio audio input into PCM bytes + metadata.
+
+    Notes
+    -----
+    Gradio may supply audio as either:
+    - a tuple of ``(sample_rate, numpy_array)`` when using microphone input
+    - a file path (str/Path) when using upload or cached audio
+    """
     if audio is None:
         raise ValueError("No audio input provided.")
     if isinstance(audio, (str, Path)):
