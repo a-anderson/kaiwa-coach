@@ -204,6 +204,8 @@ class QwenLLM:
         prompt = _["prompt"]
         max_tokens = _["max_new_tokens"]
         role = _["role"]
+        # Tradeoff: stopping on "}" reduces trailing garbage but can truncate
+        # malformed outputs before a full JSON object is complete.
         extra_eos = ["}"] if role == "conversation" else None
         return (
             self._backend.generate(prompt=prompt, max_tokens=max_tokens, extra_eos_tokens=extra_eos),

@@ -788,7 +788,7 @@ class ConversationOrchestrator:
             return _fetch(conn)
 
     def reset_session(self) -> None:
-        """Reset session-scoped state such as audio cache."""
+        """Reset session-scoped state such as audio and LLM caches."""
         if self._audio_cache is not None:
             self._audio_cache.cleanup()
         self._asr_cache.clear()

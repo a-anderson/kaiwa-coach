@@ -93,6 +93,9 @@ kaiwacoach/
   of mismatched sample rates).
 - `tts.voice`, `tts.speed`
 - `logging.timing_logs`: enable per-step timing logs in the orchestrator
+- LLM stop sequences: the conversation role uses a stop token (`}`) to reduce trailing
+  garbage in JSON outputs. Tradeoff: malformed outputs can be truncated before a full
+  JSON object is complete, so repair/trim fallback remains necessary.
 
 ---
 
