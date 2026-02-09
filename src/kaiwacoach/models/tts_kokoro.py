@@ -191,6 +191,10 @@ def _infer_lang_code_from_voice(voice: str) -> str:
         return "j"
     if voice.startswith("ff_"):
         return "f"
+    if voice.startswith("if_") or voice.startswith("im_"):
+        return "i"
+    if voice.startswith("pf_") or voice.startswith("pm_"):
+        return "p"
     if voice.startswith("bf_") or voice.startswith("bm_"):
         return "b"
     if voice.startswith("zf_") or voice.startswith("zm_"):
@@ -204,10 +208,12 @@ def _lang_code_to_language(lang_code: str) -> str:
     mapping = {
         "j": "ja",
         "f": "fr",
+        "i": "it",
         "b": "en",
         "a": "en",
         "z": "en",
-        "e": "en",
+        "e": "es",
+        "p": "pt-br",
     }
     return mapping.get(lang_code, "en")
 
@@ -217,6 +223,12 @@ def _language_to_lang_code(language: str | None) -> str:
         return "j"
     if language in {"fr", "french"}:
         return "f"
+    if language in {"it", "italian"}:
+        return "i"
+    if language in {"es", "spanish"}:
+        return "e"
+    if language in {"pt-br", "portuguese", "portuguese-br", "brazilian portuguese"}:
+        return "p"
     if language in {"en", "english"}:
         return "b"
     return "a"

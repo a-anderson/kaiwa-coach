@@ -68,6 +68,36 @@ def test_default_voice_from_language(tmp_path: Path) -> None:
     assert backend.calls[0][1] == "ff_siwis"
 
 
+@pytest.mark.parametrize(
+    ("language", "expected_voice"),
+    [
+        ("es", "ef_dora"),
+        ("it", "if_sara"),
+        ("pt-br", "pf_dora"),
+    ],
+)
+def test_default_voice_from_additional_languages(
+    tmp_path: Path, language: str, expected_voice: str
+) -> None:
+    cache = SessionAudioCache(root_dir=tmp_path)
+    backend = _Backend()
+    tts = KokoroTTS(model_id="model-x", cache=cache, backend=backend)
+
+    tts.synthesize("conv", "turn", "hello", None, 1.0, language=language)
+
+    assert backend.calls[0][1] == expected_voice
+
+
+def test_infers_lang_code_from_voice(tmp_path: Path) -> None:
+    cache = SessionAudioCache(root_dir=tmp_path)
+    backend = _Backend()
+    tts = KokoroTTS(model_id="model-x", cache=cache, backend=backend)
+
+    result = tts.synthesize("conv", "turn", "hello", "pf_dora", 1.0)
+
+    assert result.meta["lang_code"] == "p"
+
+
 def test_mlx_audio_backend_synthesizes(monkeypatch: pytest.MonkeyPatch) -> None:
     """MlxAudioBackend should load model and return PCM bytes."""
     class _FakeResult:
