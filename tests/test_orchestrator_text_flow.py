@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
-from kaiwacoach.models.llm_qwen import QwenLLM
+from kaiwacoach.models.llm_qwen import LLMResult, QwenLLM
 from kaiwacoach.models.tts_kokoro import TTSResult
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.prompts.loader import PromptLoader
@@ -98,6 +98,69 @@ def _setup_db(tmp_path: Path) -> SQLiteWriter:
     db = SQLiteWriter(db_path=db_path, schema_path=schema_path)
     db.start()
     return db
+
+
+def test_truncate_conversation_history_drops_oldest(tmp_path: Path) -> None:
+    class _FakeLLM:
+        def __init__(self, max_context_tokens: int) -> None:
+            self._max_context_tokens = max_context_tokens
+
+        def count_tokens(self, text: str) -> int:
+            return len(text)
+
+        @property
+        def max_context_tokens(self) -> int:
+            return self._max_context_tokens
+
+        def generate(self, prompt: str, role: str, max_new_tokens: int | None = None) -> LLMResult:
+            return LLMResult(text='{"reply": "ok"}', meta={})
+
+    db = _setup_db(tmp_path)
+    try:
+        prompt_loader = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        full_history = "User: A\nAssistant: B\nUser: C\nAssistant: D"
+        trimmed_history = "User: C\nAssistant: D"
+        user_text = "E"
+        prompt_trimmed = prompt_loader.render(
+            "conversation.md",
+            {"language": "ja", "conversation_history": trimmed_history, "user_text": user_text},
+        )
+        llm = _FakeLLM(max_context_tokens=len(prompt_trimmed.text))
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompt_loader,
+            language="ja",
+        )
+        result = orch._truncate_conversation_history(full_history, user_text)
+        assert result == trimmed_history
+    finally:
+        db.close()
+
+
+def test_truncate_conversation_history_no_token_counter(tmp_path: Path) -> None:
+    class _FakeLLM:
+        def __init__(self) -> None:
+            self.max_context_tokens = 10
+
+        def generate(self, prompt: str, role: str, max_new_tokens: int | None = None) -> LLMResult:
+            return LLMResult(text='{"reply": "ok"}', meta={})
+
+    db = _setup_db(tmp_path)
+    try:
+        prompt_loader = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        history = "User: A\nAssistant: B"
+        llm = _FakeLLM()
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompt_loader,
+            language="ja",
+        )
+        result = orch._truncate_conversation_history(history, "E")
+        assert result == history
+    finally:
+        db.close()
 
 
 def test_persists_turns_and_reply(tmp_path: Path) -> None:

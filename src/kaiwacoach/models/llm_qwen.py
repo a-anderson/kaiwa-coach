@@ -56,6 +56,9 @@ class MlxLmBackend:
             kwargs["extra_eos_token"] = list(extra_eos_tokens)
         return str(self._generate_fn(self._model, self._tokenizer, **kwargs))
 
+    def count_tokens(self, text: str) -> int:
+        return len(self._tokenizer.encode(text))
+
 
 class QwenLLM:
     """LLM wrapper enforcing context limits and per-role max tokens."""
@@ -159,6 +162,15 @@ class QwenLLM:
         result = LLMResult(text=text, meta=meta)
         self._cache[cache_key] = result
         return result
+
+    def count_tokens(self, text: str) -> int | None:
+        if self._token_counter is None:
+            return None
+        return self._token_counter(text)
+
+    @property
+    def max_context_tokens(self) -> int:
+        return self._max_context_tokens
 
     def generate_json(
         self,

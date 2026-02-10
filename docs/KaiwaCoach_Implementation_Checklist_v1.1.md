@@ -336,11 +336,14 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 12. Resource and Stability
 
-⬜ Enforce context truncation  
-⬜ Enforce token caps per role  
-⬜ Periodic memory logging
+✅ Enforce context truncation  
+- Add real token counting (use model tokenizer)  
+- Trim oldest conversation history first  
+- Preserve latest user turn and required fields
+✅ Enforce token caps per role  
+🔁 Periodic memory logging
 
-⬜ Manual session reset control
+✅ Manual session reset control
 
 ---
 

@@ -470,6 +470,10 @@ class ConversationOrchestrator:
         """
         if timings is None:
             timings = {}
+        conversation_history = self._truncate_conversation_history(
+            conversation_history=conversation_history,
+            user_text=user_text,
+        )
         start = time.perf_counter()
         prompt = self._prompt_loader.render(
             "conversation.md",
@@ -531,6 +535,46 @@ class ConversationOrchestrator:
         self._db.run_write(_insert_assistant)
         timings["assistant_insert_seconds"] = time.perf_counter() - start
         return assistant_turn_id, reply_text
+
+    def _truncate_conversation_history(self, conversation_history: str, user_text: str) -> str:
+        token_counter = getattr(self._llm, "count_tokens", None)
+        max_context_tokens = getattr(self._llm, "max_context_tokens", None)
+        if not callable(token_counter) or not isinstance(max_context_tokens, int):
+            return conversation_history
+
+        history = conversation_history
+        while True:
+            prompt = self._prompt_loader.render(
+                "conversation.md",
+                {
+                    "language": self._language,
+                    "conversation_history": history,
+                    "user_text": user_text,
+                },
+            )
+            tokens = token_counter(prompt.text)
+            if tokens is None or tokens <= max_context_tokens:
+                return history
+            truncated = self._drop_oldest_turn(history)
+            if not truncated:
+                return ""
+            if truncated == history:
+                return history
+            history = truncated
+
+    @staticmethod
+    def _drop_oldest_turn(history: str) -> str:
+        lines = [line for line in history.splitlines() if line.strip()]
+        if not lines:
+            return ""
+        if lines[0].startswith("User:"):
+            if len(lines) > 1 and lines[1].startswith("Assistant:"):
+                lines = lines[2:]
+            else:
+                lines = lines[1:]
+        else:
+            lines = lines[1:]
+        return "\n".join(lines)
 
     def run_corrections(
         self,
