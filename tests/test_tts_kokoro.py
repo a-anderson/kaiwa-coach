@@ -153,6 +153,8 @@ def test_mlx_audio_backend_synthesizes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(__import__("sys").modules, "numpy", _FakeNp)
 
     backend = MlxAudioBackend("model-x")
+    backend._mx = _FakeMx
+    backend._np = _FakeNp
     pcm_bytes, meta, meta_extra = backend.synthesize("text", "voice", 1.0, "j")
 
     assert isinstance(pcm_bytes, (bytes, bytearray))
