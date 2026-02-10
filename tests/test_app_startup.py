@@ -32,9 +32,19 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         def __init__(self, model_id: str) -> None:
             calls.llm = (model_id,)
 
+        def count_tokens(self, _text: str) -> int:
+            return 0
+
     class _LLM:
-        def __init__(self, model_id: str, max_context_tokens: int, role_max_new_tokens, backend) -> None:
-            calls.llm = (model_id, max_context_tokens, dict(role_max_new_tokens), backend)
+        def __init__(
+            self,
+            model_id: str,
+            max_context_tokens: int,
+            role_max_new_tokens,
+            backend,
+            token_counter=None,
+        ) -> None:
+            calls.llm = (model_id, max_context_tokens, dict(role_max_new_tokens), backend, token_counter)
 
     class _TTS:
         def __init__(self, model_id: str, cache) -> None:

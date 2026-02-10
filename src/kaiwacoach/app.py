@@ -44,6 +44,7 @@ def main(launch_ui: bool = True) -> None:
         max_context_tokens=config.llm.max_context_tokens,
         role_max_new_tokens=config.llm.role_max_new_tokens.__dict__,
         backend=llm_backend,
+        token_counter=llm_backend.count_tokens,
     )
     tts = KokoroTTS(
         model_id=config.models.tts_id,
