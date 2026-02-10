@@ -71,6 +71,11 @@ class SessionAudioCache:
         """
         return self._root_dir
 
+    @property
+    def expected_sample_rate(self) -> int | None:
+        """Return the expected sample rate for user audio validation."""
+        return self._expected_sample_rate
+
     def cleanup(self) -> None:
         """Delete the session cache directory and all audio blobs.
 

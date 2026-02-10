@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
+import time
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
@@ -47,6 +48,11 @@ def _audio_to_pcm(audio) -> tuple[bytes, AudioMeta]:
     """
     if audio is None:
         raise ValueError("No audio input provided.")
+    if isinstance(audio, dict):
+        if "path" in audio:
+            return _audio_to_pcm(audio["path"])
+        if "sample_rate" in audio and "data" in audio:
+            return _audio_to_pcm((audio["sample_rate"], audio["data"]))
     if isinstance(audio, (str, Path)):
         path = Path(audio)
         if not path.exists():
@@ -79,6 +85,74 @@ def _audio_to_pcm(audio) -> tuple[bytes, AudioMeta]:
         meta = AudioMeta(sample_rate=int(sample_rate), channels=channels, sample_width=2)
         return arr.tobytes(), meta
     raise ValueError("Unsupported audio input type.")
+
+
+def _resample_pcm_bytes(
+    pcm_bytes: bytes,
+    meta: AudioMeta,
+    target_sample_rate: int,
+) -> tuple[bytes, AudioMeta]:
+    # NOTE: This is a simple linear resampler for MVP correctness. It is not
+    # band-limited and may introduce minor artifacts compared to a higher
+    # quality resampling library.
+    if meta.sample_rate == target_sample_rate:
+        return pcm_bytes, meta
+    try:
+        import numpy as np  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        raise ValueError("Numpy is required to resample audio inputs.") from exc
+
+    frame_size = meta.channels * meta.sample_width
+    if frame_size <= 0:
+        raise ValueError("channels and sample_width must be positive.")
+    frame_count = len(pcm_bytes) // frame_size
+    if frame_count == 0:
+        raise ValueError("Audio input contains no frames.")
+
+    samples = np.frombuffer(pcm_bytes, dtype=np.int16)
+    if meta.channels > 1:
+        samples = samples.reshape(frame_count, meta.channels)
+
+    new_length = int(round(frame_count * (target_sample_rate / meta.sample_rate)))
+    if new_length <= 0:
+        raise ValueError("Resampled audio would have no frames.")
+
+    x_old = np.linspace(0, frame_count - 1, num=frame_count)
+    x_new = np.linspace(0, frame_count - 1, num=new_length)
+
+    if meta.channels > 1:
+        resampled_channels = [
+            np.interp(x_new, x_old, samples[:, idx]).astype(np.float32)
+            for idx in range(meta.channels)
+        ]
+        resampled = np.stack(resampled_channels, axis=1)
+    else:
+        resampled = np.interp(x_new, x_old, samples).astype(np.float32)
+
+    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
+    return resampled.tobytes(), AudioMeta(
+        sample_rate=target_sample_rate,
+        channels=meta.channels,
+        sample_width=meta.sample_width,
+    )
+
+
+def _audio_to_pcm_with_raw(
+    audio,
+    target_sample_rate: int | None,
+) -> tuple[bytes, AudioMeta, bytes | None, AudioMeta | None]:
+    pcm_bytes, meta = _audio_to_pcm(audio)
+    if target_sample_rate is None or meta.sample_rate == target_sample_rate:
+        return pcm_bytes, meta, None, None
+
+    raw_pcm_bytes, raw_meta = pcm_bytes, meta
+    resampled_bytes, resampled_meta = _resample_pcm_bytes(raw_pcm_bytes, raw_meta, target_sample_rate)
+    _logger.warning(
+        "audio_turn.resampled_input: %sHz -> %sHz",
+        raw_meta.sample_rate,
+        resampled_meta.sample_rate,
+    )
+    return resampled_bytes, resampled_meta, raw_pcm_bytes, raw_meta
 
 
 def _normalize_history(chat_history: list[dict[str, str]] | list[tuple[str, str]]) -> list[dict[str, str]]:
@@ -164,14 +238,28 @@ def _start_audio_turn(
     if conversation_id is None:
         conversation_id = orchestrator.create_conversation()
     try:
-        pcm_bytes, meta = _audio_to_pcm(audio)
+        target_sample_rate = getattr(orchestrator, "expected_sample_rate", None)
+        start = time.perf_counter()
+        pcm_bytes, meta, raw_pcm_bytes, raw_meta = _audio_to_pcm_with_raw(audio, target_sample_rate)
         timings = dict(timings or {})
+        timings["audio_preprocess_seconds"] = time.perf_counter() - start
         result = orchestrator.prepare_audio_turn(
             conversation_id=conversation_id,
             pcm_bytes=pcm_bytes,
             audio_meta=meta,
             timings=timings,
         )
+        if raw_pcm_bytes is not None and raw_meta is not None:
+            try:
+                orchestrator.persist_input_audio(
+                    conversation_id=conversation_id,
+                    turn_id=result.user_turn_id,
+                    pcm_bytes=raw_pcm_bytes,
+                    audio_meta=raw_meta,
+                    kind_suffix="raw",
+                )
+            except Exception as exc:  # pragma: no cover - non-fatal for UI flow
+                _logger.warning("audio_turn.raw_store_failed: %s", exc)
     except Exception as exc:
         _logger.warning("audio_turn.start_failed: %s", exc)
         return (

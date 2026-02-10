@@ -78,9 +78,17 @@ class ConversationOrchestrator:
         self._tts_speed = tts_speed
         self._asr = asr
         self._audio_cache = audio_cache
+        self._expected_sample_rate = (
+            getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
+        )
         self._asr_cache: Dict[tuple[str, str, str], ASRResult] = {}
         self._logger = logging.getLogger(__name__)
         self._timing_logs_enabled = timing_logs_enabled
+
+    @property
+    def expected_sample_rate(self) -> int | None:
+        """Expected sample rate for user audio input validation."""
+        return self._expected_sample_rate
 
     def create_conversation(self, title: Optional[str] = None) -> str:
         conversation_id = str(uuid.uuid4())
@@ -429,6 +437,7 @@ class ConversationOrchestrator:
                 conn.commit()
 
             self._db.run_write(_insert_user_failed)
+
             return AudioTurnResult(
                 conversation_id=conversation_id,
                 user_turn_id=user_turn_id,
@@ -439,6 +448,50 @@ class ConversationOrchestrator:
                 asr_meta=asr_meta,
                 tts_audio_path=None,
             )
+
+    def persist_input_audio(
+        self,
+        conversation_id: str,
+        turn_id: str,
+        pcm_bytes: bytes,
+        audio_meta: AudioMeta,
+        kind_suffix: str = "",
+    ) -> str:
+        """Persist raw input audio alongside standard user audio.
+
+        Parameters
+        ----------
+        conversation_id : str
+            Conversation identifier.
+        turn_id : str
+            Turn identifier.
+        pcm_bytes : bytes
+            Raw PCM audio bytes.
+        audio_meta : AudioMeta
+            Audio metadata for the PCM bytes.
+        kind_suffix : str
+            Optional suffix for the audio kind (e.g., "raw"). When provided, the
+            audio is stored under a `user_{suffix}` kind to distinguish raw
+            input from the resampled user audio.
+
+        Returns
+        -------
+        str
+            Path to the stored audio file.
+        """
+        if self._audio_cache is None:
+            raise ValueError("audio_cache must be configured to persist audio.")
+        kind = "user"
+        if kind_suffix:
+            kind = f"{kind}_{kind_suffix}"
+        path = self._audio_cache.save_audio(
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            kind=kind,
+            pcm_bytes=pcm_bytes,
+            meta=audio_meta,
+        )
+        return str(path)
 
     def generate_reply(
         self,
