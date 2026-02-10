@@ -155,6 +155,19 @@ def test_audio_to_pcm_rejects_missing_audio() -> None:
         ui_module._audio_to_pcm(None)
 
 
+def test_audio_to_pcm_with_raw_resamples() -> None:
+    import numpy as np
+
+    audio = (44100, np.array([0.0, 0.5, -0.5, 0.25], dtype=np.float32))
+    pcm_bytes, meta, raw_pcm_bytes, raw_meta = ui_module._audio_to_pcm_with_raw(audio, 16000)
+
+    assert isinstance(pcm_bytes, bytes)
+    assert meta.sample_rate == 16000
+    assert raw_pcm_bytes is not None
+    assert raw_meta is not None
+    assert raw_meta.sample_rate == 44100
+
+
 def test_handle_text_turn_sets_assistant_audio_only(tmp_path: Path) -> None:
     class _Orchestrator:
         def __init__(self):
@@ -290,6 +303,16 @@ def test_start_audio_turn_returns_asr_text(tmp_path: Path) -> None:
                 asr_text="konnichiwa",
             )
 
+        def persist_input_audio(
+            self,
+            conversation_id: str,
+            turn_id: str,
+            pcm_bytes: bytes,
+            audio_meta: AudioMeta,
+            kind_suffix: str = "",
+        ) -> str:
+            return "/tmp/user_raw.wav"
+
     orch = _Orchestrator()
     audio = (16000, [0.0, 0.5, -0.5])
     (
@@ -314,6 +337,62 @@ def test_start_audio_turn_returns_asr_text(tmp_path: Path) -> None:
     assert error_update == {"visible": False}
     assert skip_pipeline is False
     assert isinstance(timings, dict)
+
+
+def test_start_audio_turn_persists_raw_on_resample(tmp_path: Path) -> None:
+    class _Orchestrator:
+        expected_sample_rate = 16000
+
+        def __init__(self):
+            self.persisted = None
+
+        def create_conversation(self):
+            return "conv"
+
+        def prepare_audio_turn(
+            self,
+            conversation_id: str,
+            pcm_bytes: bytes,
+            audio_meta: AudioMeta,
+            timings: dict | None = None,
+        ):
+            return SimpleNamespace(
+                user_turn_id="turn-1",
+                input_audio_path="/tmp/user.wav",
+                asr_text="konnichiwa",
+            )
+
+        def persist_input_audio(
+            self,
+            conversation_id: str,
+            turn_id: str,
+            pcm_bytes: bytes,
+            audio_meta: AudioMeta,
+            kind_suffix: str = "",
+        ) -> str:
+            self.persisted = (conversation_id, turn_id, audio_meta.sample_rate, kind_suffix)
+            return "/tmp/user_raw.wav"
+
+    orch = _Orchestrator()
+    audio = (44100, [0.0, 0.5, -0.5, 0.25])
+    (
+        _history,
+        conversation_id,
+        _cleared_input,
+        _user_turn_id,
+        _display_history,
+        _conversation_history,
+        _user_text,
+        error_update,
+        _user_audio_path,
+        skip_pipeline,
+        _timings,
+    ) = ui_module._start_audio_turn(orch, audio, [], None)
+
+    assert conversation_id == "conv"
+    assert skip_pipeline is False
+    assert error_update == {"visible": False}
+    assert orch.persisted == ("conv", "turn-1", 44100, "raw")
 
 
 def test_run_llm_reply_updates_history() -> None:
