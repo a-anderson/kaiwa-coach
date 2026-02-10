@@ -314,16 +314,16 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ### Model Integration (Slow)
 
-⬜ ASR integration test (real model, marked `@pytest.mark.slow`)  
-⬜ Core LLM integration test (real model, marked `@pytest.mark.slow`)  
-⬜ TTS integration test (real model, marked `@pytest.mark.slow`)
+✅ ASR integration test (real model, marked `@pytest.mark.slow`)  
+✅ Core LLM integration test (real model, marked `@pytest.mark.slow`)  
+✅ TTS integration test (real model, marked `@pytest.mark.slow`)
 
 ---
 
 ### Japanese Normalisation Golden Tests (High Priority)
 
-⬜ Create JP/EN mixed fixtures  
-⬜ Assert katakana conversion or invariant fallback
+✅ Create JP/EN mixed fixtures  
+✅ Assert katakana conversion or invariant fallback
 
 ---
 

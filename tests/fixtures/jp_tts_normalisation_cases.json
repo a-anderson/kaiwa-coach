@@ -1,0 +1,32 @@
+[
+  {
+    "name": "katakana_rewrite_applies",
+    "input": "コーヒーがすきです。",
+    "llm_rewrite": "コーヒーが好きです。",
+    "expected": "コーヒーがすきです。"
+  },
+  {
+    "name": "invariant_fallback_preserves_japanese",
+    "input": "日本語とEnglishをまぜる。",
+    "llm_rewrite": "日本語とイングリッシュをまぜる。",
+    "expected": "日本語とEnglishをまぜる。"
+  },
+  {
+    "name": "punctuation_normalises",
+    "input": "すごい！！！本当？？",
+    "llm_rewrite": "すごい！！！本当？？",
+    "expected": "すごい！ 本当？"
+  },
+  {
+    "name": "protected_span_preserved",
+    "input": "詳しくはhttps://example.comを見てください。",
+    "llm_rewrite": "詳しくはhttps://example.comを見てください。",
+    "expected": "詳しくはhttps://example.comを見てください。"
+  },
+  {
+    "name": "mixed_jp_en_fallback_preserves_japanese",
+    "input": "今日はPythonで勉強します。",
+    "llm_rewrite": "今日はパイソンで勉強します。",
+    "expected": "今日はPythonで勉強します。"
+  }
+]
