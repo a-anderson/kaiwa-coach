@@ -26,6 +26,52 @@ def test_format_conversation_history_formats_turns() -> None:
     assert formatted_tuple == expected
 
 
+def test_format_turns_to_chat() -> None:
+    turns = [
+        {"input_text": "Hi", "asr_text": None, "reply_text": "Hello"},
+        {"input_text": None, "asr_text": "Audio hi", "reply_text": "Hi there"},
+    ]
+    history = ui_module._format_turns_to_chat(turns)
+    assert history == [
+        {"role": "user", "content": "Hi"},
+        {"role": "assistant", "content": "Hello"},
+        {"role": "user", "content": "Audio hi"},
+        {"role": "assistant", "content": "Hi there"},
+    ]
+
+
+def test_load_conversation_options() -> None:
+    class _Orchestrator:
+        def list_conversations(self):
+            return [
+                {"id": "c1", "title": "Test", "language": "ja", "updated_at": "2026-02-10"},
+                {"id": "c2", "title": None, "language": "fr", "updated_at": ""},
+            ]
+
+    orch = _Orchestrator()
+    options = ui_module._load_conversation_options(orch)
+    assert options[0][1] == "c1"
+    assert "Test" in options[0][0]
+    assert options[1][1] == "c2"
+
+
+def test_load_conversation_populates_chat() -> None:
+    class _Orchestrator:
+        def get_conversation(self, conversation_id: str):
+            assert conversation_id == "conv-1"
+            return {
+                "id": "conv-1",
+                "turns": [
+                    {"input_text": "Hi", "asr_text": None, "reply_text": "Hello"},
+                    {"input_text": None, "asr_text": "Audio hi", "reply_text": "Hi there"},
+                ],
+            }
+
+    orch = _Orchestrator()
+    result = ui_module._load_conversation(orch, "conv-1")
+    history = result[0]
+    assert history[0]["content"] == "Hi"
+    assert history[-1]["content"] == "Hi there"
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):
@@ -82,13 +128,9 @@ def test_handle_language_change_resets_state() -> None:
         def __init__(self):
             self.language = "ja"
             self.reset_called = False
-            self.updated = None
 
         def set_language(self, language: str) -> None:
             self.language = language
-
-        def update_conversation_language(self, conversation_id: str, language: str) -> None:
-            self.updated = (conversation_id, language)
 
         def reset_session(self) -> None:
             self.reset_called = True
@@ -98,7 +140,6 @@ def test_handle_language_change_resets_state() -> None:
 
     assert orch.language == "fr"
     assert orch.reset_called is True
-    assert orch.updated == ("conv-1", "fr")
     assert result[0] == []
 
 

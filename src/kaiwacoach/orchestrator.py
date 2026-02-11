@@ -78,6 +78,9 @@ class ConversationOrchestrator:
         self._tts_speed = tts_speed
         self._asr = asr
         self._audio_cache = audio_cache
+        self._asr_model_id = self._resolve_model_id(asr)
+        self._llm_model_id = self._resolve_model_id(llm)
+        self._tts_model_id = self._resolve_model_id(tts)
         self._expected_sample_rate = (
             getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
         )
@@ -96,10 +99,20 @@ class ConversationOrchestrator:
         def _insert(conn) -> None:
             conn.execute(
                 """
-                INSERT INTO conversations (id, title, language, model_metadata_json)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO conversations (
+                    id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (conversation_id, title, self._language, "{}"),
+                (
+                    conversation_id,
+                    title,
+                    self._language,
+                    self._asr_model_id,
+                    self._llm_model_id,
+                    self._tts_model_id,
+                    "{}",
+                ),
             )
             conn.commit()
 
@@ -935,6 +948,93 @@ class ConversationOrchestrator:
             )
 
         self._db.run_write(_update)
+
+    def list_conversations(self) -> list[dict[str, Any]]:
+        """Return a summary list of conversations for UI selection."""
+        query = """
+            SELECT id, title, language, updated_at
+            FROM conversations
+            ORDER BY datetime(updated_at) DESC
+        """
+        with self._db.read_connection() as conn:
+            rows = conn.execute(query).fetchall()
+        return [
+            {
+                "id": row[0],
+                "title": row[1],
+                "language": row[2],
+                "updated_at": row[3],
+            }
+            for row in rows
+        ]
+
+    def get_conversation(self, conversation_id: str) -> dict[str, Any]:
+        """Fetch a conversation and its turns for replay."""
+        with self._db.read_connection() as conn:
+            convo = conn.execute(
+                """
+                SELECT id, title, language, created_at, updated_at
+                FROM conversations WHERE id = ?
+                """,
+                (conversation_id,),
+            ).fetchone()
+            if convo is None:
+                raise ValueError(f"Unknown conversation_id: {conversation_id}")
+            turns = conn.execute(
+                """
+                SELECT
+                    u.id AS user_turn_id,
+                    u.input_text,
+                    u.asr_text,
+                    a.id AS assistant_turn_id,
+                    a.reply_text
+                FROM user_turns u
+                LEFT JOIN assistant_turns a
+                    ON a.user_turn_id = u.id
+                WHERE u.conversation_id = ?
+                ORDER BY datetime(u.created_at) ASC
+                """,
+                (conversation_id,),
+            ).fetchall()
+        return {
+            "id": convo[0],
+            "title": convo[1],
+            "language": convo[2],
+            "created_at": convo[3],
+            "updated_at": convo[4],
+            "turns": [
+                {
+                    "user_turn_id": row[0],
+                    "input_text": row[1],
+                    "asr_text": row[2],
+                    "assistant_turn_id": row[3],
+                    "reply_text": row[4],
+                }
+                for row in turns
+            ],
+        }
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Delete a conversation and cascade dependent rows."""
+        def _delete(conn) -> None:
+            conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+            conn.commit()
+
+        self._db.run_write(_delete)
+
+    def delete_all_conversations(self) -> None:
+        """Delete all conversations and cascade dependent rows."""
+        def _delete(conn) -> None:
+            conn.execute("DELETE FROM conversations")
+            conn.commit()
+
+        self._db.run_write(_delete)
+
+    @staticmethod
+    def _resolve_model_id(model: Any | None) -> str:
+        if model is None:
+            return "unknown"
+        return getattr(model, "model_id", None) or getattr(model, "_model_id", None) or "unknown"
 
     def _log_timings(self, label: str, timings: Dict[str, float]) -> None:
         if not self._timing_logs_enabled:

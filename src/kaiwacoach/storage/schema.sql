@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
   title TEXT,
   language TEXT NOT NULL,
+  asr_model_id TEXT NOT NULL,
+  llm_model_id TEXT NOT NULL,
+  tts_model_id TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   model_metadata_json TEXT

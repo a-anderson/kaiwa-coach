@@ -103,7 +103,7 @@ kaiwacoach/
 
 ### 4.1 SQLite schema (conceptual)
 Tables:
-- `conversations(id, title, language, created_at, model_metadata_json)`
+- `conversations(id, title, language, asr_model_id, llm_model_id, tts_model_id, created_at, model_metadata_json)`
 - `user_turns(id, conversation_id, created_at, input_text, input_audio_path, asr_text, asr_meta_json)`
 - `assistant_turns(id, user_turn_id, created_at, reply_text, reply_audio_path, llm_meta_json)`
 - `corrections(id, user_turn_id, created_at, errors_json, corrected_text, native_text, explanation_text, prompt_hash)`
@@ -129,6 +129,10 @@ Note: ASR and LLM output caches are **in-memory only** and reset each session.
 ---
 
 ## 5. Orchestrator Pipeline
+
+### 5.0 Conversation lifecycle
+- Conversations are created on first user turn (text or audio), not on app start.
+- Language changes start a new conversation (no in-place language mutation).
 
 ### 5.1 Turn lifecycle (audio input)
 1. Cache raw user audio blob (WAV) in **session audio cache**

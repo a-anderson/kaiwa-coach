@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 import time
+from datetime import datetime, timezone
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
@@ -180,6 +181,110 @@ def _replace_last_assistant(
     return updated
 
 
+def _format_turns_to_chat(turns: list[dict[str, str | None]]) -> list[dict[str, str]]:
+    history: list[dict[str, str]] = []
+    for turn in turns:
+        user_text = turn.get("input_text") or turn.get("asr_text") or ""
+        if user_text:
+            history.append({"role": "user", "content": str(user_text)})
+        reply_text = turn.get("reply_text") or ""
+        if reply_text:
+            history.append({"role": "assistant", "content": str(reply_text)})
+    return history
+
+
+def _conversation_label(row: dict[str, str]) -> str:
+    title = row.get("title") or "Untitled"
+    language = row.get("language") or "unknown"
+    updated_at = row.get("updated_at") or ""
+    emoji = _language_emoji(language)
+    if updated_at:
+        return f"{emoji} {title} · {_format_local_time(updated_at)}"
+    return f"{emoji} {title}"
+
+
+def _language_emoji(language: str) -> str:
+    return {
+        "ja": "🇯🇵",
+        "fr": "🇫🇷",
+        "en": "🇺🇸",
+        "es": "🇪🇸",
+        "it": "🇮🇹",
+        "pt-br": "🇧🇷",
+    }.get(language, "🏳️")
+
+
+def _format_local_time(timestamp: str) -> str:
+    """Format timestamps as HH:mm in the local timezone."""
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return timestamp
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    local = parsed.astimezone()
+    tz_name = local.tzname() or ""
+    suffix = f" {tz_name}" if tz_name else ""
+    return local.strftime("%H:%M") + suffix
+
+
+def _load_conversation_options(orchestrator: ConversationOrchestrator) -> list[tuple[str, str]]:
+    list_fn = getattr(orchestrator, "list_conversations", None)
+    if not callable(list_fn):
+        return []
+    rows = list_fn()
+    return [(_conversation_label(row), row["id"]) for row in rows]
+
+
+def _load_conversation(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+):
+    if not conversation_id:
+        return (
+            [],
+            None,
+            [],
+            "",
+            "",
+            "",
+            None,
+            None,
+            False,
+            {},
+            "",
+            "",
+            "",
+            None,
+            None,
+            "",
+        )
+    data = orchestrator.get_conversation(conversation_id)
+    history = _format_turns_to_chat(data["turns"])
+    conversation_history = _format_conversation_history(history)
+    return (
+        history,
+        conversation_id,
+        history,
+        conversation_history,
+        "",
+        "",
+        None,
+        None,
+        False,
+        {},
+        "",
+        "",
+        "",
+        None,
+        None,
+        "",
+    )
+
+
 def _start_text_turn(
     orchestrator: ConversationOrchestrator,
     user_text: str,
@@ -235,14 +340,14 @@ def _start_audio_turn(
     conversation_id: str | None,
     timings: dict | None = None,
 ):
-    if conversation_id is None:
-        conversation_id = orchestrator.create_conversation()
     try:
         target_sample_rate = getattr(orchestrator, "expected_sample_rate", None)
         start = time.perf_counter()
         pcm_bytes, meta, raw_pcm_bytes, raw_meta = _audio_to_pcm_with_raw(audio, target_sample_rate)
         timings = dict(timings or {})
         timings["audio_preprocess_seconds"] = time.perf_counter() - start
+        if conversation_id is None:
+            conversation_id = orchestrator.create_conversation()
         result = orchestrator.prepare_audio_turn(
             conversation_id=conversation_id,
             pcm_bytes=pcm_bytes,
@@ -534,8 +639,6 @@ def _handle_language_change(
     orchestrator: ConversationOrchestrator, language: str, conversation_id: str | None
 ):
     orchestrator.set_language(language)
-    if conversation_id is not None:
-        orchestrator.update_conversation_language(conversation_id, language)
     return _handle_reset(orchestrator)
 
 
@@ -553,6 +656,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
         if value not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language in UI choices: {value}")
     default_language = getattr(orchestrator, "language", "ja")
+    conversation_choices = _load_conversation_options(orchestrator)
 
     with gr.Blocks(
         css="""
@@ -589,6 +693,16 @@ def build_ui(orchestrator: ConversationOrchestrator):
                         audio_input = gr.Audio(sources=["microphone"], label="Microphone")
                         audio_btn = gr.Button("Send Audio")
             with gr.Column(scale=1, min_width=280):
+                gr.Markdown("### Conversations")
+                conversation_dropdown = gr.Dropdown(
+                    choices=conversation_choices,
+                    value=None,
+                    label="",
+                    show_label=False,
+                )
+                with gr.Row():
+                    refresh_conversations_btn = gr.Button("Refresh")
+                    load_conversation_btn = gr.Button("Load")
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
                 corrections_toggle = gr.Checkbox(value=True, label="Corrections")
@@ -627,6 +741,35 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 assistant_turn_id_state,
                 skip_pipeline_state,
                 timings_state,
+            ],
+        )
+
+        refresh_conversations_btn.click(
+            lambda: gr.update(choices=_load_conversation_options(orchestrator), value=None),
+            inputs=[],
+            outputs=[conversation_dropdown],
+        )
+
+        load_conversation_btn.click(
+            lambda cid: _load_conversation(orchestrator, cid),
+            inputs=[conversation_dropdown],
+            outputs=[
+                chat,
+                conversation_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                user_turn_id_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_audio_output,
+                assistant_audio_output,
+                error_output,
             ],
         )
 

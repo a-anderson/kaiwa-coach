@@ -224,11 +224,14 @@ def test_create_conversation_persists_language(tmp_path: Path) -> None:
 
         with db.read_connection() as conn:
             row = conn.execute(
-                "SELECT title, language FROM conversations WHERE id = ?",
+                """
+                SELECT title, language, asr_model_id, llm_model_id, tts_model_id
+                FROM conversations WHERE id = ?
+                """,
                 (conversation_id,),
             ).fetchone()
 
-        assert row == ("Bonjour", "fr")
+        assert row == ("Bonjour", "fr", "unknown", "model-x", "unknown")
     finally:
         db.close()
 

@@ -22,7 +22,15 @@ class SQLiteWriter:
 
     # Keep this allowlist in sync with schema.sql and any future migrations.
     _ALLOWED_UPDATE_COLUMNS: dict[str, set[str]] = {
-        "conversations": {"title", "language", "model_metadata_json", "updated_at"},
+        "conversations": {
+            "title",
+            "language",
+            "asr_model_id",
+            "llm_model_id",
+            "tts_model_id",
+            "model_metadata_json",
+            "updated_at",
+        },
         "user_turns": {"input_text", "asr_text", "asr_meta_json", "updated_at"},
         "assistant_turns": {"reply_text", "llm_meta_json", "updated_at"},
         "corrections": {
