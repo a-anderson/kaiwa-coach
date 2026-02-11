@@ -99,12 +99,12 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ✅ Auto-persist chat turns to SQLite (already writing user/assistant/corrections)  
 ✅ Store conversation metadata (language, model IDs) for replay  
-⬜ Add schema notes for forward compatibility  
+✅ Add schema notes for forward compatibility  
 ✅ Add conversation index query (title, last updated, language)  
 ✅ Add summary/preview field for list view  
 ✅ Add fetch-by-id API to load full conversation  
-⬜ Define history formatting/truncation for resumed chats  
-⬜ Support resume flow: load history + continue new turns  
+✅ Define history formatting/truncation for resumed chats  
+✅ Support resume flow: load history + continue new turns  
 ✅ Add delete/export hooks (optional, post-MVP if needed)
 
 ---
@@ -301,7 +301,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ New conversation action (clear state + start fresh)  
 ⬜ Delete conversation (optional; can be post-MVP)  
 ⬜ Delete all history (bulk delete)  
-⬜ Empty state handling (no conversations yet)  
+✅ Empty state handling (no conversations yet)  
 ⬜ Loading/error states for list and selection
 
 ---

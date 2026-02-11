@@ -1,4 +1,8 @@
 -- KaiwaCoach SQLite schema (v1)
+-- Forward compatibility notes:
+-- - Schema changes should be handled with migrations; avoid in-place edits without a migration plan.
+-- - Prefer nullable columns or defaults for additive changes, then backfill if needed.
+-- - During MVP, local DB reset on mismatch is acceptable for the sole tester.
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS schema_version (

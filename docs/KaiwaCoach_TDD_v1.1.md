@@ -110,6 +110,12 @@ Tables:
 - `artifacts(id, conversation_id, kind, path, meta_json)`
 Note: `*_audio_path` fields are optional and point to **session-only** cache files.
 
+Schema notes (forward compatibility):
+- Prefer additive migrations with nullable columns or defaults.
+- Backfill non-nullable fields in a follow-up step before enforcing constraints.
+- Avoid destructive edits to `schema.sql` without a migration plan.
+- MVP exception: local DB reset on mismatch is acceptable for a single tester.
+
 ### 4.2 Audio blobs (Session-only)
 - Stored as WAV files under a **session temp dir** (not persisted across restarts).
 - Filenames include hash for caching during the session:

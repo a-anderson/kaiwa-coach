@@ -248,6 +248,17 @@ def _load_conversation_options(orchestrator: ConversationOrchestrator) -> list[t
     return [(_conversation_label(row), row["id"]) for row in rows]
 
 
+def _refresh_conversation_options(orchestrator: ConversationOrchestrator):
+    import gradio as gr  # type: ignore
+
+    choices = _load_conversation_options(orchestrator)
+    return (
+        gr.update(choices=choices, value=None),
+        gr.update(interactive=bool(choices)),
+        gr.update(visible=not bool(choices)),
+    )
+
+
 def _load_conversation(
     orchestrator: ConversationOrchestrator,
     conversation_id: str | None,
@@ -708,6 +719,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
             raise ValueError(f"Unsupported language in UI choices: {value}")
     default_language = getattr(orchestrator, "language", "ja")
     conversation_choices = _load_conversation_options(orchestrator)
+    load_enabled = bool(conversation_choices)
 
     with gr.Blocks(
         css="""
@@ -745,6 +757,10 @@ def build_ui(orchestrator: ConversationOrchestrator):
                         audio_btn = gr.Button("Send Audio")
             with gr.Column(scale=1, min_width=280):
                 gr.Markdown("### Conversations")
+                empty_conversations_note = gr.Markdown(
+                    "No saved conversations yet.",
+                    visible=not bool(conversation_choices),
+                )
                 conversation_dropdown = gr.Dropdown(
                     choices=conversation_choices,
                     value=None,
@@ -754,7 +770,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 )
                 with gr.Row():
                     refresh_conversations_btn = gr.Button("Refresh")
-                    load_conversation_btn = gr.Button("Load")
+                    load_conversation_btn = gr.Button("Load", interactive=load_enabled)
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
                 corrections_toggle = gr.Checkbox(value=True, label="Corrections")
@@ -807,9 +823,9 @@ def build_ui(orchestrator: ConversationOrchestrator):
         )
 
         refresh_conversations_btn.click(
-            lambda: gr.update(choices=_load_conversation_options(orchestrator), value=None),
+            lambda: _refresh_conversation_options(orchestrator),
             inputs=[],
-            outputs=[conversation_dropdown],
+            outputs=[conversation_dropdown, load_conversation_btn, empty_conversations_note],
         )
 
         def _apply_loaded_language(language: str | None):

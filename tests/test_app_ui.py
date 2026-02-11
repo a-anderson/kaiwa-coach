@@ -125,6 +125,25 @@ def test_conversation_label_truncates_preview() -> None:
     label = ui_module._conversation_label(row)
     assert "A" * 60 not in label
     assert "…" in label
+
+
+def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_choices = []
+
+    def _fake_loader(_orch):
+        return list(fake_choices)
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    conversation_update, load_update, empty_update = ui_module._refresh_conversation_options(None)
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+    fake_choices.append(("Label", "id-1"))
+    conversation_update, load_update, empty_update = ui_module._refresh_conversation_options(None)
+    assert conversation_update["choices"]
+    assert load_update["interactive"] is True
+    assert empty_update["visible"] is False
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):
