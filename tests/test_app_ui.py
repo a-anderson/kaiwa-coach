@@ -144,6 +144,77 @@ def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.Mo
     assert conversation_update["choices"]
     assert load_update["interactive"] is True
     assert empty_update["visible"] is False
+
+
+def test_delete_conversation_and_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.deleted = None
+            self.reset_called = False
+
+        def delete_conversation(self, conversation_id: str) -> None:
+            self.deleted = conversation_id
+
+        def delete_all_conversations(self) -> None:
+            raise AssertionError("delete_all_conversations should not be called")
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    def _fake_loader(_orch):
+        return []
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    orch = _Orchestrator()
+    result = ui_module._delete_conversation_and_refresh(orch, "conv-1")
+    assert orch.deleted == "conv-1"
+    assert orch.reset_called is True
+    assert result[0] == []
+    conversation_update, load_update, empty_update = result[-3:]
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+
+def test_delete_all_conversations_and_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.deleted_all = False
+            self.reset_called = False
+
+        def delete_conversation(self, conversation_id: str) -> None:
+            raise AssertionError("delete_conversation should not be called")
+
+        def delete_all_conversations(self) -> None:
+            self.deleted_all = True
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    def _fake_loader(_orch):
+        return []
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    orch = _Orchestrator()
+    result = ui_module._delete_all_conversations_and_refresh(orch)
+    assert orch.deleted_all is True
+    assert orch.reset_called is True
+    assert result[0] == []
+    conversation_update, load_update, empty_update = result[-3:]
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+
+def test_confirm_row_toggle_returns_two_updates() -> None:
+    show_updates = ui_module._confirm_row_show_updates()
+    hide_updates = ui_module._confirm_row_hide_updates()
+    assert isinstance(show_updates, tuple)
+    assert isinstance(hide_updates, tuple)
+    assert len(show_updates) == 2
+    assert len(hide_updates) == 2
+
+
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):

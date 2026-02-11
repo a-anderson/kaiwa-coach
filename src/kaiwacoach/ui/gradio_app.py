@@ -259,6 +259,38 @@ def _refresh_conversation_options(orchestrator: ConversationOrchestrator):
     )
 
 
+def _delete_conversation_and_refresh(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+):
+    if conversation_id:
+        orchestrator.delete_conversation(conversation_id)
+    reset = _handle_reset(orchestrator)
+    convo_updates = _refresh_conversation_options(orchestrator)
+    return reset + convo_updates
+
+
+def _delete_all_conversations_and_refresh(
+    orchestrator: ConversationOrchestrator,
+):
+    orchestrator.delete_all_conversations()
+    reset = _handle_reset(orchestrator)
+    convo_updates = _refresh_conversation_options(orchestrator)
+    return reset + convo_updates
+
+
+def _confirm_row_show_updates():
+    import gradio as gr  # type: ignore
+
+    return (gr.update(visible=True), gr.update(visible=True))
+
+
+def _confirm_row_hide_updates():
+    import gradio as gr  # type: ignore
+
+    return (gr.update(visible=False), gr.update(visible=False))
+
+
 def _load_conversation(
     orchestrator: ConversationOrchestrator,
     conversation_id: str | None,
@@ -732,6 +764,12 @@ def build_ui(orchestrator: ConversationOrchestrator):
 #header-row h1 {margin: 0; text-align: left;}
 #header-left {display: flex; align-items: center;}
 #header-right {display: flex; justify-content: flex-end;}
+#delete-confirm-row, #delete-all-confirm-row,
+#delete-confirm-buttons, #delete-all-confirm-buttons {
+  background: #ffecec;
+  border-radius: 6px;
+  padding: 6px;
+}
 """
     ) as demo:
         with gr.Row(elem_id="header-row"):
@@ -771,13 +809,26 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 with gr.Row():
                     refresh_conversations_btn = gr.Button("Refresh")
                     load_conversation_btn = gr.Button("Load", interactive=load_enabled)
+                    delete_conversation_btn = gr.Button("Delete")
+                with gr.Row(visible=False, elem_id="delete-confirm-row") as delete_confirm_row:
+                    gr.Markdown("⚠️ Delete this conversation? This cannot be undone. ⚠️")
+                with gr.Row(visible=False, elem_id="delete-confirm-buttons") as delete_confirm_buttons_row:
+                    delete_confirm_btn = gr.Button("Confirm Delete")
+                    delete_cancel_btn = gr.Button("Cancel")
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
                 corrections_toggle = gr.Checkbox(value=True, label="Corrections")
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")
-        reset_btn = gr.Button("Reset Session")
+        with gr.Row():
+            reset_btn = gr.Button("Reset Session")
+            delete_all_btn = gr.Button("Delete All History")
+        with gr.Row(visible=False, elem_id="delete-all-confirm-row") as delete_all_confirm_row:
+            gr.Markdown("⚠️ Delete all conversations and history? This cannot be undone. ⚠️")
+        with gr.Row(visible=False, elem_id="delete-all-confirm-buttons") as delete_all_confirm_buttons_row:
+            delete_all_confirm_btn = gr.Button("Confirm Delete All")
+            delete_all_cancel_btn = gr.Button("Cancel")
 
         conversation_id_state = gr.State(None)
         history_state = gr.State([])
@@ -868,6 +919,92 @@ def build_ui(orchestrator: ConversationOrchestrator):
             lambda: False,
             inputs=[],
             outputs=[suppress_language_change_state],
+        )
+
+        delete_conversation_btn.click(
+            _confirm_row_show_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_cancel_btn.click(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_confirm_btn.click(
+            lambda cid: _delete_conversation_and_refresh(orchestrator, cid),
+            inputs=[conversation_id_state],
+            outputs=[
+                chat,
+                conversation_id_state,
+                user_input,
+                error_output,
+                user_audio_output,
+                assistant_audio_output,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                conversation_dropdown,
+                load_conversation_btn,
+                empty_conversations_note,
+            ],
+        ).then(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_all_btn.click(
+            _confirm_row_show_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
+        )
+
+        delete_all_cancel_btn.click(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
+        )
+
+        delete_all_confirm_btn.click(
+            lambda: _delete_all_conversations_and_refresh(orchestrator),
+            inputs=[],
+            outputs=[
+                chat,
+                conversation_id_state,
+                user_input,
+                error_output,
+                user_audio_output,
+                assistant_audio_output,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                conversation_dropdown,
+                load_conversation_btn,
+                empty_conversations_note,
+            ],
+        ).then(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
         )
 
         def _on_send(

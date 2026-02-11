@@ -74,3 +74,53 @@ def test_delete_all_conversations(tmp_path: Path) -> None:
         assert orch.list_conversations() == []
     finally:
         db.close()
+
+
+def test_delete_all_conversations_cascades_turns(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend(),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language="ja")
+
+        conversation_id = orch.create_conversation("Has turns")
+        user_turn_id = orch.persist_user_text_turn(conversation_id, "こんにちは")
+        orch.generate_reply(conversation_id, user_turn_id, "こんにちは", conversation_history="")
+
+        with db.read_connection() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0] == 1
+            assert conn.execute("SELECT COUNT(*) FROM user_turns").fetchone()[0] == 1
+            assert conn.execute("SELECT COUNT(*) FROM assistant_turns").fetchone()[0] == 1
+
+        orch.delete_all_conversations()
+
+        with db.read_connection() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0] == 0
+            assert conn.execute("SELECT COUNT(*) FROM user_turns").fetchone()[0] == 0
+            assert conn.execute("SELECT COUNT(*) FROM assistant_turns").fetchone()[0] == 0
+    finally:
+        db.close()
+
+
+def test_delete_all_conversations_idempotent_on_empty(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend(),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language="ja")
+
+        assert orch.list_conversations() == []
+        orch.delete_all_conversations()
+        assert orch.list_conversations() == []
+    finally:
+        db.close()

@@ -302,7 +302,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⬜ Delete conversation (optional; can be post-MVP)  
 ⬜ Delete all history (bulk delete)  
 ✅ Empty state handling (no conversations yet)  
-⬜ Loading/error states for list and selection
+🔁 Loading/error states for list and selection
 
 ---
 
