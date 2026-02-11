@@ -101,7 +101,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Store conversation metadata (language, model IDs) for replay  
 ⬜ Add schema notes for forward compatibility  
 ✅ Add conversation index query (title, last updated, language)  
-⬜ Add summary/preview field for list view  
+✅ Add summary/preview field for list view  
 ✅ Add fetch-by-id API to load full conversation  
 ⬜ Define history formatting/truncation for resumed chats  
 ⬜ Support resume flow: load history + continue new turns  
@@ -295,10 +295,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ### 9.1 Conversation History UI
 
 ✅ Conversation list panel (title, last updated, language)  
-⬜ Conversation preview (summary or last assistant reply)  
+✅ Conversation preview (summary or last assistant reply)  
 ✅ Select conversation → load transcript into chat  
-⏳ Continue conversation → append new turns  
-⬜ New conversation action (clear state + start fresh)  
+✅ Continue conversation → append new turns  
+✅ New conversation action (clear state + start fresh)  
 ⬜ Delete conversation (optional; can be post-MVP)  
 ⬜ Delete all history (bulk delete)  
 ⬜ Empty state handling (no conversations yet)  
@@ -381,7 +381,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Spoken JP conversation works end-to-end  
 ⏳ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
-⬜ Conversations persist across restarts (text + corrections)  
+⏳ Conversations persist across restarts (text + corrections)  
 ⬜ Audio can be regenerated on demand for a single turn or full conversation
 ⬜ Stable operation within ~22–26 GB RAM
 

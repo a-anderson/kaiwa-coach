@@ -44,14 +44,20 @@ def test_load_conversation_options() -> None:
     class _Orchestrator:
         def list_conversations(self):
             return [
-                {"id": "c1", "title": "Test", "language": "ja", "updated_at": "2026-02-10"},
+                {
+                    "id": "c1",
+                    "title": "Test",
+                    "language": "ja",
+                    "updated_at": "2026-02-10",
+                    "preview_text": "これはテストです。",
+                },
                 {"id": "c2", "title": None, "language": "fr", "updated_at": ""},
             ]
 
     orch = _Orchestrator()
     options = ui_module._load_conversation_options(orch)
     assert options[0][1] == "c1"
-    assert "Test" in options[0][0]
+    assert "これはテストです。" in options[0][0]
     assert options[1][1] == "c2"
 
 
@@ -81,6 +87,44 @@ def test_load_conversation_populates_chat() -> None:
     assert history[-1]["content"] == "Hi there"
     assert orch.language == "fr"
     assert result[-2] == "fr"
+    assert result[-1] is True
+
+
+def test_load_conversation_returns_language_and_suppresses_change() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+
+        def get_conversation(self, conversation_id: str):
+            assert conversation_id == "conv-2"
+            return {
+                "id": "conv-2",
+                "language": "es",
+                "turns": [
+                    {"input_text": "Hola", "asr_text": None, "reply_text": "Hola"},
+                ],
+            }
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+    orch = _Orchestrator()
+    result = ui_module._load_conversation(orch, "conv-2")
+    assert result[-2] == "es"
+    assert result[-1] is True
+    assert orch.language == "es"
+
+
+def test_conversation_label_truncates_preview() -> None:
+    row = {
+        "title": "Ignored",
+        "language": "en",
+        "updated_at": "2026-02-10",
+        "preview_text": "A" * 80,
+    }
+    label = ui_module._conversation_label(row)
+    assert "A" * 60 not in label
+    assert "…" in label
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):

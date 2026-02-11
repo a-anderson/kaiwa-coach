@@ -195,12 +195,21 @@ def _format_turns_to_chat(turns: list[dict[str, str | None]]) -> list[dict[str, 
 
 def _conversation_label(row: dict[str, str]) -> str:
     title = row.get("title") or "Untitled"
+    preview = row.get("preview_text") or ""
     language = row.get("language") or "unknown"
     updated_at = row.get("updated_at") or ""
     emoji = _language_emoji(language)
+    summary = _truncate_preview(preview) if preview else title
     if updated_at:
-        return f"{emoji} {title} · {_format_local_time(updated_at)}"
-    return f"{emoji} {title}"
+        return f"{emoji} {summary} · {_format_local_time(updated_at)}"
+    return f"{emoji} {summary}"
+
+
+def _truncate_preview(text: str, max_chars: int = 60) -> str:
+    trimmed = text.strip()
+    if len(trimmed) <= max_chars:
+        return trimmed
+    return f"{trimmed[: max_chars - 1].rstrip()}…"
 
 
 def _language_emoji(language: str) -> str:

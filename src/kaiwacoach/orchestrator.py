@@ -952,7 +952,18 @@ class ConversationOrchestrator:
     def list_conversations(self) -> list[dict[str, Any]]:
         """Return a summary list of conversations for UI selection."""
         query = """
-            SELECT id, title, language, updated_at
+            SELECT
+                id,
+                title,
+                language,
+                updated_at,
+                (
+                    SELECT a.reply_text
+                    FROM assistant_turns a
+                    WHERE a.conversation_id = conversations.id
+                    ORDER BY datetime(a.created_at) DESC
+                    LIMIT 1
+                ) AS preview_text
             FROM conversations
             ORDER BY datetime(updated_at) DESC
         """
@@ -964,6 +975,7 @@ class ConversationOrchestrator:
                 "title": row[1],
                 "language": row[2],
                 "updated_at": row[3],
+                "preview_text": row[4],
             }
             for row in rows
         ]
