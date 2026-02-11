@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import sqlite3
 import threading
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,7 +23,15 @@ class SQLiteWriter:
 
     # Keep this allowlist in sync with schema.sql and any future migrations.
     _ALLOWED_UPDATE_COLUMNS: dict[str, set[str]] = {
-        "conversations": {"title", "language", "model_metadata_json", "updated_at"},
+        "conversations": {
+            "title",
+            "language",
+            "asr_model_id",
+            "llm_model_id",
+            "tts_model_id",
+            "model_metadata_json",
+            "updated_at",
+        },
         "user_turns": {"input_text", "asr_text", "asr_meta_json", "updated_at"},
         "assistant_turns": {"reply_text", "llm_meta_json", "updated_at"},
         "corrections": {
@@ -270,7 +279,7 @@ class SQLiteWriter:
         connection = sqlite3.connect(self._db_path)
         try:
             connection.execute("PRAGMA foreign_keys = ON;")
-            self._apply_schema(connection)
+            connection = self._apply_schema(connection)
             self._ready_event.set()
             while not self._stop_event.is_set():
                 task = self._task_queue.get()
@@ -285,7 +294,7 @@ class SQLiteWriter:
         finally:
             connection.close()
 
-    def _apply_schema(self, connection: sqlite3.Connection) -> None:
+    def _apply_schema(self, connection: sqlite3.Connection) -> sqlite3.Connection:
         """Apply the schema to the writer connection.
 
         Parameters
@@ -300,3 +309,33 @@ class SQLiteWriter:
         schema_sql = self._schema_path.read_text(encoding="utf-8")
         connection.executescript(schema_sql)
         connection.commit()
+        if self._schema_needs_reset(connection):
+            logging.getLogger(__name__).warning(
+                "schema_mismatch: resetting sqlite db at %s", self._db_path
+            )
+            connection.close()
+            if self._db_path.exists():
+                self._db_path.unlink()
+            connection = sqlite3.connect(self._db_path)
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.executescript(schema_sql)
+            connection.commit()
+        return connection
+
+    def _schema_needs_reset(self, connection: sqlite3.Connection) -> bool:
+        required_columns = {
+            "id",
+            "title",
+            "language",
+            "asr_model_id",
+            "llm_model_id",
+            "tts_model_id",
+            "created_at",
+            "updated_at",
+            "model_metadata_json",
+        }
+        rows = connection.execute("PRAGMA table_info(conversations)").fetchall()
+        if not rows:
+            return False
+        columns = {row[1] for row in rows}
+        return not required_columns.issubset(columns)

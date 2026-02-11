@@ -95,11 +95,25 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ---
 
+### 2.4 Conversation Persistence (Across Restarts)
+
+✅ Auto-persist chat turns to SQLite (already writing user/assistant/corrections)  
+✅ Store conversation metadata (language, model IDs) for replay  
+✅ Add schema notes for forward compatibility  
+✅ Add conversation index query (title, last updated, language)  
+✅ Add summary/preview field for list view  
+✅ Add fetch-by-id API to load full conversation  
+✅ Define history formatting/truncation for resumed chats  
+✅ Support resume flow: load history + continue new turns  
+✅ Add delete/export hooks (optional, post-MVP if needed)
+
+---
+
 ## 3. ASR Module
 
 ✅ Implement `models/asr_whisper.py`  
 ✅ Load ASR model via `settings.py` (default set in `config/models.py`)  
-🔁 Force language per session  
+✅ Force language per session  
 🔁 Preserve English words in mixed-language utterances
 
 ✅ Return:
@@ -120,7 +134,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Load LLM via `settings.py` (default set in `config/models.py`)  
 ✅ Integrate MLX-LM backend in `models/llm_qwen.py`  
 🔁 Support optional BF16 mode  
-🔁 Use MLX tokenizer for prompt token counting  
+✅ Use MLX tokenizer for prompt token counting  
 ✅ Enforce:
 
 - max context tokens
@@ -278,6 +292,20 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ---
 
+### 9.1 Conversation History UI
+
+✅ Conversation list panel (title, last updated, language)  
+✅ Conversation preview (summary or last assistant reply)  
+✅ Select conversation → load transcript into chat  
+✅ Continue conversation → append new turns  
+✅ New conversation action (clear state + start fresh)  
+✅ Delete conversation (optional; can be post-MVP)  
+✅ Delete all history (bulk delete)  
+✅ Empty state handling (no conversations yet)  
+🔁 Loading/error states for list and selection
+
+---
+
 ## 10. Caching and Performance
 
 ✅ ASR cache (session-only)  
@@ -336,12 +364,13 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 12. Resource and Stability
 
-✅ Enforce context truncation  
-- Add real token counting (use model tokenizer)  
-- Trim oldest conversation history first  
+✅ Enforce context truncation
+
+- Add real token counting (use model tokenizer)
+- Trim oldest conversation history first
 - Preserve latest user turn and required fields
-✅ Enforce token caps per role  
-🔁 Periodic memory logging
+  ✅ Enforce token caps per role  
+  🔁 Periodic memory logging
 
 ✅ Manual session reset control
 
@@ -349,10 +378,10 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ## 13. MVP Exit Criteria
 
-⬜ Spoken JP conversation works end-to-end  
-⬜ Corrections and native phrasing displayed  
+✅ Spoken JP conversation works end-to-end  
+⏳ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
-⬜ Conversations persist across restarts (text + corrections)  
+⏳ Conversations persist across restarts (text + corrections)  
 ⬜ Audio can be regenerated on demand for a single turn or full conversation
 ⬜ Stable operation within ~22–26 GB RAM
 

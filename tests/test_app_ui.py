@@ -26,6 +26,195 @@ def test_format_conversation_history_formats_turns() -> None:
     assert formatted_tuple == expected
 
 
+def test_format_turns_to_chat() -> None:
+    turns = [
+        {"input_text": "Hi", "asr_text": None, "reply_text": "Hello"},
+        {"input_text": None, "asr_text": "Audio hi", "reply_text": "Hi there"},
+    ]
+    history = ui_module._format_turns_to_chat(turns)
+    assert history == [
+        {"role": "user", "content": "Hi"},
+        {"role": "assistant", "content": "Hello"},
+        {"role": "user", "content": "Audio hi"},
+        {"role": "assistant", "content": "Hi there"},
+    ]
+
+
+def test_load_conversation_options() -> None:
+    class _Orchestrator:
+        def list_conversations(self):
+            return [
+                {
+                    "id": "c1",
+                    "title": "Test",
+                    "language": "ja",
+                    "updated_at": "2026-02-10",
+                    "preview_text": "これはテストです。",
+                },
+                {"id": "c2", "title": None, "language": "fr", "updated_at": ""},
+            ]
+
+    orch = _Orchestrator()
+    options = ui_module._load_conversation_options(orch)
+    assert options[0][1] == "c1"
+    assert "これはテストです。" in options[0][0]
+    assert options[1][1] == "c2"
+
+
+def test_load_conversation_populates_chat() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+
+        def get_conversation(self, conversation_id: str):
+            assert conversation_id == "conv-1"
+            return {
+                "id": "conv-1",
+                "language": "fr",
+                "turns": [
+                    {"input_text": "Hi", "asr_text": None, "reply_text": "Hello"},
+                    {"input_text": None, "asr_text": "Audio hi", "reply_text": "Hi there"},
+                ],
+            }
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+    orch = _Orchestrator()
+    result = ui_module._load_conversation(orch, "conv-1")
+    history = result[0]
+    assert history[0]["content"] == "Hi"
+    assert history[-1]["content"] == "Hi there"
+    assert orch.language == "fr"
+    assert result[-2] == "fr"
+    assert result[-1] is True
+
+
+def test_load_conversation_returns_language_and_suppresses_change() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+
+        def get_conversation(self, conversation_id: str):
+            assert conversation_id == "conv-2"
+            return {
+                "id": "conv-2",
+                "language": "es",
+                "turns": [
+                    {"input_text": "Hola", "asr_text": None, "reply_text": "Hola"},
+                ],
+            }
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+    orch = _Orchestrator()
+    result = ui_module._load_conversation(orch, "conv-2")
+    assert result[-2] == "es"
+    assert result[-1] is True
+    assert orch.language == "es"
+
+
+def test_conversation_label_truncates_preview() -> None:
+    row = {
+        "title": "Ignored",
+        "language": "en",
+        "updated_at": "2026-02-10",
+        "preview_text": "A" * 80,
+    }
+    label = ui_module._conversation_label(row)
+    assert "A" * 60 not in label
+    assert "…" in label
+
+
+def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_choices = []
+
+    def _fake_loader(_orch):
+        return list(fake_choices)
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    conversation_update, load_update, empty_update = ui_module._refresh_conversation_options(None)
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+    fake_choices.append(("Label", "id-1"))
+    conversation_update, load_update, empty_update = ui_module._refresh_conversation_options(None)
+    assert conversation_update["choices"]
+    assert load_update["interactive"] is True
+    assert empty_update["visible"] is False
+
+
+def test_delete_conversation_and_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.deleted = None
+            self.reset_called = False
+
+        def delete_conversation(self, conversation_id: str) -> None:
+            self.deleted = conversation_id
+
+        def delete_all_conversations(self) -> None:
+            raise AssertionError("delete_all_conversations should not be called")
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    def _fake_loader(_orch):
+        return []
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    orch = _Orchestrator()
+    result = ui_module._delete_conversation_and_refresh(orch, "conv-1")
+    assert orch.deleted == "conv-1"
+    assert orch.reset_called is True
+    assert result[0] == []
+    conversation_update, load_update, empty_update = result[-3:]
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+
+def test_delete_all_conversations_and_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.deleted_all = False
+            self.reset_called = False
+
+        def delete_conversation(self, conversation_id: str) -> None:
+            raise AssertionError("delete_conversation should not be called")
+
+        def delete_all_conversations(self) -> None:
+            self.deleted_all = True
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    def _fake_loader(_orch):
+        return []
+
+    monkeypatch.setattr(ui_module, "_load_conversation_options", _fake_loader)
+    orch = _Orchestrator()
+    result = ui_module._delete_all_conversations_and_refresh(orch)
+    assert orch.deleted_all is True
+    assert orch.reset_called is True
+    assert result[0] == []
+    conversation_update, load_update, empty_update = result[-3:]
+    assert conversation_update["choices"] == []
+    assert load_update["interactive"] is False
+    assert empty_update["visible"] is True
+
+
+def test_confirm_row_toggle_returns_two_updates() -> None:
+    show_updates = ui_module._confirm_row_show_updates()
+    hide_updates = ui_module._confirm_row_hide_updates()
+    assert isinstance(show_updates, tuple)
+    assert isinstance(hide_updates, tuple)
+    assert len(show_updates) == 2
+    assert len(hide_updates) == 2
+
+
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):
@@ -82,24 +271,42 @@ def test_handle_language_change_resets_state() -> None:
         def __init__(self):
             self.language = "ja"
             self.reset_called = False
-            self.updated = None
 
         def set_language(self, language: str) -> None:
             self.language = language
-
-        def update_conversation_language(self, conversation_id: str, language: str) -> None:
-            self.updated = (conversation_id, language)
 
         def reset_session(self) -> None:
             self.reset_called = True
 
     orch = _Orchestrator()
-    result = ui_module._handle_language_change(orch, "fr", "conv-1")
+    should_reset = ui_module._request_language_change(orch, "fr", False)
+    assert should_reset is True
+    result = ui_module._apply_language_change(orch, should_reset)
 
     assert orch.language == "fr"
     assert orch.reset_called is True
-    assert orch.updated == ("conv-1", "fr")
     assert result[0] == []
+
+
+def test_handle_language_change_noop_when_suppressed() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+            self.reset_called = False
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    orch = _Orchestrator()
+    should_reset = ui_module._request_language_change(orch, "fr", True)
+    assert should_reset is False
+    assert orch.language == "ja"
+    result = ui_module._apply_language_change(orch, should_reset)
+    assert orch.reset_called is False
+    assert isinstance(result, tuple)
 
 
 def test_run_corrections_skips_when_toggle_off() -> None:

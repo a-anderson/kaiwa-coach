@@ -19,10 +19,12 @@ def test_storage_roundtrip_and_cascade() -> None:
 
     connection.execute(
         """
-        INSERT INTO conversations (id, title, language, model_metadata_json)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO conversations (
+            id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        ("conv_1", "Test", "ja", "{}"),
+        ("conv_1", "Test", "ja", "asr", "llm", "tts", "{}"),
     )
 
     connection.execute(
@@ -90,4 +92,3 @@ def test_foreign_key_enforcement() -> None:
         assert False, "Expected foreign key constraint to fail."
     except sqlite3.IntegrityError:
         pass
-

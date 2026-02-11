@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 import time
+from datetime import datetime, timezone
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
@@ -180,6 +181,169 @@ def _replace_last_assistant(
     return updated
 
 
+def _format_turns_to_chat(turns: list[dict[str, str | None]]) -> list[dict[str, str]]:
+    history: list[dict[str, str]] = []
+    for turn in turns:
+        user_text = turn.get("input_text") or turn.get("asr_text") or ""
+        if user_text:
+            history.append({"role": "user", "content": str(user_text)})
+        reply_text = turn.get("reply_text") or ""
+        if reply_text:
+            history.append({"role": "assistant", "content": str(reply_text)})
+    return history
+
+
+def _conversation_label(row: dict[str, str]) -> str:
+    title = row.get("title") or "Untitled"
+    preview = row.get("preview_text") or ""
+    language = row.get("language") or "unknown"
+    updated_at = row.get("updated_at") or ""
+    emoji = _language_emoji(language)
+    summary = _truncate_preview(preview) if preview else title
+    if updated_at:
+        return f"{emoji} {summary} · {_format_local_time(updated_at)}"
+    return f"{emoji} {summary}"
+
+
+def _truncate_preview(text: str, max_chars: int = 60) -> str:
+    trimmed = text.strip()
+    if len(trimmed) <= max_chars:
+        return trimmed
+    return f"{trimmed[: max_chars - 1].rstrip()}…"
+
+
+def _language_emoji(language: str) -> str:
+    return {
+        "ja": "🇯🇵",
+        "fr": "🇫🇷",
+        "en": "🇺🇸",
+        "es": "🇪🇸",
+        "it": "🇮🇹",
+        "pt-br": "🇧🇷",
+    }.get(language, "🏳️")
+
+
+def _format_local_time(timestamp: str) -> str:
+    """Format timestamps as HH:mm in the local timezone."""
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return timestamp
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    local = parsed.astimezone()
+    tz_name = local.tzname() or ""
+    suffix = f" {tz_name}" if tz_name else ""
+    return local.strftime("%H:%M") + suffix
+
+
+def _load_conversation_options(orchestrator: ConversationOrchestrator) -> list[tuple[str, str]]:
+    list_fn = getattr(orchestrator, "list_conversations", None)
+    if not callable(list_fn):
+        return []
+    rows = list_fn()
+    return [(_conversation_label(row), row["id"]) for row in rows]
+
+
+def _refresh_conversation_options(orchestrator: ConversationOrchestrator):
+    import gradio as gr  # type: ignore
+
+    choices = _load_conversation_options(orchestrator)
+    return (
+        gr.update(choices=choices, value=None),
+        gr.update(interactive=bool(choices)),
+        gr.update(visible=not bool(choices)),
+    )
+
+
+def _delete_conversation_and_refresh(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+):
+    if conversation_id:
+        orchestrator.delete_conversation(conversation_id)
+    reset = _handle_reset(orchestrator)
+    convo_updates = _refresh_conversation_options(orchestrator)
+    return reset + convo_updates
+
+
+def _delete_all_conversations_and_refresh(
+    orchestrator: ConversationOrchestrator,
+):
+    orchestrator.delete_all_conversations()
+    reset = _handle_reset(orchestrator)
+    convo_updates = _refresh_conversation_options(orchestrator)
+    return reset + convo_updates
+
+
+def _confirm_row_show_updates():
+    import gradio as gr  # type: ignore
+
+    return (gr.update(visible=True), gr.update(visible=True))
+
+
+def _confirm_row_hide_updates():
+    import gradio as gr  # type: ignore
+
+    return (gr.update(visible=False), gr.update(visible=False))
+
+
+def _load_conversation(
+    orchestrator: ConversationOrchestrator,
+    conversation_id: str | None,
+):
+    if not conversation_id:
+        return (
+            [],
+            None,
+            [],
+            "",
+            "",
+            "",
+            None,
+            None,
+            False,
+            {},
+            "",
+            "",
+            "",
+            None,
+            None,
+            "",
+            None,
+            True,
+        )
+    data = orchestrator.get_conversation(conversation_id)
+    language = data.get("language")
+    if language:
+        orchestrator.set_language(language)
+    history = _format_turns_to_chat(data["turns"])
+    conversation_history = _format_conversation_history(history)
+    return (
+        history,
+        conversation_id,
+        history,
+        conversation_history,
+        "",
+        "",
+        None,
+        None,
+        False,
+        {},
+        "",
+        "",
+        "",
+        None,
+        None,
+        "",
+        language,
+        True,
+    )
+
+
 def _start_text_turn(
     orchestrator: ConversationOrchestrator,
     user_text: str,
@@ -235,14 +399,14 @@ def _start_audio_turn(
     conversation_id: str | None,
     timings: dict | None = None,
 ):
-    if conversation_id is None:
-        conversation_id = orchestrator.create_conversation()
     try:
         target_sample_rate = getattr(orchestrator, "expected_sample_rate", None)
         start = time.perf_counter()
         pcm_bytes, meta, raw_pcm_bytes, raw_meta = _audio_to_pcm_with_raw(audio, target_sample_rate)
         timings = dict(timings or {})
         timings["audio_preprocess_seconds"] = time.perf_counter() - start
+        if conversation_id is None:
+            conversation_id = orchestrator.create_conversation()
         result = orchestrator.prepare_audio_turn(
             conversation_id=conversation_id,
             pcm_bytes=pcm_bytes,
@@ -530,13 +694,46 @@ def _handle_reset(orchestrator: ConversationOrchestrator):
     )
 
 
-def _handle_language_change(
-    orchestrator: ConversationOrchestrator, language: str, conversation_id: str | None
-):
+def _request_language_change(
+    orchestrator: ConversationOrchestrator,
+    language: str,
+    suppress_language_change: bool,
+) -> bool:
+    if suppress_language_change:
+        return False
     orchestrator.set_language(language)
-    if conversation_id is not None:
-        orchestrator.update_conversation_language(conversation_id, language)
-    return _handle_reset(orchestrator)
+    return True
+
+
+def _apply_language_change(
+    orchestrator: ConversationOrchestrator,
+    should_reset: bool,
+):
+    if not should_reset:
+        import gradio as gr  # type: ignore
+
+        no_change = gr.update()
+        return (
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+        )
+    reset = _handle_reset(orchestrator)
+    return reset
 
 
 def build_ui(orchestrator: ConversationOrchestrator):
@@ -553,6 +750,8 @@ def build_ui(orchestrator: ConversationOrchestrator):
         if value not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language in UI choices: {value}")
     default_language = getattr(orchestrator, "language", "ja")
+    conversation_choices = _load_conversation_options(orchestrator)
+    load_enabled = bool(conversation_choices)
 
     with gr.Blocks(
         css="""
@@ -565,6 +764,12 @@ def build_ui(orchestrator: ConversationOrchestrator):
 #header-row h1 {margin: 0; text-align: left;}
 #header-left {display: flex; align-items: center;}
 #header-right {display: flex; justify-content: flex-end;}
+#delete-confirm-row, #delete-all-confirm-row,
+#delete-confirm-buttons, #delete-all-confirm-buttons {
+  background: #ffecec;
+  border-radius: 6px;
+  padding: 6px;
+}
 """
     ) as demo:
         with gr.Row(elem_id="header-row"):
@@ -589,13 +794,41 @@ def build_ui(orchestrator: ConversationOrchestrator):
                         audio_input = gr.Audio(sources=["microphone"], label="Microphone")
                         audio_btn = gr.Button("Send Audio")
             with gr.Column(scale=1, min_width=280):
+                gr.Markdown("### Conversations")
+                empty_conversations_note = gr.Markdown(
+                    "No saved conversations yet.",
+                    visible=not bool(conversation_choices),
+                )
+                conversation_dropdown = gr.Dropdown(
+                    choices=conversation_choices,
+                    value=None,
+                    label="",
+                    show_label=False,
+                    interactive=True,
+                )
+                with gr.Row():
+                    refresh_conversations_btn = gr.Button("Refresh")
+                    load_conversation_btn = gr.Button("Load", interactive=load_enabled)
+                    delete_conversation_btn = gr.Button("Delete")
+                with gr.Row(visible=False, elem_id="delete-confirm-row") as delete_confirm_row:
+                    gr.Markdown("⚠️ Delete this conversation? This cannot be undone. ⚠️")
+                with gr.Row(visible=False, elem_id="delete-confirm-buttons") as delete_confirm_buttons_row:
+                    delete_confirm_btn = gr.Button("Confirm Delete")
+                    delete_cancel_btn = gr.Button("Cancel")
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
                 corrections_toggle = gr.Checkbox(value=True, label="Corrections")
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")
-        reset_btn = gr.Button("Reset Session")
+        with gr.Row():
+            reset_btn = gr.Button("Reset Session")
+            delete_all_btn = gr.Button("Delete All History")
+        with gr.Row(visible=False, elem_id="delete-all-confirm-row") as delete_all_confirm_row:
+            gr.Markdown("⚠️ Delete all conversations and history? This cannot be undone. ⚠️")
+        with gr.Row(visible=False, elem_id="delete-all-confirm-buttons") as delete_all_confirm_buttons_row:
+            delete_all_confirm_btn = gr.Button("Confirm Delete All")
+            delete_all_cancel_btn = gr.Button("Cancel")
 
         conversation_id_state = gr.State(None)
         history_state = gr.State([])
@@ -606,9 +839,19 @@ def build_ui(orchestrator: ConversationOrchestrator):
         reply_text_state = gr.State("")
         skip_pipeline_state = gr.State(False)
         timings_state = gr.State({})
+        suppress_language_change_state = gr.State(False)
+        loaded_language_state = gr.State(None)
+        language_changed_state = gr.State(False)
         language_dropdown.change(
-            lambda lang, cid: _handle_language_change(orchestrator, lang, cid),
-            inputs=[language_dropdown, conversation_id_state],
+            lambda language, suppress: _request_language_change(orchestrator, language, suppress),
+            inputs=[
+                language_dropdown,
+                suppress_language_change_state,
+            ],
+            outputs=[language_changed_state],
+        ).then(
+            lambda should_reset: _apply_language_change(orchestrator, should_reset),
+            inputs=[language_changed_state],
             outputs=[
                 chat,
                 conversation_id_state,
@@ -628,6 +871,140 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 skip_pipeline_state,
                 timings_state,
             ],
+        )
+
+        refresh_conversations_btn.click(
+            lambda: _refresh_conversation_options(orchestrator),
+            inputs=[],
+            outputs=[conversation_dropdown, load_conversation_btn, empty_conversations_note],
+        )
+
+        def _apply_loaded_language(language: str | None):
+            if not language:
+                return gr.update()
+            return gr.update(value=language)
+
+        load_conversation_btn.click(
+            lambda: True,
+            inputs=[],
+            outputs=[suppress_language_change_state],
+        ).then(
+            lambda cid: _load_conversation(orchestrator, cid),
+            inputs=[conversation_dropdown],
+            outputs=[
+                chat,
+                conversation_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                user_turn_id_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_audio_output,
+                assistant_audio_output,
+                error_output,
+                loaded_language_state,
+                suppress_language_change_state,
+            ],
+        ).then(
+            _apply_loaded_language,
+            inputs=[loaded_language_state],
+            outputs=[language_dropdown],
+        ).then(
+            lambda: False,
+            inputs=[],
+            outputs=[suppress_language_change_state],
+        )
+
+        delete_conversation_btn.click(
+            _confirm_row_show_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_cancel_btn.click(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_confirm_btn.click(
+            lambda cid: _delete_conversation_and_refresh(orchestrator, cid),
+            inputs=[conversation_id_state],
+            outputs=[
+                chat,
+                conversation_id_state,
+                user_input,
+                error_output,
+                user_audio_output,
+                assistant_audio_output,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                conversation_dropdown,
+                load_conversation_btn,
+                empty_conversations_note,
+            ],
+        ).then(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_confirm_row, delete_confirm_buttons_row],
+        )
+
+        delete_all_btn.click(
+            _confirm_row_show_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
+        )
+
+        delete_all_cancel_btn.click(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
+        )
+
+        delete_all_confirm_btn.click(
+            lambda: _delete_all_conversations_and_refresh(orchestrator),
+            inputs=[],
+            outputs=[
+                chat,
+                conversation_id_state,
+                user_input,
+                error_output,
+                user_audio_output,
+                assistant_audio_output,
+                corrected_output,
+                native_output,
+                explanation_output,
+                user_turn_id_state,
+                history_state,
+                conversation_history_state,
+                user_text_state,
+                reply_text_state,
+                assistant_turn_id_state,
+                skip_pipeline_state,
+                timings_state,
+                conversation_dropdown,
+                load_conversation_btn,
+                empty_conversations_note,
+            ],
+        ).then(
+            _confirm_row_hide_updates,
+            inputs=[],
+            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
         )
 
         def _on_send(

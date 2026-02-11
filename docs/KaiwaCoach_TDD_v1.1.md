@@ -103,12 +103,18 @@ kaiwacoach/
 
 ### 4.1 SQLite schema (conceptual)
 Tables:
-- `conversations(id, title, language, created_at, model_metadata_json)`
+- `conversations(id, title, language, asr_model_id, llm_model_id, tts_model_id, created_at, model_metadata_json)`
 - `user_turns(id, conversation_id, created_at, input_text, input_audio_path, asr_text, asr_meta_json)`
 - `assistant_turns(id, user_turn_id, created_at, reply_text, reply_audio_path, llm_meta_json)`
 - `corrections(id, user_turn_id, created_at, errors_json, corrected_text, native_text, explanation_text, prompt_hash)`
 - `artifacts(id, conversation_id, kind, path, meta_json)`
 Note: `*_audio_path` fields are optional and point to **session-only** cache files.
+
+Schema notes (forward compatibility):
+- Prefer additive migrations with nullable columns or defaults.
+- Backfill non-nullable fields in a follow-up step before enforcing constraints.
+- Avoid destructive edits to `schema.sql` without a migration plan.
+- MVP exception: local DB reset on mismatch is acceptable for a single tester.
 
 ### 4.2 Audio blobs (Session-only)
 - Stored as WAV files under a **session temp dir** (not persisted across restarts).
@@ -129,6 +135,10 @@ Note: ASR and LLM output caches are **in-memory only** and reset each session.
 ---
 
 ## 5. Orchestrator Pipeline
+
+### 5.0 Conversation lifecycle
+- Conversations are created on first user turn (text or audio), not on app start.
+- Language changes start a new conversation (no in-place language mutation).
 
 ### 5.1 Turn lifecycle (audio input)
 1. Cache raw user audio blob (WAV) in **session audio cache**

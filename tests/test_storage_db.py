@@ -50,10 +50,12 @@ def test_run_write_inserts_and_returns_value(tmp_path: Path) -> None:
         def _insert(conn: sqlite3.Connection) -> int:
             conn.execute(
                 """
-                INSERT INTO conversations (id, title, language, model_metadata_json)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO conversations (
+                    id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                ("conv_1", "Test", "ja", "{}"),
+                ("conv_1", "Test", "ja", "asr", "llm", "tts", "{}"),
             )
             conn.commit()
             return conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
@@ -67,10 +69,12 @@ def test_execute_write_inserts_row(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.execute_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("conv_2", "Title", "fr", "{}"),
+            ("conv_2", "Title", "fr", "asr", "llm", "tts", "{}"),
         )
 
         with writer.read_connection() as conn:
@@ -83,10 +87,12 @@ def test_executemany_write_inserts_rows(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.execute_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("conv_3", "Batch", "ja", "{}"),
+            ("conv_3", "Batch", "ja", "asr", "llm", "tts", "{}"),
         )
 
         writer.executemany_write(
@@ -110,8 +116,10 @@ def test_executescript_write_runs_script(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.executescript_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json)
-            VALUES ('conv_4', 'Script', 'ja', '{}');
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+            )
+            VALUES ('conv_4', 'Script', 'ja', 'asr', 'llm', 'tts', '{}');
             INSERT INTO user_turns (id, conversation_id, input_text)
             VALUES ('user_1', 'conv_4', 'こんにちは');
             """
@@ -130,8 +138,10 @@ def test_executescript_write_rejects_parameters(tmp_path: Path) -> None:
         with pytest.raises(sqlite3.IntegrityError):
             writer.executescript_write(
                 """
-                INSERT INTO conversations (id, title, language, model_metadata_json)
-                VALUES (?, ?, ?, ?);
+                INSERT INTO conversations (
+                    id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?);
                 """
             )
 
@@ -141,10 +151,12 @@ def test_read_connection_sees_committed_writes(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.execute_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("conv_5", "Read", "fr", "{}"),
+            ("conv_5", "Read", "fr", "asr", "llm", "tts", "{}"),
         )
 
         with writer.read_connection() as conn:
@@ -165,10 +177,12 @@ def test_execute_update_refreshes_updated_at(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.execute_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("conv_update", "Before", "ja", "{}", "2000-01-01 00:00:00"),
+            ("conv_update", "Before", "ja", "asr", "llm", "tts", "{}", "2000-01-01 00:00:00"),
         )
 
         writer.execute_update(
@@ -240,10 +254,12 @@ def test_concurrent_writes_are_serialized(tmp_path: Path) -> None:
     with _writer(tmp_path / "db.sqlite") as writer:
         writer.execute_write(
             """
-            INSERT INTO conversations (id, title, language, model_metadata_json)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (
+                id, title, language, asr_model_id, llm_model_id, tts_model_id, model_metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("conv_threads", "Threads", "ja", "{}"),
+            ("conv_threads", "Threads", "ja", "asr", "llm", "tts", "{}"),
         )
 
         def _insert_artifact(index: int) -> None:
