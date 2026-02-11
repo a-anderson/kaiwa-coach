@@ -261,8 +261,13 @@ def _load_conversation(
             None,
             None,
             "",
+            None,
+            True,
         )
     data = orchestrator.get_conversation(conversation_id)
+    language = data.get("language")
+    if language:
+        orchestrator.set_language(language)
     history = _format_turns_to_chat(data["turns"])
     conversation_history = _format_conversation_history(history)
     return (
@@ -282,6 +287,8 @@ def _load_conversation(
         None,
         None,
         "",
+        language,
+        True,
     )
 
 
@@ -635,11 +642,46 @@ def _handle_reset(orchestrator: ConversationOrchestrator):
     )
 
 
-def _handle_language_change(
-    orchestrator: ConversationOrchestrator, language: str, conversation_id: str | None
-):
+def _request_language_change(
+    orchestrator: ConversationOrchestrator,
+    language: str,
+    suppress_language_change: bool,
+) -> bool:
+    if suppress_language_change:
+        return False
     orchestrator.set_language(language)
-    return _handle_reset(orchestrator)
+    return True
+
+
+def _apply_language_change(
+    orchestrator: ConversationOrchestrator,
+    should_reset: bool,
+):
+    if not should_reset:
+        import gradio as gr  # type: ignore
+
+        no_change = gr.update()
+        return (
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+            no_change,
+        )
+    reset = _handle_reset(orchestrator)
+    return reset
 
 
 def build_ui(orchestrator: ConversationOrchestrator):
@@ -699,6 +741,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                     value=None,
                     label="",
                     show_label=False,
+                    interactive=True,
                 )
                 with gr.Row():
                     refresh_conversations_btn = gr.Button("Refresh")
@@ -720,9 +763,19 @@ def build_ui(orchestrator: ConversationOrchestrator):
         reply_text_state = gr.State("")
         skip_pipeline_state = gr.State(False)
         timings_state = gr.State({})
+        suppress_language_change_state = gr.State(False)
+        loaded_language_state = gr.State(None)
+        language_changed_state = gr.State(False)
         language_dropdown.change(
-            lambda lang, cid: _handle_language_change(orchestrator, lang, cid),
-            inputs=[language_dropdown, conversation_id_state],
+            lambda language, suppress: _request_language_change(orchestrator, language, suppress),
+            inputs=[
+                language_dropdown,
+                suppress_language_change_state,
+            ],
+            outputs=[language_changed_state],
+        ).then(
+            lambda should_reset: _apply_language_change(orchestrator, should_reset),
+            inputs=[language_changed_state],
             outputs=[
                 chat,
                 conversation_id_state,
@@ -750,7 +803,16 @@ def build_ui(orchestrator: ConversationOrchestrator):
             outputs=[conversation_dropdown],
         )
 
+        def _apply_loaded_language(language: str | None):
+            if not language:
+                return gr.update()
+            return gr.update(value=language)
+
         load_conversation_btn.click(
+            lambda: True,
+            inputs=[],
+            outputs=[suppress_language_change_state],
+        ).then(
             lambda cid: _load_conversation(orchestrator, cid),
             inputs=[conversation_dropdown],
             outputs=[
@@ -770,7 +832,17 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_audio_output,
                 assistant_audio_output,
                 error_output,
+                loaded_language_state,
+                suppress_language_change_state,
             ],
+        ).then(
+            _apply_loaded_language,
+            inputs=[loaded_language_state],
+            outputs=[language_dropdown],
+        ).then(
+            lambda: False,
+            inputs=[],
+            outputs=[suppress_language_change_state],
         )
 
         def _on_send(

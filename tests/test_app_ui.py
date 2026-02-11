@@ -57,21 +57,30 @@ def test_load_conversation_options() -> None:
 
 def test_load_conversation_populates_chat() -> None:
     class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+
         def get_conversation(self, conversation_id: str):
             assert conversation_id == "conv-1"
             return {
                 "id": "conv-1",
+                "language": "fr",
                 "turns": [
                     {"input_text": "Hi", "asr_text": None, "reply_text": "Hello"},
                     {"input_text": None, "asr_text": "Audio hi", "reply_text": "Hi there"},
                 ],
             }
 
+        def set_language(self, language: str) -> None:
+            self.language = language
+
     orch = _Orchestrator()
     result = ui_module._load_conversation(orch, "conv-1")
     history = result[0]
     assert history[0]["content"] == "Hi"
     assert history[-1]["content"] == "Hi there"
+    assert orch.language == "fr"
+    assert result[-2] == "fr"
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Blocks:
         def __init__(self, *args, **kwargs):
@@ -136,11 +145,34 @@ def test_handle_language_change_resets_state() -> None:
             self.reset_called = True
 
     orch = _Orchestrator()
-    result = ui_module._handle_language_change(orch, "fr", "conv-1")
+    should_reset = ui_module._request_language_change(orch, "fr", False)
+    assert should_reset is True
+    result = ui_module._apply_language_change(orch, should_reset)
 
     assert orch.language == "fr"
     assert orch.reset_called is True
     assert result[0] == []
+
+
+def test_handle_language_change_noop_when_suppressed() -> None:
+    class _Orchestrator:
+        def __init__(self):
+            self.language = "ja"
+            self.reset_called = False
+
+        def set_language(self, language: str) -> None:
+            self.language = language
+
+        def reset_session(self) -> None:
+            self.reset_called = True
+
+    orch = _Orchestrator()
+    should_reset = ui_module._request_language_change(orch, "fr", True)
+    assert should_reset is False
+    assert orch.language == "ja"
+    result = ui_module._apply_language_change(orch, should_reset)
+    assert orch.reset_called is False
+    assert isinstance(result, tuple)
 
 
 def test_run_corrections_skips_when_toggle_off() -> None:
