@@ -299,8 +299,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Select conversation → load transcript into chat  
 ✅ Continue conversation → append new turns  
 ✅ New conversation action (clear state + start fresh)  
-⬜ Delete conversation (optional; can be post-MVP)  
-⬜ Delete all history (bulk delete)  
+✅ Delete conversation (optional; can be post-MVP)  
+✅ Delete all history (bulk delete)  
 ✅ Empty state handling (no conversations yet)  
 🔁 Loading/error states for list and selection
 
