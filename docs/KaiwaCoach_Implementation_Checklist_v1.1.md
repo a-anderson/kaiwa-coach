@@ -267,8 +267,6 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Store prompt hash per LLM call (orchestrator)  
 ✅ Pass session language into TTS synthesis by default  
 ✅ Call katakana LLM rewrite step in the TTS normalisation pipeline  
-🔁 Provide audio regeneration for a single turn  
-🔁 Provide audio regeneration for a full conversation
 
 ---
 
@@ -283,9 +281,6 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Send button
 - Per-turn audio playback (session cache, user + assistant)
 - Corrections panel
-- Regenerate audio action
-    - For a single turn
-    - For a full conversation
 
 ✅ Wire orchestrator with ASR + audio cache in `app.py` / UI setup  
 ✅ Session reset support  
@@ -383,7 +378,6 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⏳ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
 ✅ Conversations persist across restarts (text)  
-⬜ Audio can be regenerated on demand for a single turn or full conversation
 ⬜ Stable operation within ~22–26 GB RAM
 
 ---
@@ -394,6 +388,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 🔁 Correction text persists across restarts
 🔁 Pronunciation scoring  
 🔁 Download option for message audio
+🔁 Audio regeneration (single turn + full conversation)
 🔁 ASR confidence-based UX  
 🔁 Shadowing mode  
 🔁 Anki export  
