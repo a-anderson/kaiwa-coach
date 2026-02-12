@@ -266,7 +266,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Graceful degradation on failure  
 ✅ Store prompt hash per LLM call (orchestrator)  
 ✅ Pass session language into TTS synthesis by default  
-✅ Call katakana LLM rewrite step in the TTS normalisation pipeline  
+✅ Call katakana LLM rewrite step in the TTS normalisation pipeline
 
 ---
 
@@ -378,7 +378,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ⏳ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
 ✅ Conversations persist across restarts (text)  
-⬜ Stable operation within ~22–26 GB RAM
+✅ Stable operation within ~22–26 GB RAM
 
 ---
 

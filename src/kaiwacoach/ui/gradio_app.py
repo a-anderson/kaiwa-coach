@@ -240,6 +240,82 @@ def _format_local_time(timestamp: str) -> str:
     return local.strftime("%H:%M") + suffix
 
 
+def _theme_html(language: str) -> str:
+    themes = {
+        "ja": {"primary": "#3a3a3a", "accent": "#8d1b1b", "user": "#f6e7e7", "bot": "#f1f1f1"},
+        "fr": {"primary": "#1e3a8a", "accent": "#b71c1c", "user": "#e9eef9", "bot": "#fce8e8"},
+        "it": {"primary": "#166534", "accent": "#b71c1c", "user": "#e9f6ee", "bot": "#fce8e8"},
+        "es": {"primary": "#b45309", "accent": "#b71c1c", "user": "#fff2e0", "bot": "#fce8e8"},
+        "pt-br": {"primary": "#166534", "accent": "#1e3a8a", "user": "#e7f5ec", "bot": "#e9eef9"},
+        "en": {"primary": "#1e3a8a", "accent": "#b71c1c", "user": "#e9eef9", "bot": "#fce8e8"},
+    }
+    cfg = themes.get(language, themes["en"])
+    return f"""
+<style id="kc-theme-style">
+:root, body, .gradio-container {{
+  --kc-primary: {cfg["primary"]};
+  --kc-accent: {cfg["accent"]};
+  --kc-user-bg: {cfg["user"]};
+  --kc-bot-bg: {cfg["bot"]};
+  --color-accent: {cfg["user"]} !important;
+  --color-accent-soft: {cfg["user"]} !important;
+  --color-accent-subtle: {cfg["user"]} !important;
+  --color-accent-text: #ffffff !important;
+  --color-accent-hover: {cfg["user"]} !important;
+}}
+.gradio-container input[type="checkbox"] {{
+  accent-color: var(--kc-primary) !important;
+}}
+.gradio-container button,
+.gradio-container .gr-button {{
+  border-color: var(--kc-user-bg) !important;
+}}
+.gradio-container button.primary,
+.gradio-container .gr-button.gr-button-primary {{
+  background: var(--kc-user-bg) !important;
+  color: #111827 !important;
+  box-shadow: none !important;
+}}
+.gradio-container .message.user {{
+  background: var(--kc-user-bg) !important;
+  color: #111827 !important;
+  border: 1px solid var(--kc-user-bg) !important;
+}}
+.gradio-container .message.bot {{
+  background: var(--kc-bot-bg) !important;
+  color: #111827 !important;
+  border: 1px solid var(--kc-bot-bg) !important;
+}}
+.gradio-container .audio-recorder button,
+.gradio-container button[data-testid="record-button"],
+.gradio-container .record button,
+.gradio-container .record .gr-button {{
+  background: var(--kc-primary) !important;
+  border-color: var(--kc-primary) !important;
+  color: #ffffff !important;
+}}
+.gradio-container .gr-checkbox input[type="checkbox"],
+.gradio-container input[type="checkbox"] {{
+  accent-color: var(--kc-primary) !important;
+}}
+.gradio-container .message.user,
+.gradio-container .message.bot {{
+  box-shadow: none !important;
+}}
+.gradio-container .gr-checkbox {{
+  box-shadow: none !important;
+}}
+.gradio-container button.secondary,
+.gradio-container .gr-button.gr-button-secondary {{
+  color: #111827 !important;
+  background: var(--kc-user-bg) !important;
+  border-color: var(--kc-user-bg) !important;
+  box-shadow: none !important;
+}}
+</style>
+"""
+
+
 def _load_conversation_options(orchestrator: ConversationOrchestrator) -> list[tuple[str, str]]:
     list_fn = getattr(orchestrator, "list_conversations", None)
     if not callable(list_fn):
@@ -770,8 +846,37 @@ def build_ui(orchestrator: ConversationOrchestrator):
   border-radius: 6px;
   padding: 6px;
 }
+.gradio-container {
+  --color-accent: var(--kc-user-bg, #e5e7eb);
+}
+.gradio-container button,
+.gradio-container .gr-button {
+  border-color: var(--kc-user-bg, #e5e7eb);
+}
+.gradio-container button.primary,
+.gradio-container .gr-button.gr-button-primary {
+  background: var(--kc-user-bg, #e5e7eb);
+  color: #111827;
+  box-shadow: none;
+}
+.gradio-container button.secondary,
+.gradio-container .gr-button.gr-button-secondary {
+  color: #111827;
+  background: var(--kc-user-bg, #e5e7eb);
+  border-color: var(--kc-user-bg, #e5e7eb);
+  box-shadow: none;
+}
+.gradio-container .message.user {
+  background: var(--kc-user-bg, #f3f4f6);
+  color: #111827;
+}
+.gradio-container .message.bot {
+  background: var(--kc-bot-bg, #eef2ff);
+  color: #111827;
+}
 """
     ) as demo:
+        theme_html = gr.HTML(_theme_html(default_language))
         with gr.Row(elem_id="header-row"):
             with gr.Column(elem_id="header-left"):
                 gr.Markdown("# KaiwaCoach")
@@ -871,6 +976,10 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 skip_pipeline_state,
                 timings_state,
             ],
+        ).then(
+            lambda language: _theme_html(language),
+            inputs=[language_dropdown],
+            outputs=[theme_html],
         )
 
         refresh_conversations_btn.click(
@@ -915,6 +1024,10 @@ def build_ui(orchestrator: ConversationOrchestrator):
             _apply_loaded_language,
             inputs=[loaded_language_state],
             outputs=[language_dropdown],
+        ).then(
+            lambda language: _theme_html(language),
+            inputs=[language_dropdown],
+            outputs=[theme_html],
         ).then(
             lambda: False,
             inputs=[],

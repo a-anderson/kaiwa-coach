@@ -127,6 +127,12 @@ def test_conversation_label_truncates_preview() -> None:
     assert "…" in label
 
 
+def test_theme_html_sets_language_attribute() -> None:
+    html = ui_module._theme_html("ja")
+    assert "<style>" in html
+    assert "--kc-primary" in html
+
+
 def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_choices = []
 
