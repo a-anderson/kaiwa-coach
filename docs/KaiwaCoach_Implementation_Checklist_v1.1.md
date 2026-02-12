@@ -283,8 +283,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - Send button
 - Per-turn audio playback (session cache, user + assistant)
 - Corrections panel
-  🔁 Regenerate audio action for a single turn  
-  🔁 Regenerate audio action for a full conversation
+- Regenerate audio action
+    - For a single turn
+    - For a full conversation
 
 ✅ Wire orchestrator with ASR + audio cache in `app.py` / UI setup  
 ✅ Session reset support  
@@ -381,7 +382,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Spoken JP conversation works end-to-end  
 ⏳ Corrections and native phrasing displayed  
 ⬜ Kokoro pronounces mixed JP/EN correctly  
-⏳ Conversations persist across restarts (text + corrections)  
+✅ Conversations persist across restarts (text)  
 ⬜ Audio can be regenerated on demand for a single turn or full conversation
 ⬜ Stable operation within ~22–26 GB RAM
 
@@ -390,6 +391,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ## 14. Post-MVP (Optional)
 
 ✅ Add support for other languages
+🔁 Correction text persists across restarts
 🔁 Pronunciation scoring  
 🔁 Download option for message audio
 🔁 ASR confidence-based UX  
