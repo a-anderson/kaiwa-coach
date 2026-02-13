@@ -315,10 +315,63 @@ def _theme_html(language: str) -> str:
 }}
 .gradio-container .audio-recorder button,
 .gradio-container button[data-testid="record-button"],
-.gradio-container [data-testid="record-button"] {{
-  background: var(--kc-primary) !important;
-  border-color: var(--kc-primary) !important;
+#mic-input button[data-testid="record-button"],
+#mic-input .record-button,
+#mic-input .audio-recorder button,
+#mic-input button[aria-label*="Record"],
+#mic-input button[aria-label*="record"] {{
+  background: var(--kc-checkbox) !important;
+  border-color: var(--kc-checkbox) !important;
   color: #ffffff !important;
+}}
+#mic-input button[data-testid="record-button"] svg,
+#mic-input .record-button svg,
+#mic-input .audio-recorder button svg {{
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}}
+#mic-input {{
+  --color-accent: #ffffff !important;
+  --color-accent-soft: #ffffff !important;
+  --color-accent-subtle: #ffffff !important;
+  --button-primary-text-color: #ffffff !important;
+}}
+#mic-input button[data-testid="record-button"] svg circle,
+#mic-input button[data-testid="record-button"] svg path,
+#mic-input .record-button svg circle,
+#mic-input .record-button svg path,
+#mic-input .audio-recorder button svg circle,
+#mic-input .audio-recorder button svg path {{
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}}
+#mic-input button[data-testid="record-button"] [class*="record"],
+#mic-input button[data-testid="record-button"] [class*="dot"],
+#mic-input button[data-testid="record-button"] [class*="pulse"],
+#mic-input .record-button [class*="record"],
+#mic-input .record-button [class*="dot"],
+#mic-input .record-button [class*="pulse"] {{
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}}
+#mic-input button[data-testid="record-button"]::before,
+#mic-input button[data-testid="record-button"]::after,
+#mic-input .record-button::before,
+#mic-input .record-button::after,
+#mic-input [class*="recording"]::before,
+#mic-input [class*="recording"]::after,
+#mic-input [class*="pulse"]::before,
+#mic-input [class*="pulse"]::after,
+#mic-input [class*="dot"]::before,
+#mic-input [class*="dot"]::after {{
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px #ffffff inset !important;
 }}
 #corrections-toggle input[data-testid="checkbox"] {{
   -webkit-appearance: none !important;
@@ -915,7 +968,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                         user_input = gr.Textbox(label="Your message", lines=3)
                         send_btn = gr.Button("Send")
                     with gr.Column(scale=1, min_width=260, elem_id="audio-input"):
-                        audio_input = gr.Audio(sources=["microphone"], label="Microphone")
+                        audio_input = gr.Audio(sources=["microphone"], label="Microphone", elem_id="mic-input")
                         audio_btn = gr.Button("Send Audio")
             with gr.Column(scale=1, min_width=280):
                 gr.Markdown("### Conversations")
