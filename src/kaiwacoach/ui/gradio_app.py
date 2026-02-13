@@ -244,50 +244,38 @@ def _theme_html(language: str) -> str:
     themes = {
         "ja": {
             "primary": "#3a3a3a",
-            "accent": "#ce2037",
             "user": "#fce8e8",
             "bot": "#f1f1f1",
-            "accent_strong": "#111827",
             "checkbox": "#ce2037",
         },
         "fr": {
             "primary": "#264db6",
-            "accent": "#b71c1c",
             "user": "#e9eef9",
             "bot": "#fce8e8",
-            "accent_strong": "#111827",
             "checkbox": "#264db6",
         },
         "it": {
             "primary": "#166534",
-            "accent": "#b71c1c",
             "user": "#e9f6ee",
             "bot": "#fce8e8",
-            "accent_strong": "#111827",
             "checkbox": "#166534",
         },
         "es": {
             "primary": "#e27a2b",
-            "accent": "#b71c1c",
             "user": "#fff2e0",
             "bot": "#fce8e8",
-            "accent_strong": "#111827",
             "checkbox": "#e27a2b",
         },
         "pt-br": {
             "primary": "#166534",
-            "accent": "#264db6",
             "user": "#e7f5ec",
             "bot": "#e9eef9",
-            "accent_strong": "#111827",
             "checkbox": "#166534",
         },
         "en": {
             "primary": "#264db6",
-            "accent": "#b71c1c",
             "user": "#e9eef9",
             "bot": "#fce8e8",
-            "accent_strong": "#111827",
             "checkbox": "#264db6",
         },
     }
@@ -296,19 +284,14 @@ def _theme_html(language: str) -> str:
 <style id="kc-theme-style">
 :root, body, .gradio-container {{
   --kc-primary: {cfg["primary"]};
-  --kc-accent: {cfg["accent"]};
-  --kc-accent-strong: {cfg["accent_strong"]};
   --kc-checkbox: {cfg["checkbox"]};
   --kc-user-bg: {cfg["user"]};
   --kc-bot-bg: {cfg["bot"]};
-  --color-accent: {cfg["accent_strong"]} !important;
-  --color-accent-soft: {cfg["accent_strong"]} !important;
-  --color-accent-subtle: {cfg["accent_strong"]} !important;
+  --color-accent: {cfg["checkbox"]} !important;
+  --color-accent-soft: {cfg["checkbox"]} !important;
+  --color-accent-subtle: {cfg["checkbox"]} !important;
   --color-accent-text: #ffffff !important;
-  --color-accent-hover: {cfg["accent_strong"]} !important;
-}}
-.gradio-container input[type="checkbox"] {{
-  accent-color: var(--kc-checkbox) !important;
+  --color-accent-hover: {cfg["checkbox"]} !important;
 }}
 .gradio-container button,
 .gradio-container .gr-button {{
@@ -332,8 +315,7 @@ def _theme_html(language: str) -> str:
 }}
 .gradio-container .audio-recorder button,
 .gradio-container button[data-testid="record-button"],
-.gradio-container .record button,
-.gradio-container .record .gr-button {{
+.gradio-container [data-testid="record-button"] {{
   background: var(--kc-primary) !important;
   border-color: var(--kc-primary) !important;
   color: #ffffff !important;
@@ -368,9 +350,6 @@ def _theme_html(language: str) -> str:
 }}
 .gradio-container .message.user,
 .gradio-container .message.bot {{
-  box-shadow: none !important;
-}}
-.gradio-container .gr-checkbox {{
   box-shadow: none !important;
 }}
 .gradio-container button.secondary,
@@ -913,34 +892,6 @@ def build_ui(orchestrator: ConversationOrchestrator):
   background: #ffecec;
   border-radius: 6px;
   padding: 6px;
-}
-.gradio-container {
-  --color-accent: var(--kc-user-bg, #e5e7eb);
-}
-.gradio-container button,
-.gradio-container .gr-button {
-  border-color: var(--kc-user-bg, #e5e7eb);
-}
-.gradio-container button.primary,
-.gradio-container .gr-button.gr-button-primary {
-  background: var(--kc-user-bg, #e5e7eb);
-  color: #111827;
-  box-shadow: none;
-}
-.gradio-container button.secondary,
-.gradio-container .gr-button.gr-button-secondary {
-  color: #111827;
-  background: var(--kc-user-bg, #e5e7eb);
-  border-color: var(--kc-user-bg, #e5e7eb);
-  box-shadow: none;
-}
-.gradio-container .message.user {
-  background: var(--kc-user-bg, #f3f4f6);
-  color: #111827;
-}
-.gradio-container .message.bot {
-  background: var(--kc-bot-bg, #eef2ff);
-  color: #111827;
 }
 """
     ) as demo:
