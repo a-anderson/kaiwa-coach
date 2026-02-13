@@ -244,19 +244,19 @@ def _theme_html(language: str) -> str:
     themes = {
         "ja": {
             "primary": "#3a3a3a",
-            "accent": "#8d1b1b",
+            "accent": "#ce2037",
             "user": "#fce8e8",
             "bot": "#f1f1f1",
             "accent_strong": "#111827",
-            "checkbox": "#8d1b1b",
+            "checkbox": "#ce2037",
         },
         "fr": {
-            "primary": "#1e3a8a",
+            "primary": "#264db6",
             "accent": "#b71c1c",
             "user": "#e9eef9",
             "bot": "#fce8e8",
             "accent_strong": "#111827",
-            "checkbox": "#1e3a8a",
+            "checkbox": "#264db6",
         },
         "it": {
             "primary": "#166534",
@@ -267,28 +267,28 @@ def _theme_html(language: str) -> str:
             "checkbox": "#166534",
         },
         "es": {
-            "primary": "#b45309",
+            "primary": "#e27a2b",
             "accent": "#b71c1c",
             "user": "#fff2e0",
             "bot": "#fce8e8",
             "accent_strong": "#111827",
-            "checkbox": "#b45309",
+            "checkbox": "#e27a2b",
         },
         "pt-br": {
             "primary": "#166534",
-            "accent": "#1e3a8a",
+            "accent": "#264db6",
             "user": "#e7f5ec",
             "bot": "#e9eef9",
             "accent_strong": "#111827",
             "checkbox": "#166534",
         },
         "en": {
-            "primary": "#1e3a8a",
+            "primary": "#264db6",
             "accent": "#b71c1c",
             "user": "#e9eef9",
             "bot": "#fce8e8",
             "accent_strong": "#111827",
-            "checkbox": "#1e3a8a",
+            "checkbox": "#264db6",
         },
     }
     cfg = themes.get(language, themes["en"])
