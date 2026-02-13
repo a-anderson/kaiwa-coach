@@ -242,12 +242,54 @@ def _format_local_time(timestamp: str) -> str:
 
 def _theme_html(language: str) -> str:
     themes = {
-        "ja": {"primary": "#3a3a3a", "accent": "#8d1b1b", "user": "#f6e7e7", "bot": "#f1f1f1"},
-        "fr": {"primary": "#1e3a8a", "accent": "#b71c1c", "user": "#e9eef9", "bot": "#fce8e8"},
-        "it": {"primary": "#166534", "accent": "#b71c1c", "user": "#e9f6ee", "bot": "#fce8e8"},
-        "es": {"primary": "#b45309", "accent": "#b71c1c", "user": "#fff2e0", "bot": "#fce8e8"},
-        "pt-br": {"primary": "#166534", "accent": "#1e3a8a", "user": "#e7f5ec", "bot": "#e9eef9"},
-        "en": {"primary": "#1e3a8a", "accent": "#b71c1c", "user": "#e9eef9", "bot": "#fce8e8"},
+        "ja": {
+            "primary": "#3a3a3a",
+            "accent": "#8d1b1b",
+            "user": "#fce8e8",
+            "bot": "#f1f1f1",
+            "accent_strong": "#111827",
+            "checkbox": "#8d1b1b",
+        },
+        "fr": {
+            "primary": "#1e3a8a",
+            "accent": "#b71c1c",
+            "user": "#e9eef9",
+            "bot": "#fce8e8",
+            "accent_strong": "#111827",
+            "checkbox": "#1e3a8a",
+        },
+        "it": {
+            "primary": "#166534",
+            "accent": "#b71c1c",
+            "user": "#e9f6ee",
+            "bot": "#fce8e8",
+            "accent_strong": "#111827",
+            "checkbox": "#166534",
+        },
+        "es": {
+            "primary": "#b45309",
+            "accent": "#b71c1c",
+            "user": "#fff2e0",
+            "bot": "#fce8e8",
+            "accent_strong": "#111827",
+            "checkbox": "#b45309",
+        },
+        "pt-br": {
+            "primary": "#166534",
+            "accent": "#1e3a8a",
+            "user": "#e7f5ec",
+            "bot": "#e9eef9",
+            "accent_strong": "#111827",
+            "checkbox": "#166534",
+        },
+        "en": {
+            "primary": "#1e3a8a",
+            "accent": "#b71c1c",
+            "user": "#e9eef9",
+            "bot": "#fce8e8",
+            "accent_strong": "#111827",
+            "checkbox": "#1e3a8a",
+        },
     }
     cfg = themes.get(language, themes["en"])
     return f"""
@@ -255,16 +297,18 @@ def _theme_html(language: str) -> str:
 :root, body, .gradio-container {{
   --kc-primary: {cfg["primary"]};
   --kc-accent: {cfg["accent"]};
+  --kc-accent-strong: {cfg["accent_strong"]};
+  --kc-checkbox: {cfg["checkbox"]};
   --kc-user-bg: {cfg["user"]};
   --kc-bot-bg: {cfg["bot"]};
-  --color-accent: {cfg["user"]} !important;
-  --color-accent-soft: {cfg["user"]} !important;
-  --color-accent-subtle: {cfg["user"]} !important;
+  --color-accent: {cfg["accent_strong"]} !important;
+  --color-accent-soft: {cfg["accent_strong"]} !important;
+  --color-accent-subtle: {cfg["accent_strong"]} !important;
   --color-accent-text: #ffffff !important;
-  --color-accent-hover: {cfg["user"]} !important;
+  --color-accent-hover: {cfg["accent_strong"]} !important;
 }}
 .gradio-container input[type="checkbox"] {{
-  accent-color: var(--kc-primary) !important;
+  accent-color: var(--kc-checkbox) !important;
 }}
 .gradio-container button,
 .gradio-container .gr-button {{
@@ -294,9 +338,33 @@ def _theme_html(language: str) -> str:
   border-color: var(--kc-primary) !important;
   color: #ffffff !important;
 }}
-.gradio-container .gr-checkbox input[type="checkbox"],
-.gradio-container input[type="checkbox"] {{
-  accent-color: var(--kc-primary) !important;
+#corrections-toggle input[data-testid="checkbox"] {{
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  margin: 0 !important;
+  border: 2px solid var(--kc-checkbox) !important;
+  border-radius: 0.25rem !important;
+  background: #ffffff !important;
+  display: inline-grid !important;
+  place-content: center !important;
+}}
+#corrections-toggle input[data-testid="checkbox"]::after {{
+  content: "" !important;
+  width: 0.28rem !important;
+  height: 0.52rem !important;
+  border: solid #ffffff !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) scale(0) !important;
+  transform-origin: center !important;
+}}
+#corrections-toggle input[data-testid="checkbox"]:checked {{
+  background: var(--kc-checkbox) !important;
+  border-color: var(--kc-checkbox) !important;
+}}
+#corrections-toggle input[data-testid="checkbox"]:checked::after {{
+  transform: rotate(45deg) scale(1) !important;
 }}
 .gradio-container .message.user,
 .gradio-container .message.bot {{
@@ -922,7 +990,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                     delete_cancel_btn = gr.Button("Cancel")
                 user_audio_output = gr.Audio(label="Last user audio", interactive=False)
                 assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
-                corrections_toggle = gr.Checkbox(value=True, label="Corrections")
+                corrections_toggle = gr.Checkbox(value=True, label="Corrections", elem_id="corrections-toggle")
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
                 explanation_output = gr.Textbox(label="Explanation")

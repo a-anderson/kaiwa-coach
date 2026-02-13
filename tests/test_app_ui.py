@@ -129,8 +129,15 @@ def test_conversation_label_truncates_preview() -> None:
 
 def test_theme_html_sets_language_attribute() -> None:
     html = ui_module._theme_html("ja")
-    assert "<style>" in html
+    assert '<style id="kc-theme-style">' in html
     assert "--kc-primary" in html
+
+
+def test_theme_html_includes_corrections_checkbox_selector() -> None:
+    html = ui_module._theme_html("fr")
+    assert '#corrections-toggle input[data-testid="checkbox"]' in html
+    assert ':checked::after' in html
+    assert "--kc-checkbox" in html
 
 
 def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
