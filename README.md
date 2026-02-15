@@ -7,7 +7,7 @@
   Local-first conversational language coaching with deterministic, schema-validated LLM pipelines.
 </p>
 
-[![CI](https://github.com/ashleyanderson/kaiwa-coach/actions/workflows/tests.yaml/badge.svg)](https://github.com/ashleyanderson/kaiwa-coach/actions/workflows/tests.yaml)
+[![CI](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml/badge.svg)](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python: 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
 
