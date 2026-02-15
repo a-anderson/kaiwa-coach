@@ -1,17 +1,12 @@
 <p align="center">
-  <img src="assets/logo/kaiwacoach_logo.png" alt="KaiwaCoach logo" width="220"/>
+  <img src="assets/logo/kaiwacoach_logo.png" alt="KaiwaCoach logo" width="240"/>
 </p>
 
-<p align="center">
-  <strong>KaiwaCoach</strong><br/>
-  Local-first conversational language coaching with deterministic, schema-validated LLM pipelines.
-</p>
+# KaiwaCoach
 
 [![CI](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml/badge.svg)](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python: 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
-
-# KaiwaCoach
 
 KaiwaCoach is an offline-first language coaching app built for Apple Silicon macOS.  
 It supports text and microphone turns, structured correction feedback, and TTS playback while keeping model orchestration, persistence, and normalisation logic explicit and testable.
