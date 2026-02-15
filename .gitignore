@@ -62,3 +62,4 @@ exports/
 
 # Local storage (repo root only)
 /storage/
+AGENTS.md
