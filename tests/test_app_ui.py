@@ -163,6 +163,27 @@ def test_theme_updates_for_language_returns_waveform_updates(monkeypatch: pytest
         assert update["waveform_options"]["waveform_progress_color"] == "#3a3a3a"
 
 
+def test_theme_updates_for_language_resets_and_remounts_audio(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs)
+    monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
+
+    ja_updates = ui_module._theme_updates_for_language("ja")
+    fr_updates = ui_module._theme_updates_for_language("fr")
+
+    ja_audio_updates = ja_updates[1:]
+    fr_audio_updates = fr_updates[1:]
+
+    for update in ja_audio_updates + fr_audio_updates:
+        assert update["value"] is None
+
+    assert ja_audio_updates[0]["key"] == "mic-input-ja"
+    assert fr_audio_updates[0]["key"] == "mic-input-fr"
+    assert ja_audio_updates[1]["key"] == "user-audio-ja"
+    assert fr_audio_updates[1]["key"] == "user-audio-fr"
+    assert ja_audio_updates[2]["key"] == "assistant-audio-ja"
+    assert fr_audio_updates[2]["key"] == "assistant-audio-fr"
+
+
 def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_choices = []
 
@@ -323,6 +344,7 @@ def test_handle_language_change_resets_state() -> None:
     assert orch.language == "fr"
     assert orch.reset_called is True
     assert result[0] == []
+    assert result[3] is None
 
 
 def test_handle_language_change_noop_when_suppressed() -> None:

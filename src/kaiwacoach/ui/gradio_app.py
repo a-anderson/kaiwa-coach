@@ -138,6 +138,8 @@ _THEME_STYLE_TEMPLATE = Template(
 #mic-input,
 #last-user-audio,
 #last-assistant-audio {
+  /* Note: Gradio's recorder dot color is partly internal and may ignore
+     CSS overrides depending on Gradio internals/version. */
   --color-accent: var(--kc-audio-active) !important;
   --color-accent-soft: var(--kc-audio-active) !important;
   --color-accent-subtle: var(--kc-audio-active) !important;
@@ -192,7 +194,13 @@ def _theme_config(language: str) -> dict[str, str]:
     return _LANGUAGE_THEMES.get(language, _LANGUAGE_THEMES["en"])
 
 
-def _waveform_options(language: str) -> dict[str, str]:
+def _waveform_options(_language: str) -> dict[str, str]:
+    """Return waveform colors for Gradio audio widgets.
+
+    Notes
+    -----
+    This is intentionally fixed (not per-language) for MVP stability.
+    """
     return {
         "waveform_color": "#9ca3af",
         "waveform_progress_color": "#3a3a3a",
