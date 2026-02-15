@@ -121,8 +121,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 - transcript
 - ASR metadata
 
-✅ Cache ASR results by audio hash (session-only)  
-🔁 (Post-MVP) Log confidence proxies
+✅ Cache ASR results by audio hash (session-only)
 
 ---
 
@@ -203,7 +202,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 
 ✅ Implement LLM-based rewrite (temp = 0)  
 ✅ Rewrite only non-Japanese spans
-🔁 Implement LLM rewrite function for katakana conversion (uses `jp_tts_normalise.md`)
+✅ Implement LLM rewrite function for katakana conversion (uses `jp_tts_normalise.md`)
 
 ---
 
@@ -375,8 +374,8 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ## 13. MVP Exit Criteria
 
 ✅ Spoken JP conversation works end-to-end  
-⏳ Corrections and native phrasing displayed  
-⬜ Kokoro pronounces mixed JP/EN correctly  
+✅ Corrections and native phrasing displayed  
+✅ Kokoro pronounces mixed JP/EN correctly  
 ✅ Conversations persist across restarts (text)  
 ✅ Stable operation within ~22–26 GB RAM
 
