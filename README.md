@@ -11,13 +11,6 @@
 KaiwaCoach is an offline-first language coaching app for Apple Silicon macOS.  
 It supports text and microphone turns, structured correction feedback, and TTS playback, with clear model orchestration and persistence boundaries.
 
-## Demo
-
-- App logo: [assets/logo/kaiwacoach_logo.png](assets/logo/kaiwacoach_logo.png)
-- UI demo assets can be added under [assets/](assets/):
-    - short text-turn GIF
-    - short audio-turn GIF
-
 ![KaiwaCoach UI Example](assets/ui/kc_ui_full.png)
 
 ## What It Does
@@ -179,19 +172,19 @@ poetry run pytest -q -m slow
 
 These scripts verify that local models are installed correctly, can be loaded, and can run one basic inference path.
 
-- [scripts/smoke_asr.py](scripts/smoke_asr.py)
+- [scripts/asr_smoke.py](scripts/asr_smoke.py)
     - ASR model load and short transcription
-- [scripts/smoke_tts.py](scripts/smoke_tts.py)
+- [scripts/tts_smoke.py](scripts/tts_smoke.py)
     - TTS model load and synthesis from sample text
-- [scripts/smoke_llm.py](scripts/smoke_llm.py)
+- [scripts/llm_smoke.py](scripts/llm_smoke.py)
     - LLM model load and sample generation
 
 Run:
 
 ```bash
-poetry run python scripts/smoke_asr.py --language ja --seconds 6
-poetry run python scripts/smoke_tts.py --text "こんにちは。元気ですか？" --lang_code j --voice jf_alpha
-poetry run python scripts/smoke_llm.py --language ja
+poetry run python scripts/asr_smoke.py --language ja --seconds 6
+poetry run python scripts/tts_smoke.py --text "こんにちは。元気ですか？" --lang_code j --voice jf_alpha
+poetry run python scripts/llm_smoke.py --language ja
 ```
 
 ## Data and Persistence
@@ -205,6 +198,47 @@ poetry run python scripts/smoke_llm.py --language ja
 - Turn stage timings are logged (ASR, LLM, corrections, TTS, total).
 - Role token caps and context limits are configurable for latency control.
 - Schema enforcement prevents invalid role outputs from silently propagating.
+
+## Evaluation (Current)
+
+The project currently reports system-level evidence in three areas:
+
+1. **Automated reliability checks**
+2. **Schema/repair robustness checks**
+3. **Per-stage latency instrumentation**
+
+### Automated reliability checks
+
+- CI runs non-slow tests on each push and pull request:
+    - `poetry run pytest -q -m "not slow"`
+- Full local suite (including slow tests) is available with:
+    - `poetry run pytest -q`
+
+Latest full local snapshot:
+
+- `154 passed`
+
+### Schema and repair robustness
+
+LLM role outputs are schema-validated, with one repair attempt on invalid output.  
+These paths are covered in tests under:
+
+- [tests/test_json_enforcement.py](tests/test_json_enforcement.py)
+- [tests/test_orchestrator_text_flow.py](tests/test_orchestrator_text_flow.py)
+
+### Latency instrumentation
+
+Turn processing logs stage timings for:
+
+- ASR
+- LLM generation
+- corrections (detect/correct/native/explain)
+- TTS
+- total turn time
+
+Instrumentation lives in:
+
+- [src/kaiwacoach/orchestrator.py](src/kaiwacoach/orchestrator.py)
 
 ## Limitations
 
@@ -228,6 +262,7 @@ Current implementation status and post-MVP work are tracked in:
 
 This project is licensed under the MIT Licence.  
 See [LICENSE](LICENSE).
+
 
 ## Acknowledgements
 
