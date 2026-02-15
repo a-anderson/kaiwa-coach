@@ -105,7 +105,7 @@ def parse_with_schema(
 
     try:
         raw_json = extract_first_json_object(text)
-        model = schema.parse_obj(raw_json)
+        model = schema.model_validate(raw_json)
         return ParseResult(model=model, raw_json=raw_json, error=None, repaired=False)
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         if repair_fn is None:
@@ -114,7 +114,7 @@ def parse_with_schema(
     repaired_text = repair_fn(text)
     try:
         raw_json = extract_first_json_object(repaired_text)
-        model = schema.parse_obj(raw_json)
+        model = schema.model_validate(raw_json)
         return ParseResult(model=model, raw_json=raw_json, error=None, repaired=True)
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         return ParseResult(model=None, raw_json=None, error=str(exc), repaired=True)

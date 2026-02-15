@@ -9,16 +9,230 @@ Notes
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import logging
 import time
 from datetime import datetime, timezone
+from string import Template
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import AudioMeta
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TextTurnStartResult:
+    chat_history: list[dict[str, str]] | list[tuple[str, str]]
+    conversation_id: str | None
+    cleared_input: str
+    user_turn_id: str | None
+    history_state: list[dict[str, str]] | list[tuple[str, str]]
+    conversation_history: str
+    user_text: str
+    error_update: dict
+    skip_pipeline: bool
+    timings: dict
+
+
+@dataclass(frozen=True)
+class AudioTurnStartResult:
+    chat_history: list[dict[str, str]] | list[tuple[str, str]]
+    conversation_id: str | None
+    cleared_input: str
+    user_turn_id: str | None
+    history_state: list[dict[str, str]] | list[tuple[str, str]]
+    conversation_history: str
+    user_text: str
+    error_update: dict
+    user_audio_path: str | None
+    skip_pipeline: bool
+    timings: dict
+
+
+@dataclass(frozen=True)
+class LlmReplyResult:
+    chat_history: list[dict[str, str]]
+    assistant_turn_id: str | None
+    reply_text: str
+    error_update: dict
+
+
+_LANGUAGE_THEMES: dict[str, dict[str, str]] = {
+    "ja": {
+        "primary": "#3a3a3a",
+        "user": "#fce8e8",
+        "bot": "#f1f1f1",
+        "checkbox": "#ce2037",
+    },
+    "fr": {
+        "primary": "#264db6",
+        "user": "#e9eef9",
+        "bot": "#fce8e8",
+        "checkbox": "#264db6",
+    },
+    "it": {
+        "primary": "#166534",
+        "user": "#e9f6ee",
+        "bot": "#fce8e8",
+        "checkbox": "#166534",
+    },
+    "es": {
+        "primary": "#e27a2b",
+        "user": "#fff2e0",
+        "bot": "#fce8e8",
+        "checkbox": "#e27a2b",
+    },
+    "pt-br": {
+        "primary": "#166534",
+        "user": "#e7f5ec",
+        "bot": "#e9eef9",
+        "checkbox": "#166534",
+    },
+    "en": {
+        "primary": "#264db6",
+        "user": "#e9eef9",
+        "bot": "#fce8e8",
+        "checkbox": "#264db6",
+    },
+}
+
+_THEME_STYLE_TEMPLATE = Template(
+    """
+<style id="kc-theme-style">
+:root, body, .gradio-container {
+  --kc-primary: $primary;
+  --kc-checkbox: $checkbox;
+  --kc-user-bg: $user_bg;
+  --kc-bot-bg: $bot_bg;
+  --kc-audio-active: #3a3a3a;
+  --kc-audio-inactive: #9ca3af;
+  --color-accent: $checkbox !important;
+  --color-accent-soft: $checkbox !important;
+  --color-accent-subtle: $checkbox !important;
+  --color-accent-text: #ffffff !important;
+  --color-accent-hover: $checkbox !important;
+}
+.gradio-container button,
+.gradio-container .gr-button {
+  border-color: var(--kc-user-bg) !important;
+}
+.gradio-container button.primary,
+.gradio-container .gr-button.gr-button-primary {
+  background: var(--kc-user-bg) !important;
+  color: #111827 !important;
+  box-shadow: none !important;
+}
+.gradio-container .message.user {
+  background: var(--kc-user-bg) !important;
+  color: #111827 !important;
+  border: 1px solid var(--kc-user-bg) !important;
+}
+.gradio-container .message.bot {
+  background: var(--kc-bot-bg) !important;
+  color: #111827 !important;
+  border: 1px solid var(--kc-bot-bg) !important;
+}
+#mic-input,
+#last-user-audio,
+#last-assistant-audio {
+  --color-accent: var(--kc-audio-active) !important;
+  --color-accent-soft: var(--kc-audio-active) !important;
+  --color-accent-subtle: var(--kc-audio-active) !important;
+  --waveform-color: var(--kc-audio-inactive);
+  --waveform-progress-color: var(--kc-audio-active);
+}
+#corrections-toggle input[data-testid="checkbox"] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  margin: 0 !important;
+  border: 2px solid var(--kc-checkbox) !important;
+  border-radius: 0.25rem !important;
+  background: #ffffff !important;
+  display: inline-grid !important;
+  place-content: center !important;
+}
+#corrections-toggle input[data-testid="checkbox"]::after {
+  content: "" !important;
+  width: 0.28rem !important;
+  height: 0.52rem !important;
+  border: solid #ffffff !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) scale(0) !important;
+  transform-origin: center !important;
+}
+#corrections-toggle input[data-testid="checkbox"]:checked {
+  background: var(--kc-checkbox) !important;
+  border-color: var(--kc-checkbox) !important;
+}
+#corrections-toggle input[data-testid="checkbox"]:checked::after {
+  transform: rotate(45deg) scale(1) !important;
+}
+.gradio-container .message.user,
+.gradio-container .message.bot {
+  box-shadow: none !important;
+}
+.gradio-container button.secondary,
+.gradio-container .gr-button.gr-button-secondary {
+  color: #111827 !important;
+  background: var(--kc-user-bg) !important;
+  border-color: var(--kc-user-bg) !important;
+  box-shadow: none !important;
+}
+</style>
+"""
+)
+
+
+def _theme_config(language: str) -> dict[str, str]:
+    return _LANGUAGE_THEMES.get(language, _LANGUAGE_THEMES["en"])
+
+
+def _waveform_options(language: str) -> dict[str, str]:
+    return {
+        "waveform_color": "#9ca3af",
+        "waveform_progress_color": "#3a3a3a",
+        "trim_region_color": "#3a3a3a",
+    }
+
+
+def _theme_updates_for_language(language: str):
+    import gradio as gr  # type: ignore
+
+    opts = _waveform_options(language)
+    return (
+        _theme_html(language),
+        gr.Audio(
+            value=None,
+            waveform_options=opts,
+            elem_id="mic-input",
+            key=f"mic-input-{language}",
+            sources=["microphone"],
+            label="Microphone",
+        ),
+        gr.Audio(
+            value=None,
+            waveform_options=opts,
+            elem_id="last-user-audio",
+            key=f"user-audio-{language}",
+            interactive=False,
+            label="Last user audio",
+        ),
+        gr.Audio(
+            value=None,
+            waveform_options=opts,
+            elem_id="last-assistant-audio",
+            key=f"assistant-audio-{language}",
+            interactive=False,
+            autoplay=True,
+            label="Last assistant audio",
+        ),
+    )
+
 
 def _format_conversation_history(chat_history: list[dict[str, str]] | list[tuple[str, str]]) -> str:
     lines: list[str] = []
@@ -241,179 +455,13 @@ def _format_local_time(timestamp: str) -> str:
 
 
 def _theme_html(language: str) -> str:
-    themes = {
-        "ja": {
-            "primary": "#3a3a3a",
-            "user": "#fce8e8",
-            "bot": "#f1f1f1",
-            "checkbox": "#ce2037",
-        },
-        "fr": {
-            "primary": "#264db6",
-            "user": "#e9eef9",
-            "bot": "#fce8e8",
-            "checkbox": "#264db6",
-        },
-        "it": {
-            "primary": "#166534",
-            "user": "#e9f6ee",
-            "bot": "#fce8e8",
-            "checkbox": "#166534",
-        },
-        "es": {
-            "primary": "#e27a2b",
-            "user": "#fff2e0",
-            "bot": "#fce8e8",
-            "checkbox": "#e27a2b",
-        },
-        "pt-br": {
-            "primary": "#166534",
-            "user": "#e7f5ec",
-            "bot": "#e9eef9",
-            "checkbox": "#166534",
-        },
-        "en": {
-            "primary": "#264db6",
-            "user": "#e9eef9",
-            "bot": "#fce8e8",
-            "checkbox": "#264db6",
-        },
-    }
-    cfg = themes.get(language, themes["en"])
-    return f"""
-<style id="kc-theme-style">
-:root, body, .gradio-container {{
-  --kc-primary: {cfg["primary"]};
-  --kc-checkbox: {cfg["checkbox"]};
-  --kc-user-bg: {cfg["user"]};
-  --kc-bot-bg: {cfg["bot"]};
-  --color-accent: {cfg["checkbox"]} !important;
-  --color-accent-soft: {cfg["checkbox"]} !important;
-  --color-accent-subtle: {cfg["checkbox"]} !important;
-  --color-accent-text: #ffffff !important;
-  --color-accent-hover: {cfg["checkbox"]} !important;
-}}
-.gradio-container button,
-.gradio-container .gr-button {{
-  border-color: var(--kc-user-bg) !important;
-}}
-.gradio-container button.primary,
-.gradio-container .gr-button.gr-button-primary {{
-  background: var(--kc-user-bg) !important;
-  color: #111827 !important;
-  box-shadow: none !important;
-}}
-.gradio-container .message.user {{
-  background: var(--kc-user-bg) !important;
-  color: #111827 !important;
-  border: 1px solid var(--kc-user-bg) !important;
-}}
-.gradio-container .message.bot {{
-  background: var(--kc-bot-bg) !important;
-  color: #111827 !important;
-  border: 1px solid var(--kc-bot-bg) !important;
-}}
-.gradio-container .audio-recorder button,
-.gradio-container button[data-testid="record-button"],
-#mic-input button[data-testid="record-button"],
-#mic-input .record-button,
-#mic-input .audio-recorder button,
-#mic-input button[aria-label*="Record"],
-#mic-input button[aria-label*="record"] {{
-  background: var(--kc-checkbox) !important;
-  border-color: var(--kc-checkbox) !important;
-  color: #ffffff !important;
-}}
-#mic-input button[data-testid="record-button"] svg,
-#mic-input .record-button svg,
-#mic-input .audio-recorder button svg {{
-  color: #ffffff !important;
-  fill: #ffffff !important;
-  stroke: #ffffff !important;
-}}
-#mic-input {{
-  --color-accent: #ffffff !important;
-  --color-accent-soft: #ffffff !important;
-  --color-accent-subtle: #ffffff !important;
-  --button-primary-text-color: #ffffff !important;
-}}
-#mic-input button[data-testid="record-button"] svg circle,
-#mic-input button[data-testid="record-button"] svg path,
-#mic-input .record-button svg circle,
-#mic-input .record-button svg path,
-#mic-input .audio-recorder button svg circle,
-#mic-input .audio-recorder button svg path {{
-  fill: #ffffff !important;
-  stroke: #ffffff !important;
-}}
-#mic-input button[data-testid="record-button"] [class*="record"],
-#mic-input button[data-testid="record-button"] [class*="dot"],
-#mic-input button[data-testid="record-button"] [class*="pulse"],
-#mic-input .record-button [class*="record"],
-#mic-input .record-button [class*="dot"],
-#mic-input .record-button [class*="pulse"] {{
-  background: #ffffff !important;
-  border-color: #ffffff !important;
-  color: #ffffff !important;
-  fill: #ffffff !important;
-  stroke: #ffffff !important;
-}}
-#mic-input button[data-testid="record-button"]::before,
-#mic-input button[data-testid="record-button"]::after,
-#mic-input .record-button::before,
-#mic-input .record-button::after,
-#mic-input [class*="recording"]::before,
-#mic-input [class*="recording"]::after,
-#mic-input [class*="pulse"]::before,
-#mic-input [class*="pulse"]::after,
-#mic-input [class*="dot"]::before,
-#mic-input [class*="dot"]::after {{
-  background: #ffffff !important;
-  border-color: #ffffff !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 0 1px #ffffff inset !important;
-}}
-#corrections-toggle input[data-testid="checkbox"] {{
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  width: 1rem !important;
-  height: 1rem !important;
-  margin: 0 !important;
-  border: 2px solid var(--kc-checkbox) !important;
-  border-radius: 0.25rem !important;
-  background: #ffffff !important;
-  display: inline-grid !important;
-  place-content: center !important;
-}}
-#corrections-toggle input[data-testid="checkbox"]::after {{
-  content: "" !important;
-  width: 0.28rem !important;
-  height: 0.52rem !important;
-  border: solid #ffffff !important;
-  border-width: 0 2px 2px 0 !important;
-  transform: rotate(45deg) scale(0) !important;
-  transform-origin: center !important;
-}}
-#corrections-toggle input[data-testid="checkbox"]:checked {{
-  background: var(--kc-checkbox) !important;
-  border-color: var(--kc-checkbox) !important;
-}}
-#corrections-toggle input[data-testid="checkbox"]:checked::after {{
-  transform: rotate(45deg) scale(1) !important;
-}}
-.gradio-container .message.user,
-.gradio-container .message.bot {{
-  box-shadow: none !important;
-}}
-.gradio-container button.secondary,
-.gradio-container .gr-button.gr-button-secondary {{
-  color: #111827 !important;
-  background: var(--kc-user-bg) !important;
-  border-color: var(--kc-user-bg) !important;
-  box-shadow: none !important;
-}}
-</style>
-"""
+    cfg = _theme_config(language)
+    return _THEME_STYLE_TEMPLATE.substitute(
+        primary=cfg["primary"],
+        checkbox=cfg["checkbox"],
+        user_bg=cfg["user"],
+        bot_bg=cfg["bot"],
+    )
 
 
 def _load_conversation_options(orchestrator: ConversationOrchestrator) -> list[tuple[str, str]]:
@@ -526,20 +574,19 @@ def _start_text_turn(
     chat_history: list[dict[str, str]] | list[tuple[str, str]],
     conversation_id: str | None,
     timings: dict | None = None,
-):
+)-> TextTurnStartResult:
     if not user_text:
-        return (
-            chat_history,
-            conversation_id,
-            "",
-            None,
-            chat_history,
-            "",
-            "",
-            "",
-            {"visible": False},
-            False,
-            {},
+        return TextTurnStartResult(
+            chat_history=chat_history,
+            conversation_id=conversation_id,
+            cleared_input="",
+            user_turn_id=None,
+            history_state=chat_history,
+            conversation_history="",
+            user_text="",
+            error_update={"visible": False},
+            skip_pipeline=False,
+            timings={},
         )
     if conversation_id is None:
         conversation_id = orchestrator.create_conversation()
@@ -554,17 +601,17 @@ def _start_text_turn(
     display_history = list(normalized_history)
     display_history.append({"role": "user", "content": user_text})
     conversation_history = _format_conversation_history(normalized_history)
-    return (
-        display_history,
-        conversation_id,
-        "",
-        user_turn_id,
-        display_history,
-        conversation_history,
-        user_text,
-        {"visible": False},
-        False,
-        timings,
+    return TextTurnStartResult(
+        chat_history=display_history,
+        conversation_id=conversation_id,
+        cleared_input="",
+        user_turn_id=user_turn_id,
+        history_state=display_history,
+        conversation_history=conversation_history,
+        user_text=user_text,
+        error_update={"visible": False},
+        skip_pipeline=False,
+        timings=timings,
     )
 
 
@@ -574,7 +621,7 @@ def _start_audio_turn(
     chat_history: list[dict[str, str]] | list[tuple[str, str]],
     conversation_id: str | None,
     timings: dict | None = None,
-):
+)-> AudioTurnStartResult:
     try:
         target_sample_rate = getattr(orchestrator, "expected_sample_rate", None)
         start = time.perf_counter()
@@ -602,36 +649,36 @@ def _start_audio_turn(
                 _logger.warning("audio_turn.raw_store_failed: %s", exc)
     except Exception as exc:
         _logger.warning("audio_turn.start_failed: %s", exc)
-        return (
-            chat_history,
-            conversation_id,
-            "",
-            None,
-            chat_history,
-            "",
-            "",
-            {"visible": False},
-            None,
-            True,
-            timings or {},
+        return AudioTurnStartResult(
+            chat_history=chat_history,
+            conversation_id=conversation_id,
+            cleared_input="",
+            user_turn_id=None,
+            history_state=chat_history,
+            conversation_history="",
+            user_text="",
+            error_update={"visible": False},
+            user_audio_path=None,
+            skip_pipeline=True,
+            timings=timings or {},
         )
 
     normalized_history = _normalize_history(chat_history)
     display_history = list(normalized_history)
     display_history.append({"role": "user", "content": result.asr_text})
     conversation_history = _format_conversation_history(normalized_history)
-    return (
-        display_history,
-        conversation_id,
-        "",
-        result.user_turn_id,
-        display_history,
-        conversation_history,
-        result.asr_text,
-        {"visible": False},
-        result.input_audio_path,
-        False,
-        timings,
+    return AudioTurnStartResult(
+        chat_history=display_history,
+        conversation_id=conversation_id,
+        cleared_input="",
+        user_turn_id=result.user_turn_id,
+        history_state=display_history,
+        conversation_history=conversation_history,
+        user_text=result.asr_text,
+        error_update={"visible": False},
+        user_audio_path=result.input_audio_path,
+        skip_pipeline=False,
+        timings=timings,
     )
 
 
@@ -644,21 +691,11 @@ def _run_llm_reply(
     chat_history: list[dict[str, str]],
     skip_pipeline: bool,
     timings: dict | None = None,
-):
+)-> LlmReplyResult:
     if skip_pipeline:
-        return (
-            chat_history,
-            None,
-            "",
-            {"visible": False},
-        )
+        return LlmReplyResult(chat_history=chat_history, assistant_turn_id=None, reply_text="", error_update={"visible": False})
     if conversation_id is None or user_turn_id is None:
-        return (
-            chat_history,
-            None,
-            "",
-            {"visible": False},
-        )
+        return LlmReplyResult(chat_history=chat_history, assistant_turn_id=None, reply_text="", error_update={"visible": False})
     if timings is None:
         timings = {}
     assistant_turn_id, reply_text = orchestrator.generate_reply(
@@ -675,11 +712,11 @@ def _run_llm_reply(
     else:
         error_update = {"visible": False}
     updated_history = _replace_last_assistant(chat_history, reply_text)
-    return (
-        updated_history,
-        assistant_turn_id,
-        reply_text,
-        error_update,
+    return LlmReplyResult(
+        chat_history=updated_history,
+        assistant_turn_id=assistant_turn_id,
+        reply_text=reply_text,
+        error_update=error_update,
     )
 
 
@@ -730,129 +767,13 @@ def _run_tts(
     return tts_result.audio_path if tts_result is not None else None
 
 
-def _handle_text_turn(
-    orchestrator: ConversationOrchestrator,
-    user_text: str,
-    chat_history: list[dict[str, str]] | list[tuple[str, str]],
-    conversation_id: str | None,
-):
-    if not user_text:
-        return (
-            chat_history,
-            conversation_id,
-            "",
-            {"visible": False},
-            None,
-            None,
-            [],
-            "",
-            "",
-            "",
-        )
-    if conversation_id is None:
-        conversation_id = orchestrator.create_conversation()
-    conversation_history = _format_conversation_history(chat_history)
-    result = orchestrator.process_text_turn(
-        conversation_id=conversation_id,
-        user_text=user_text,
-        conversation_history=conversation_history,
-    )
-    corrections = orchestrator.get_latest_corrections(result.user_turn_id)
-    reply_text = result.reply_text
-    error_update = {"visible": False}
-    if not reply_text:
-        reply_text = "(No reply - invalid LLM response)"
-        error_update = {
-            "value": "LLM response was invalid JSON. See logs for details.",
-            "visible": True,
-        }
-
-    normalized_history = _normalize_history(chat_history)
-    normalized_history.extend(
-        [
-            {"role": "user", "content": user_text},
-            {"role": "assistant", "content": reply_text},
-        ]
-    )
-    return (
-        normalized_history,
-        conversation_id,
-        "",
-        error_update,
-        None,
-        result.tts_audio_path,
-        corrections["corrected"],
-        corrections["native"],
-        corrections["explanation"],
-    )
-
-
-def _handle_audio_turn(
-    orchestrator: ConversationOrchestrator,
-    audio,
-    chat_history: list[dict[str, str]] | list[tuple[str, str]],
-    conversation_id: str | None,
-):
-    if conversation_id is None:
-        conversation_id = orchestrator.create_conversation()
-    try:
-        pcm_bytes, meta = _audio_to_pcm(audio)
-        conversation_history = _format_conversation_history(chat_history)
-        result = orchestrator.process_audio_turn(
-            conversation_id=conversation_id,
-            pcm_bytes=pcm_bytes,
-            audio_meta=meta,
-            conversation_history=conversation_history,
-        )
-    except Exception as exc:
-        return (
-            chat_history,
-            conversation_id,
-            "",
-            {"value": str(exc), "visible": True},
-            None,
-            None,
-            [],
-            "",
-            "",
-            "",
-        )
-
-    normalized_history = _normalize_history(chat_history)
-    reply_text = result.reply_text
-    error_update = {"visible": False}
-    if not reply_text:
-        reply_text = "(No reply - invalid LLM response)"
-        error_update = {
-            "value": "LLM response was invalid JSON. See logs for details.",
-            "visible": True,
-        }
-    normalized_history.extend(
-        [
-            {"role": "user", "content": result.asr_text},
-            {"role": "assistant", "content": reply_text},
-        ]
-    )
-    corrections = orchestrator.get_latest_corrections(result.user_turn_id)
-    return (
-        normalized_history,
-        conversation_id,
-        None,
-        error_update,
-        result.input_audio_path,
-        result.tts_audio_path,
-        corrections["corrected"],
-        corrections["native"],
-        corrections["explanation"],
-    )
-
-
 def _handle_reset(orchestrator: ConversationOrchestrator):
     orchestrator.reset_session()
     return (
         [],
         None,
         "",
+        None,
         "",
         None,
         None,
@@ -870,22 +791,12 @@ def _handle_reset(orchestrator: ConversationOrchestrator):
     )
 
 
-def _request_language_change(
+def _handle_language_change(
     orchestrator: ConversationOrchestrator,
     language: str,
     suppress_language_change: bool,
-) -> bool:
-    if suppress_language_change:
-        return False
-    orchestrator.set_language(language)
-    return True
-
-
-def _apply_language_change(
-    orchestrator: ConversationOrchestrator,
-    should_reset: bool,
 ):
-    if not should_reset:
+    if suppress_language_change:
         import gradio as gr  # type: ignore
 
         no_change = gr.update()
@@ -907,9 +818,10 @@ def _apply_language_change(
             no_change,
             no_change,
             no_change,
+            no_change,
         )
-    reset = _handle_reset(orchestrator)
-    return reset
+    orchestrator.set_language(language)
+    return _handle_reset(orchestrator)
 
 
 def build_ui(orchestrator: ConversationOrchestrator):
@@ -926,6 +838,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
         if value not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language in UI choices: {value}")
     default_language = getattr(orchestrator, "language", "ja")
+    default_waveform_options = _waveform_options(default_language)
     conversation_choices = _load_conversation_options(orchestrator)
     load_enabled = bool(conversation_choices)
 
@@ -968,7 +881,12 @@ def build_ui(orchestrator: ConversationOrchestrator):
                         user_input = gr.Textbox(label="Your message", lines=3)
                         send_btn = gr.Button("Send")
                     with gr.Column(scale=1, min_width=260, elem_id="audio-input"):
-                        audio_input = gr.Audio(sources=["microphone"], label="Microphone", elem_id="mic-input")
+                        audio_input = gr.Audio(
+                            sources=["microphone"],
+                            label="Microphone",
+                            elem_id="mic-input",
+                            waveform_options=default_waveform_options,
+                        )
                         audio_btn = gr.Button("Send Audio")
             with gr.Column(scale=1, min_width=280):
                 gr.Markdown("### Conversations")
@@ -992,8 +910,19 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 with gr.Row(visible=False, elem_id="delete-confirm-buttons") as delete_confirm_buttons_row:
                     delete_confirm_btn = gr.Button("Confirm Delete")
                     delete_cancel_btn = gr.Button("Cancel")
-                user_audio_output = gr.Audio(label="Last user audio", interactive=False)
-                assistant_audio_output = gr.Audio(label="Last assistant audio", autoplay=True, interactive=False)
+                user_audio_output = gr.Audio(
+                    label="Last user audio",
+                    interactive=False,
+                    elem_id="last-user-audio",
+                    waveform_options=default_waveform_options,
+                )
+                assistant_audio_output = gr.Audio(
+                    label="Last assistant audio",
+                    autoplay=True,
+                    interactive=False,
+                    elem_id="last-assistant-audio",
+                    waveform_options=default_waveform_options,
+                )
                 corrections_toggle = gr.Checkbox(value=True, label="Corrections", elem_id="corrections-toggle")
                 corrected_output = gr.Textbox(label="Corrected")
                 native_output = gr.Textbox(label="Native")
@@ -1018,271 +947,306 @@ def build_ui(orchestrator: ConversationOrchestrator):
         timings_state = gr.State({})
         suppress_language_change_state = gr.State(False)
         loaded_language_state = gr.State(None)
-        language_changed_state = gr.State(False)
-        language_dropdown.change(
-            lambda language, suppress: _request_language_change(orchestrator, language, suppress),
-            inputs=[
-                language_dropdown,
-                suppress_language_change_state,
-            ],
-            outputs=[language_changed_state],
-        ).then(
-            lambda should_reset: _apply_language_change(orchestrator, should_reset),
-            inputs=[language_changed_state],
-            outputs=[
-                chat,
-                conversation_id_state,
-                user_input,
-                error_output,
-                user_audio_output,
-                assistant_audio_output,
-                corrected_output,
-                native_output,
-                explanation_output,
-                user_turn_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                reply_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-        ).then(
-            lambda language: _theme_html(language),
-            inputs=[language_dropdown],
-            outputs=[theme_html],
-        )
-
-        refresh_conversations_btn.click(
-            lambda: _refresh_conversation_options(orchestrator),
-            inputs=[],
-            outputs=[conversation_dropdown, load_conversation_btn, empty_conversations_note],
-        )
+        theme_audio_outputs = [theme_html, audio_input, user_audio_output, assistant_audio_output]
+        reset_outputs = [
+            chat,
+            conversation_id_state,
+            user_input,
+            audio_input,
+            error_output,
+            user_audio_output,
+            assistant_audio_output,
+            corrected_output,
+            native_output,
+            explanation_output,
+            user_turn_id_state,
+            history_state,
+            conversation_history_state,
+            user_text_state,
+            reply_text_state,
+            assistant_turn_id_state,
+            skip_pipeline_state,
+            timings_state,
+        ]
+        conversation_picker_outputs = [conversation_dropdown, load_conversation_btn, empty_conversations_note]
+        delete_refresh_outputs = [*reset_outputs, *conversation_picker_outputs]
+        confirm_delete_outputs = [delete_confirm_row, delete_confirm_buttons_row]
+        confirm_delete_all_outputs = [delete_all_confirm_row, delete_all_confirm_buttons_row]
+        load_conversation_outputs = [
+            chat,
+            conversation_id_state,
+            history_state,
+            conversation_history_state,
+            user_text_state,
+            reply_text_state,
+            user_turn_id_state,
+            assistant_turn_id_state,
+            skip_pipeline_state,
+            timings_state,
+            corrected_output,
+            native_output,
+            explanation_output,
+            user_audio_output,
+            assistant_audio_output,
+            error_output,
+            loaded_language_state,
+            suppress_language_change_state,
+        ]
 
         def _apply_loaded_language(language: str | None):
             if not language:
                 return gr.update()
             return gr.update(value=language)
 
-        load_conversation_btn.click(
-            lambda: True,
-            inputs=[],
-            outputs=[suppress_language_change_state],
-        ).then(
-            lambda cid: _load_conversation(orchestrator, cid),
-            inputs=[conversation_dropdown],
-            outputs=[
-                chat,
-                conversation_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                reply_text_state,
-                user_turn_id_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                timings_state,
-                corrected_output,
-                native_output,
-                explanation_output,
-                user_audio_output,
-                assistant_audio_output,
-                error_output,
-                loaded_language_state,
-                suppress_language_change_state,
-            ],
-        ).then(
-            _apply_loaded_language,
-            inputs=[loaded_language_state],
-            outputs=[language_dropdown],
-        ).then(
-            lambda language: _theme_html(language),
-            inputs=[language_dropdown],
-            outputs=[theme_html],
-        ).then(
-            lambda: False,
-            inputs=[],
-            outputs=[suppress_language_change_state],
-        )
-
-        delete_conversation_btn.click(
-            _confirm_row_show_updates,
-            inputs=[],
-            outputs=[delete_confirm_row, delete_confirm_buttons_row],
-        )
-
-        delete_cancel_btn.click(
-            _confirm_row_hide_updates,
-            inputs=[],
-            outputs=[delete_confirm_row, delete_confirm_buttons_row],
-        )
-
-        delete_confirm_btn.click(
-            lambda cid: _delete_conversation_and_refresh(orchestrator, cid),
-            inputs=[conversation_id_state],
-            outputs=[
-                chat,
-                conversation_id_state,
-                user_input,
-                error_output,
-                user_audio_output,
-                assistant_audio_output,
-                corrected_output,
-                native_output,
-                explanation_output,
-                user_turn_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                reply_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                timings_state,
-                conversation_dropdown,
-                load_conversation_btn,
-                empty_conversations_note,
-            ],
-        ).then(
-            _confirm_row_hide_updates,
-            inputs=[],
-            outputs=[delete_confirm_row, delete_confirm_buttons_row],
-        )
-
-        delete_all_btn.click(
-            _confirm_row_show_updates,
-            inputs=[],
-            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
-        )
-
-        delete_all_cancel_btn.click(
-            _confirm_row_hide_updates,
-            inputs=[],
-            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
-        )
-
-        delete_all_confirm_btn.click(
-            lambda: _delete_all_conversations_and_refresh(orchestrator),
-            inputs=[],
-            outputs=[
-                chat,
-                conversation_id_state,
-                user_input,
-                error_output,
-                user_audio_output,
-                assistant_audio_output,
-                corrected_output,
-                native_output,
-                explanation_output,
-                user_turn_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                reply_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                timings_state,
-                conversation_dropdown,
-                load_conversation_btn,
-                empty_conversations_note,
-            ],
-        ).then(
-            _confirm_row_hide_updates,
-            inputs=[],
-            outputs=[delete_all_confirm_row, delete_all_confirm_buttons_row],
-        )
-
-        def _on_send(
-            user_text: str,
-            chat_history: list[dict[str, str]] | list[tuple[str, str]],
-            conversation_id: str | None,
-            timings: dict,
-        ):
-            result = _start_text_turn(orchestrator, user_text, chat_history, conversation_id, timings)
-            error_update = result[7]
-            if isinstance(error_update, dict):
-                error_update = gr.update(**error_update)
-            return result[:7] + (error_update,) + result[8:]
-
-        def _on_audio(
-            audio,
-            chat_history: list[dict[str, str]] | list[tuple[str, str]],
-            conversation_id: str | None,
-            timings: dict,
-        ):
-            result = _start_audio_turn(orchestrator, audio, chat_history, conversation_id, timings)
-            error_update = result[7]
-            if isinstance(error_update, dict):
-                error_update = gr.update(**error_update)
-            return result[:7] + (error_update,) + result[8:]
-
-        def _llm_reply_wrapper(
-            conversation_id: str | None,
-            user_turn_id: str | None,
-            user_text: str,
-            conversation_history: str,
-            chat_history: list[dict[str, str]],
-            skip_pipeline: bool,
-            timings: dict,
-        ):
-            timings = dict(timings or {})
-            result = _run_llm_reply(
-                orchestrator,
-                conversation_id,
-                user_turn_id,
-                user_text,
-                conversation_history,
-                chat_history,
-                skip_pipeline,
-                timings=timings,
+        def _wire_language_and_conversation_handlers() -> None:
+            language_dropdown.change(
+                lambda language, suppress: _handle_language_change(orchestrator, language, suppress),
+                inputs=[language_dropdown, suppress_language_change_state],
+                outputs=reset_outputs,
+            ).then(
+                _theme_updates_for_language,
+                inputs=[language_dropdown],
+                outputs=theme_audio_outputs,
             )
-            error_update = result[3]
-            if isinstance(error_update, dict):
-                error_update = gr.update(**error_update)
-            return result[:3] + (error_update,) + (timings,)
 
-        def _corrections_wrapper(
-            user_turn_id: str | None,
-            user_text: str,
-            assistant_turn_id: str | None,
-            skip_pipeline: bool,
-            corrections_enabled: bool,
-            timings: dict,
-        ):
-            timings = dict(timings or {})
-            result = _run_corrections(
-                orchestrator,
-                user_turn_id,
-                user_text,
-                assistant_turn_id,
-                skip_pipeline,
-                corrections_enabled,
-                timings=timings,
+            refresh_conversations_btn.click(
+                lambda: _refresh_conversation_options(orchestrator),
+                inputs=[],
+                outputs=conversation_picker_outputs,
             )
-            return result + (timings,)
 
-        def _tts_wrapper(
-            conversation_id: str | None,
-            assistant_turn_id: str | None,
-            reply_text: str,
-            skip_pipeline: bool,
-            timings: dict,
-        ):
-            timings = dict(timings or {})
-            result = _run_tts(
-                orchestrator,
-                conversation_id,
-                assistant_turn_id,
-                reply_text,
-                skip_pipeline,
-                timings=timings,
+            load_conversation_btn.click(
+                lambda: True,
+                inputs=[],
+                outputs=[suppress_language_change_state],
+            ).then(
+                lambda cid: _load_conversation(orchestrator, cid),
+                inputs=[conversation_dropdown],
+                outputs=load_conversation_outputs,
+            ).then(
+                _apply_loaded_language,
+                inputs=[loaded_language_state],
+                outputs=[language_dropdown],
+            ).then(
+                _theme_updates_for_language,
+                inputs=[language_dropdown],
+                outputs=theme_audio_outputs,
+            ).then(
+                lambda: False,
+                inputs=[],
+                outputs=[suppress_language_change_state],
             )
-            return result, timings
 
-        send_btn.click(
-            _on_send,
-            inputs=[user_input, history_state, conversation_id_state, timings_state],
-            outputs=[
+        def _wire_delete_handlers() -> None:
+            delete_conversation_btn.click(
+                _confirm_row_show_updates,
+                inputs=[],
+                outputs=confirm_delete_outputs,
+            )
+            delete_cancel_btn.click(
+                _confirm_row_hide_updates,
+                inputs=[],
+                outputs=confirm_delete_outputs,
+            )
+            delete_confirm_btn.click(
+                lambda cid: _delete_conversation_and_refresh(orchestrator, cid),
+                inputs=[conversation_id_state],
+                outputs=delete_refresh_outputs,
+            ).then(
+                _confirm_row_hide_updates,
+                inputs=[],
+                outputs=confirm_delete_outputs,
+            )
+
+            delete_all_btn.click(
+                _confirm_row_show_updates,
+                inputs=[],
+                outputs=confirm_delete_all_outputs,
+            )
+            delete_all_cancel_btn.click(
+                _confirm_row_hide_updates,
+                inputs=[],
+                outputs=confirm_delete_all_outputs,
+            )
+            delete_all_confirm_btn.click(
+                lambda: _delete_all_conversations_and_refresh(orchestrator),
+                inputs=[],
+                outputs=delete_refresh_outputs,
+            ).then(
+                _confirm_row_hide_updates,
+                inputs=[],
+                outputs=confirm_delete_all_outputs,
+            )
+
+        def _wire_turn_handlers() -> None:
+            def _on_send(
+                user_text: str,
+                chat_history: list[dict[str, str]] | list[tuple[str, str]],
+                conversation_id: str | None,
+                timings: dict,
+            ):
+                result = _start_text_turn(orchestrator, user_text, chat_history, conversation_id, timings)
+                error_update = gr.update(**result.error_update)
+                return (
+                    result.chat_history,
+                    result.conversation_id,
+                    result.cleared_input,
+                    result.user_turn_id,
+                    result.history_state,
+                    result.conversation_history,
+                    result.user_text,
+                    error_update,
+                    result.skip_pipeline,
+                    result.timings,
+                )
+
+            def _on_audio(
+                audio,
+                chat_history: list[dict[str, str]] | list[tuple[str, str]],
+                conversation_id: str | None,
+                timings: dict,
+            ):
+                result = _start_audio_turn(orchestrator, audio, chat_history, conversation_id, timings)
+                error_update = gr.update(**result.error_update)
+                return (
+                    result.chat_history,
+                    result.conversation_id,
+                    result.cleared_input,
+                    result.user_turn_id,
+                    result.history_state,
+                    result.conversation_history,
+                    result.user_text,
+                    error_update,
+                    result.user_audio_path,
+                    result.skip_pipeline,
+                    result.timings,
+                )
+
+            def _llm_reply_wrapper(
+                conversation_id: str | None,
+                user_turn_id: str | None,
+                user_text: str,
+                conversation_history: str,
+                chat_history: list[dict[str, str]],
+                skip_pipeline: bool,
+                timings: dict,
+            ):
+                timings = dict(timings or {})
+                result = _run_llm_reply(
+                    orchestrator,
+                    conversation_id,
+                    user_turn_id,
+                    user_text,
+                    conversation_history,
+                    chat_history,
+                    skip_pipeline,
+                    timings=timings,
+                )
+                error_update = gr.update(**result.error_update)
+                return (
+                    result.chat_history,
+                    result.assistant_turn_id,
+                    result.reply_text,
+                    error_update,
+                    timings,
+                )
+
+            def _corrections_wrapper(
+                user_turn_id: str | None,
+                user_text: str,
+                assistant_turn_id: str | None,
+                skip_pipeline: bool,
+                corrections_enabled: bool,
+                timings: dict,
+            ):
+                timings = dict(timings or {})
+                result = _run_corrections(
+                    orchestrator,
+                    user_turn_id,
+                    user_text,
+                    assistant_turn_id,
+                    skip_pipeline,
+                    corrections_enabled,
+                    timings=timings,
+                )
+                return result + (timings,)
+
+            def _tts_wrapper(
+                conversation_id: str | None,
+                assistant_turn_id: str | None,
+                reply_text: str,
+                skip_pipeline: bool,
+                timings: dict,
+            ):
+                timings = dict(timings or {})
+                result = _run_tts(
+                    orchestrator,
+                    conversation_id,
+                    assistant_turn_id,
+                    reply_text,
+                    skip_pipeline,
+                    timings=timings,
+                )
+                return result, timings
+
+            def _wire_turn_pipeline(start_event, turn_name: str):
+                return (
+                    start_event.then(
+                        _llm_reply_wrapper,
+                        inputs=[
+                            conversation_id_state,
+                            user_turn_id_state,
+                            user_text_state,
+                            conversation_history_state,
+                            history_state,
+                            skip_pipeline_state,
+                            timings_state,
+                        ],
+                        outputs=[
+                            chat,
+                            assistant_turn_id_state,
+                            reply_text_state,
+                            error_output,
+                            timings_state,
+                        ],
+                    )
+                    .then(
+                        _tts_wrapper,
+                        inputs=[
+                            conversation_id_state,
+                            assistant_turn_id_state,
+                            reply_text_state,
+                            skip_pipeline_state,
+                            timings_state,
+                        ],
+                        outputs=[assistant_audio_output, timings_state],
+                    )
+                    .then(
+                        _corrections_wrapper,
+                        inputs=[
+                            user_turn_id_state,
+                            user_text_state,
+                            assistant_turn_id_state,
+                            skip_pipeline_state,
+                            corrections_toggle,
+                            timings_state,
+                        ],
+                        outputs=[corrected_output, native_output, explanation_output, timings_state],
+                    )
+                    .then(
+                        lambda h, t: (h, t),
+                        inputs=[chat, timings_state],
+                        outputs=[history_state, timings_state],
+                    )
+                    .then(
+                        lambda t: orchestrator.finalize_and_log_timings(turn_name, t),
+                        inputs=[timings_state],
+                        outputs=[],
+                    )
+                )
+
+            text_start_inputs = [user_input, history_state, conversation_id_state, timings_state]
+            text_start_outputs = [
                 chat,
                 conversation_id_state,
                 user_input,
@@ -1293,124 +1257,9 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 error_output,
                 skip_pipeline_state,
                 timings_state,
-            ],
-        ).then(
-            _llm_reply_wrapper,
-            inputs=[
-                conversation_id_state,
-                user_turn_id_state,
-                user_text_state,
-                conversation_history_state,
-                history_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[
-                chat,
-                assistant_turn_id_state,
-                reply_text_state,
-                error_output,
-                timings_state,
-            ],
-        ).then(
-            _tts_wrapper,
-            inputs=[
-                conversation_id_state,
-                assistant_turn_id_state,
-                reply_text_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[assistant_audio_output, timings_state],
-        ).then(
-            _corrections_wrapper,
-            inputs=[
-                user_turn_id_state,
-                user_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                corrections_toggle,
-                timings_state,
-            ],
-            outputs=[corrected_output, native_output, explanation_output, timings_state],
-        ).then(
-            lambda h, t: (h, t),
-            inputs=[chat, timings_state],
-            outputs=[history_state, timings_state],
-        ).then(
-            lambda t: orchestrator.finalize_and_log_timings("text_turn", t),
-            inputs=[timings_state],
-            outputs=[],
-        )
-
-        user_input.submit(
-            _on_send,
-            inputs=[user_input, history_state, conversation_id_state, timings_state],
-            outputs=[
-                chat,
-                conversation_id_state,
-                user_input,
-                user_turn_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                error_output,
-                skip_pipeline_state,
-                timings_state,
-            ],
-        ).then(
-            _llm_reply_wrapper,
-            inputs=[
-                conversation_id_state,
-                user_turn_id_state,
-                user_text_state,
-                conversation_history_state,
-                history_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[
-                chat,
-                assistant_turn_id_state,
-                reply_text_state,
-                error_output,
-                timings_state,
-            ],
-        ).then(
-            _tts_wrapper,
-            inputs=[
-                conversation_id_state,
-                assistant_turn_id_state,
-                reply_text_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[assistant_audio_output, timings_state],
-        ).then(
-            _corrections_wrapper,
-            inputs=[
-                user_turn_id_state,
-                user_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                corrections_toggle,
-                timings_state,
-            ],
-            outputs=[corrected_output, native_output, explanation_output, timings_state],
-        ).then(
-            lambda h, t: (h, t),
-            inputs=[chat, timings_state],
-            outputs=[history_state, timings_state],
-        ).then(
-            lambda t: orchestrator.finalize_and_log_timings("text_turn", t),
-            inputs=[timings_state],
-            outputs=[],
-        )
-
-        audio_btn.click(
-            _on_audio,
-            inputs=[audio_input, history_state, conversation_id_state, timings_state],
-            outputs=[
+            ]
+            audio_start_inputs = [audio_input, history_state, conversation_id_state, timings_state]
+            audio_start_outputs = [
                 chat,
                 conversation_id_state,
                 user_input,
@@ -1422,82 +1271,47 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_audio_output,
                 skip_pipeline_state,
                 timings_state,
-            ],
-        ).then(
-            _llm_reply_wrapper,
-            inputs=[
-                conversation_id_state,
-                user_turn_id_state,
-                user_text_state,
-                conversation_history_state,
-                history_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[
-                chat,
-                assistant_turn_id_state,
-                reply_text_state,
-                error_output,
-                timings_state,
-            ],
-        ).then(
-            _tts_wrapper,
-            inputs=[
-                conversation_id_state,
-                assistant_turn_id_state,
-                reply_text_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-            outputs=[assistant_audio_output, timings_state],
-        ).then(
-            _corrections_wrapper,
-            inputs=[
-                user_turn_id_state,
-                user_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                corrections_toggle,
-                timings_state,
-            ],
-            outputs=[corrected_output, native_output, explanation_output, timings_state],
-        ).then(
-            lambda h, t: (h, t),
-            inputs=[chat, timings_state],
-            outputs=[history_state, timings_state],
-        ).then(
-            lambda t: orchestrator.finalize_and_log_timings("audio_turn", t),
-            inputs=[timings_state],
-            outputs=[],
-        )
+            ]
 
-        reset_btn.click(
-            lambda: _handle_reset(orchestrator),
-            inputs=[],
-            outputs=[
-                chat,
-                conversation_id_state,
-                user_input,
-                error_output,
-                user_audio_output,
-                assistant_audio_output,
-                corrected_output,
-                native_output,
-                explanation_output,
-                user_turn_id_state,
-                history_state,
-                conversation_history_state,
-                user_text_state,
-                reply_text_state,
-                assistant_turn_id_state,
-                skip_pipeline_state,
-                timings_state,
-            ],
-        ).then(
-            lambda h: h,
-            inputs=chat,
-            outputs=history_state,
-        )
+            _wire_turn_pipeline(
+                send_btn.click(
+                    _on_send,
+                    inputs=text_start_inputs,
+                    outputs=text_start_outputs,
+                ),
+                "text_turn",
+            )
+            _wire_turn_pipeline(
+                user_input.submit(
+                    _on_send,
+                    inputs=text_start_inputs,
+                    outputs=text_start_outputs,
+                ),
+                "text_turn",
+            )
+            _wire_turn_pipeline(
+                audio_btn.click(
+                    _on_audio,
+                    inputs=audio_start_inputs,
+                    outputs=audio_start_outputs,
+                ),
+                "audio_turn",
+            )
+
+        def _wire_reset_handler() -> None:
+            reset_btn.click(
+                lambda: _handle_reset(orchestrator),
+                inputs=[],
+                outputs=reset_outputs,
+            ).then(
+                lambda h: h,
+                inputs=chat,
+                outputs=history_state,
+            )
+
+        _wire_language_and_conversation_handlers()
+        _wire_delete_handlers()
+        _wire_turn_handlers()
+        _wire_reset_handler()
 
     return demo
