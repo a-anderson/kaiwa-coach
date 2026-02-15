@@ -127,6 +127,63 @@ def test_conversation_label_truncates_preview() -> None:
     assert "…" in label
 
 
+def test_theme_html_sets_language_attribute() -> None:
+    html = ui_module._theme_html("ja")
+    assert '<style id="kc-theme-style">' in html
+    assert "--kc-primary" in html
+
+
+def test_theme_html_includes_corrections_checkbox_selector() -> None:
+    html = ui_module._theme_html("fr")
+    assert '#corrections-toggle input[data-testid="checkbox"]' in html
+    assert ':checked::after' in html
+    assert "--kc-checkbox" in html
+
+
+def test_waveform_options_follow_theme_language() -> None:
+    ja = ui_module._waveform_options("ja")
+    fr = ui_module._waveform_options("fr")
+    assert ja["waveform_color"] == "#9ca3af"
+    assert ja["waveform_progress_color"] == "#3a3a3a"
+    assert fr["waveform_progress_color"] == "#3a3a3a"
+    assert ja["trim_region_color"] == ja["waveform_progress_color"]
+
+
+def test_theme_updates_for_language_returns_waveform_updates(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs)
+    monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
+    updates = ui_module._theme_updates_for_language("es")
+    assert isinstance(updates, tuple)
+    assert len(updates) == 4
+    assert "<style" in updates[0]
+    for update in updates[1:]:
+        assert "waveform_options" in update
+        assert update["value"] is None
+        assert "key" in update
+        assert update["waveform_options"]["waveform_progress_color"] == "#3a3a3a"
+
+
+def test_theme_updates_for_language_resets_and_remounts_audio(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs)
+    monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
+
+    ja_updates = ui_module._theme_updates_for_language("ja")
+    fr_updates = ui_module._theme_updates_for_language("fr")
+
+    ja_audio_updates = ja_updates[1:]
+    fr_audio_updates = fr_updates[1:]
+
+    for update in ja_audio_updates + fr_audio_updates:
+        assert update["value"] is None
+
+    assert ja_audio_updates[0]["key"] == "mic-input-ja"
+    assert fr_audio_updates[0]["key"] == "mic-input-fr"
+    assert ja_audio_updates[1]["key"] == "user-audio-ja"
+    assert fr_audio_updates[1]["key"] == "user-audio-fr"
+    assert ja_audio_updates[2]["key"] == "assistant-audio-ja"
+    assert fr_audio_updates[2]["key"] == "assistant-audio-fr"
+
+
 def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_choices = []
 
@@ -227,6 +284,9 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         def __exit__(self, exc_type, exc, tb):
             return False
 
+        def load(self, *args, **kwargs):
+            return self
+
     class _Component:
         def __init__(self, *args, **kwargs):
             self.args = args
@@ -279,13 +339,12 @@ def test_handle_language_change_resets_state() -> None:
             self.reset_called = True
 
     orch = _Orchestrator()
-    should_reset = ui_module._request_language_change(orch, "fr", False)
-    assert should_reset is True
-    result = ui_module._apply_language_change(orch, should_reset)
+    result = ui_module._handle_language_change(orch, "fr", False)
 
     assert orch.language == "fr"
     assert orch.reset_called is True
     assert result[0] == []
+    assert result[3] is None
 
 
 def test_handle_language_change_noop_when_suppressed() -> None:
@@ -301,10 +360,8 @@ def test_handle_language_change_noop_when_suppressed() -> None:
             self.reset_called = True
 
     orch = _Orchestrator()
-    should_reset = ui_module._request_language_change(orch, "fr", True)
-    assert should_reset is False
+    result = ui_module._handle_language_change(orch, "fr", True)
     assert orch.language == "ja"
-    result = ui_module._apply_language_change(orch, should_reset)
     assert orch.reset_called is False
     assert isinstance(result, tuple)
 
@@ -375,44 +432,6 @@ def test_audio_to_pcm_with_raw_resamples() -> None:
     assert raw_meta.sample_rate == 44100
 
 
-def test_handle_text_turn_sets_assistant_audio_only(tmp_path: Path) -> None:
-    class _Orchestrator:
-        def __init__(self):
-            self.created = False
-
-        def create_conversation(self):
-            self.created = True
-            return "conv"
-
-        def process_text_turn(self, conversation_id: str, user_text: str, conversation_history: str):
-            return SimpleNamespace(reply_text="ok", tts_audio_path="/tmp/tts.wav", user_turn_id="turn-1")
-
-        def get_latest_corrections(self, user_turn_id: str):
-            return {"errors": ["err"], "corrected": "fixed", "native": "native", "explanation": "explain"}
-
-    orch = _Orchestrator()
-    (
-        history,
-        conversation_id,
-        _,
-        error_update,
-        user_audio,
-        assistant_audio,
-        corrected,
-        native,
-        explanation,
-    ) = ui_module._handle_text_turn(orch, "hello", [], None)
-
-    assert conversation_id == "conv"
-    assert user_audio is None
-    assert assistant_audio == "/tmp/tts.wav"
-    assert error_update == {"visible": False}
-    assert history[-1]["role"] == "assistant"
-    assert corrected == "fixed"
-    assert native == "native"
-    assert explanation == "explain"
-
-
 def test_start_text_turn_sets_placeholder_and_states() -> None:
     class _Orchestrator:
         def create_conversation(self):
@@ -424,72 +443,17 @@ def test_start_text_turn_sets_placeholder_and_states() -> None:
             return "turn-1"
 
     orch = _Orchestrator()
-    (
-        history,
-        conversation_id,
-        _cleared_input,
-        user_turn_id,
-        display_history,
-        conversation_history,
-        user_text,
-        error_update,
-        skip_pipeline,
-        timings,
-    ) = ui_module._start_text_turn(orch, "hello", [], None)
+    result = ui_module._start_text_turn(orch, "hello", [], None)
 
-    assert conversation_id == "conv"
-    assert user_turn_id == "turn-1"
-    assert user_text == "hello"
-    assert history[-1]["content"] == "hello"
-    assert display_history[-1]["content"] == "hello"
-    assert "User: " not in conversation_history
-    assert error_update == {"visible": False}
-    assert skip_pipeline is False
-    assert isinstance(timings, dict)
-
-
-def test_handle_audio_turn_sets_both_audio_paths(tmp_path: Path) -> None:
-    class _Orchestrator:
-        def __init__(self):
-            self.created = False
-
-        def create_conversation(self):
-            self.created = True
-            return "conv"
-
-        def process_audio_turn(self, conversation_id: str, pcm_bytes: bytes, audio_meta: AudioMeta, conversation_history: str):
-            return SimpleNamespace(
-                asr_text="konnichiwa",
-                reply_text="hello",
-                input_audio_path="/tmp/user.wav",
-                tts_audio_path="/tmp/tts.wav",
-                user_turn_id="turn-1",
-            )
-
-        def get_latest_corrections(self, user_turn_id: str):
-            return {"errors": ["err"], "corrected": "fixed", "native": "native", "explanation": "explain"}
-    orch = _Orchestrator()
-    audio = (16000, [0.0, 0.5, -0.5])
-    (
-        history,
-        conversation_id,
-        _,
-        error_update,
-        user_audio,
-        assistant_audio,
-        corrected,
-        native,
-        explanation,
-    ) = ui_module._handle_audio_turn(orch, audio, [], None)
-
-    assert conversation_id == "conv"
-    assert user_audio == "/tmp/user.wav"
-    assert assistant_audio == "/tmp/tts.wav"
-    assert error_update == {"visible": False}
-    assert history[-1]["role"] == "assistant"
-    assert corrected == "fixed"
-    assert native == "native"
-    assert explanation == "explain"
+    assert result.conversation_id == "conv"
+    assert result.user_turn_id == "turn-1"
+    assert result.user_text == "hello"
+    assert result.chat_history[-1]["content"] == "hello"
+    assert result.history_state[-1]["content"] == "hello"
+    assert "User: " not in result.conversation_history
+    assert result.error_update == {"visible": False}
+    assert result.skip_pipeline is False
+    assert isinstance(result.timings, dict)
 
 
 def test_start_audio_turn_returns_asr_text(tmp_path: Path) -> None:
@@ -522,28 +486,16 @@ def test_start_audio_turn_returns_asr_text(tmp_path: Path) -> None:
 
     orch = _Orchestrator()
     audio = (16000, [0.0, 0.5, -0.5])
-    (
-        history,
-        conversation_id,
-        _cleared_input,
-        user_turn_id,
-        _display_history,
-        _conversation_history,
-        user_text,
-        error_update,
-        user_audio_path,
-        skip_pipeline,
-        timings,
-    ) = ui_module._start_audio_turn(orch, audio, [], None)
+    result = ui_module._start_audio_turn(orch, audio, [], None)
 
-    assert conversation_id == "conv"
-    assert user_turn_id == "turn-1"
-    assert user_text == "konnichiwa"
-    assert user_audio_path == "/tmp/user.wav"
-    assert history[-1]["content"] == "konnichiwa"
-    assert error_update == {"visible": False}
-    assert skip_pipeline is False
-    assert isinstance(timings, dict)
+    assert result.conversation_id == "conv"
+    assert result.user_turn_id == "turn-1"
+    assert result.user_text == "konnichiwa"
+    assert result.user_audio_path == "/tmp/user.wav"
+    assert result.chat_history[-1]["content"] == "konnichiwa"
+    assert result.error_update == {"visible": False}
+    assert result.skip_pipeline is False
+    assert isinstance(result.timings, dict)
 
 
 def test_start_audio_turn_persists_raw_on_resample(tmp_path: Path) -> None:
@@ -582,23 +534,11 @@ def test_start_audio_turn_persists_raw_on_resample(tmp_path: Path) -> None:
 
     orch = _Orchestrator()
     audio = (44100, [0.0, 0.5, -0.5, 0.25])
-    (
-        _history,
-        conversation_id,
-        _cleared_input,
-        _user_turn_id,
-        _display_history,
-        _conversation_history,
-        _user_text,
-        error_update,
-        _user_audio_path,
-        skip_pipeline,
-        _timings,
-    ) = ui_module._start_audio_turn(orch, audio, [], None)
+    result = ui_module._start_audio_turn(orch, audio, [], None)
 
-    assert conversation_id == "conv"
-    assert skip_pipeline is False
-    assert error_update == {"visible": False}
+    assert result.conversation_id == "conv"
+    assert result.skip_pipeline is False
+    assert result.error_update == {"visible": False}
     assert orch.persisted == ("conv", "turn-1", 44100, "raw")
 
 
@@ -616,14 +556,14 @@ def test_run_llm_reply_updates_history() -> None:
 
     orch = _Orchestrator()
     chat_history = [{"role": "assistant", "content": "(Thinking...)"}]
-    updated, assistant_turn_id, reply_text, error_update = ui_module._run_llm_reply(
+    result = ui_module._run_llm_reply(
         orch, "conv", "turn-1", "hello", "", chat_history, False
     )
 
-    assert updated[-1]["content"] == "hello"
-    assert assistant_turn_id == "assistant-1"
-    assert reply_text == "hello"
-    assert error_update == {"visible": False}
+    assert result.chat_history[-1]["content"] == "hello"
+    assert result.assistant_turn_id == "assistant-1"
+    assert result.reply_text == "hello"
+    assert result.error_update == {"visible": False}
 
 
 def test_run_corrections_noop_on_skip() -> None:
