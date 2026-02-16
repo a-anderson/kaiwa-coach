@@ -479,6 +479,47 @@ def test_native_reformulation_empty_string_persists(tmp_path: Path) -> None:
         db.close()
 
 
+def test_native_reformulation_salvages_prefixed_json(tmp_path: Path) -> None:
+    class _NativePrefixedBackend:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+            if "Error Detection" in prompt:
+                return "{\"errors\": []}"
+            if "Corrected Sentence" in prompt:
+                return "{\"corrected\": \"こんにちは\"}"
+            if "Native Reformulation" in prompt:
+                return 'note: {"native": "こんにちは。"}'
+            if "Explanation" in prompt:
+                return "{\"explanation\": \"\"}"
+            return "{\"reply\": \"ok\"}"
+
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={
+                "conversation": 5,
+                "error_detection": 5,
+                "correction": 5,
+                "native_reformulation": 5,
+                "explanation": 5,
+            },
+            backend=_NativePrefixedBackend(),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language="ja")
+
+        conversation_id = orch.create_conversation("Test")
+        orch.process_text_turn(conversation_id, "こんにちは", conversation_history="")
+
+        with db.read_connection() as conn:
+            row = conn.execute("SELECT native_text FROM corrections").fetchone()
+
+        assert row == ("こんにちは。",)
+    finally:
+        db.close()
+
+
 def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)
     try:
