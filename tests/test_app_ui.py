@@ -273,6 +273,8 @@ def test_confirm_row_toggle_returns_two_updates() -> None:
 
 
 def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
+    created_components = []
+
     class _Blocks:
         def __init__(self, *args, **kwargs):
             self._entered = False
@@ -291,8 +293,11 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
         def __init__(self, *args, **kwargs):
             self.args = args
             self.kwargs = kwargs
+            self.click_calls = []
+            created_components.append(self)
 
         def click(self, *args, **kwargs):
+            self.click_calls.append({"args": args, "kwargs": kwargs})
             return self
 
         def then(self, *args, **kwargs):
@@ -324,6 +329,12 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
     demo = ui_module.build_ui(orchestrator=SimpleNamespace())
     assert isinstance(demo, _Blocks)
+
+    mic_input = next(c for c in created_components if c.kwargs.get("elem_id") == "mic-input")
+    audio_send_btn = next(c for c in created_components if c.args and c.args[0] == "Send Audio")
+    assert audio_send_btn.click_calls
+    first_click_outputs = audio_send_btn.click_calls[0]["kwargs"]["outputs"]
+    assert mic_input in first_click_outputs
 
 
 def test_handle_language_change_resets_state() -> None:
@@ -540,6 +551,39 @@ def test_start_audio_turn_persists_raw_on_resample(tmp_path: Path) -> None:
     assert result.skip_pipeline is False
     assert result.error_update == {"visible": False}
     assert orch.persisted == ("conv", "turn-1", 44100, "raw")
+
+
+def test_audio_input_after_submit_clear_behavior() -> None:
+    original_audio = (44100, [0.0, 0.5, -0.5])
+    assert ui_module._audio_input_after_submit(skip_pipeline=False, original_audio=original_audio) is None
+    assert ui_module._audio_input_after_submit(skip_pipeline=True, original_audio=original_audio) == original_audio
+
+
+def test_audio_start_callback_outputs_order() -> None:
+    result = ui_module.AudioTurnStartResult(
+        chat_history=[{"role": "user", "content": "hi"}],
+        conversation_id="conv-1",
+        cleared_input="",
+        user_turn_id="turn-1",
+        history_state=[{"role": "user", "content": "hi"}],
+        conversation_history="",
+        user_text="konnichiwa",
+        error_update={"visible": False},
+        user_audio_path="/tmp/user.wav",
+        skip_pipeline=False,
+        timings={"audio_preprocess_seconds": 0.1},
+    )
+    output = ui_module._audio_start_callback_outputs(
+        result=result,
+        error_update={"__type__": "update", "visible": False},
+        original_audio=(16000, [0.0, 0.1]),
+    )
+    assert len(output) == 12
+    assert output[0] == result.chat_history
+    assert output[1] == "conv-1"
+    assert output[8] == "/tmp/user.wav"
+    assert output[9] is False
+    assert output[11] is None
 
 
 def test_run_llm_reply_updates_history() -> None:

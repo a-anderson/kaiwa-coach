@@ -216,7 +216,7 @@ The project currently reports system-level evidence in three areas:
 
 Latest full local snapshot:
 
-- `154 passed`
+- `156 passed`
 
 ### Schema and repair robustness
 
@@ -262,7 +262,6 @@ Current implementation status and post-MVP work are tracked in:
 
 This project is licensed under the MIT Licence.  
 See [LICENSE](LICENSE).
-
 
 ## Acknowledgements
 
