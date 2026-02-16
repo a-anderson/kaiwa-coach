@@ -31,6 +31,8 @@ from kaiwacoach.textnorm.invariants import enforce_japanese_invariant
 from kaiwacoach.textnorm.jp_katakana import normalise_katakana
 from kaiwacoach.textnorm.tts_punctuation import normalize_for_tts
 
+_logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class TextTurnResult:
@@ -711,11 +713,24 @@ class ConversationOrchestrator:
             {"language": self._language, "user_text": user_text},
         )
         start = time.perf_counter()
-        native_result = self._safe_generate_json(prompt=native_prompt.text, role="native_reformulation")
+        native_raw, native_result, native_fallback_used = self._generate_with_repair(
+            prompt=native_prompt.text,
+            role="native_reformulation",
+            repair_schema='{"native": "<natural rewrite>"}',
+        )
         timings["corrections_native_seconds"] = time.perf_counter() - start
         native_text = None
         if native_result.model is not None:
             native_text = getattr(native_result.model, "native", None)
+        if native_result.model is None and native_result.error:
+            _logger.warning(
+                "corrections.native_invalid language=%s error=%s",
+                self._language,
+                native_result.error,
+            )
+        if native_fallback_used:
+            _logger.info("corrections.native_fallback_used language=%s", self._language)
+        _ = native_raw
 
         correction_id = str(uuid.uuid4())
         errors_json = json.dumps(errors, ensure_ascii=False)
