@@ -11,7 +11,7 @@
 KaiwaCoach is an offline-first language coaching app for Apple Silicon macOS.  
 It supports text and microphone turns, structured correction feedback, and TTS playback, with clear model orchestration and persistence boundaries.
 
-## Example Usage
+## Example
 
 ### Audio Input (Japanese)
 
