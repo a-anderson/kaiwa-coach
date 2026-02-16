@@ -199,7 +199,7 @@ poetry run python scripts/llm_smoke.py --language ja
 - Role token caps and context limits are configurable for latency control.
 - Schema enforcement prevents invalid role outputs from silently propagating.
 
-## Evaluation (Current)
+## Evaluation
 
 The project currently reports system-level evidence in three areas:
 
