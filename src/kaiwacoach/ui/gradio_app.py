@@ -21,6 +21,7 @@ from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import AudioMeta
 
 _logger = logging.getLogger(__name__)
+AudioInputValue = tuple[int, object] | str | Path | None
 
 
 @dataclass(frozen=True)
@@ -690,6 +691,41 @@ def _start_audio_turn(
     )
 
 
+def _audio_input_after_submit(skip_pipeline: bool, original_audio: AudioInputValue) -> AudioInputValue:
+    """Return the next value for the audio input tile after submit.
+
+    Successful submit clears the tile. Failed submit keeps user audio in place.
+    """
+    if skip_pipeline:
+        return original_audio
+    return None
+
+
+def _audio_start_callback_outputs(
+    result: AudioTurnStartResult,
+    error_update,
+    original_audio: AudioInputValue,
+) -> tuple:
+    """Build `_on_audio` outputs in UI callback order.
+
+    Keeping this as a helper makes output ordering explicit and unit-testable.
+    """
+    return (
+        result.chat_history,
+        result.conversation_id,
+        result.cleared_input,
+        result.user_turn_id,
+        result.history_state,
+        result.conversation_history,
+        result.user_text,
+        error_update,
+        result.user_audio_path,
+        result.skip_pipeline,
+        result.timings,
+        _audio_input_after_submit(result.skip_pipeline, original_audio),
+    )
+
+
 def _run_llm_reply(
     orchestrator: ConversationOrchestrator,
     conversation_id: str | None,
@@ -1114,21 +1150,13 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 conversation_id: str | None,
                 timings: dict,
             ):
+                """Handle audio submit.
+
+                If the audio pipeline fails, keep the input audio so the user can retry.
+                """
                 result = _start_audio_turn(orchestrator, audio, chat_history, conversation_id, timings)
                 error_update = gr.update(**result.error_update)
-                return (
-                    result.chat_history,
-                    result.conversation_id,
-                    result.cleared_input,
-                    result.user_turn_id,
-                    result.history_state,
-                    result.conversation_history,
-                    result.user_text,
-                    error_update,
-                    result.user_audio_path,
-                    result.skip_pipeline,
-                    result.timings,
-                )
+                return _audio_start_callback_outputs(result, error_update, audio)
 
             def _llm_reply_wrapper(
                 conversation_id: str | None,
@@ -1279,6 +1307,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 user_audio_output,
                 skip_pipeline_state,
                 timings_state,
+                audio_input,
             ]
 
             _wire_turn_pipeline(
