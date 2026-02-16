@@ -386,11 +386,9 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Add support for other languages
 🔁 Correction text persists across restarts
 🔁 Pronunciation scoring  
-🔁 Download option for message audio
+✅ Download option for message audio
 🔁 Audio regeneration (single turn + full conversation)
-🔁 ASR confidence-based UX  
 🔁 Shadowing mode  
 🔁 Anki export  
-🔁 Desktop packaging
 ✅ Toggle to disable corrections (speed-focused mode)
 🔁 Evaluate smaller LLM variants (e.g., 4-bit) for latency
