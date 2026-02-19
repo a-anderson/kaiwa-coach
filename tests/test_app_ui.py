@@ -150,28 +150,32 @@ def test_waveform_options_follow_theme_language() -> None:
 
 
 def test_theme_updates_for_language_returns_waveform_updates(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs)
+    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs, Image=lambda **kwargs: kwargs)
     monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
-    updates = ui_module._theme_updates_for_language("es")
+    logo_dir = Path(__file__).resolve().parents[1] / "assets" / "logo"
+    updates = ui_module._theme_updates_for_language("es", logo_dir)
     assert isinstance(updates, tuple)
-    assert len(updates) == 4
+    assert len(updates) == 5
     assert "<style" in updates[0]
-    for update in updates[1:]:
+    for update in updates[1:4]:
         assert "waveform_options" in update
         assert update["value"] is None
         assert "key" in update
         assert update["waveform_options"]["waveform_progress_color"] == "#3a3a3a"
+    assert isinstance(updates[4], str)
+    assert updates[4].startswith('<img src="data:image/png;base64,')
 
 
 def test_theme_updates_for_language_resets_and_remounts_audio(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs)
+    fake_gr = SimpleNamespace(Audio=lambda **kwargs: kwargs, Image=lambda **kwargs: kwargs)
     monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
+    logo_dir = Path(__file__).resolve().parents[1] / "assets" / "logo"
 
-    ja_updates = ui_module._theme_updates_for_language("ja")
-    fr_updates = ui_module._theme_updates_for_language("fr")
+    ja_updates = ui_module._theme_updates_for_language("ja", logo_dir)
+    fr_updates = ui_module._theme_updates_for_language("fr", logo_dir)
 
-    ja_audio_updates = ja_updates[1:]
-    fr_audio_updates = fr_updates[1:]
+    ja_audio_updates = ja_updates[1:4]
+    fr_audio_updates = fr_updates[1:4]
 
     for update in ja_audio_updates + fr_audio_updates:
         assert update["value"] is None
@@ -182,6 +186,37 @@ def test_theme_updates_for_language_resets_and_remounts_audio(monkeypatch: pytes
     assert fr_audio_updates[1]["key"] == "user-audio-fr"
     assert ja_audio_updates[2]["key"] == "assistant-audio-ja"
     assert fr_audio_updates[2]["key"] == "assistant-audio-fr"
+    assert isinstance(ja_updates[4], str)
+    assert isinstance(fr_updates[4], str)
+    assert ja_updates[4] != fr_updates[4]
+
+
+def test_logo_path_for_language_fallback() -> None:
+    logo_dir = Path(__file__).resolve().parents[1] / "assets" / "logo"
+    fallback = ui_module._logo_path_for_language("unknown", logo_dir)
+    assert fallback.endswith("kaiwacoach_logo_ja.png")
+
+
+def test_logo_path_for_language_missing_requested_uses_ja_fallback(tmp_path: Path) -> None:
+    logo_dir = tmp_path / "logo"
+    logo_dir.mkdir(parents=True)
+    (logo_dir / "kaiwacoach_logo_ja.png").write_bytes(b"fake-ja")
+    resolved = ui_module._logo_path_for_language("fr", logo_dir)
+    assert resolved.endswith("kaiwacoach_logo_ja.png")
+
+
+def test_header_logo_html_uses_data_uri() -> None:
+    logo_dir = Path(__file__).resolve().parents[1] / "assets" / "logo"
+    html = ui_module._header_logo_html("ja", logo_dir)
+    assert html.startswith('<img src="data:image/png;base64,')
+    assert 'alt="KaiwaCoach logo"' in html
+
+
+def test_header_logo_html_raises_when_no_logo_available(tmp_path: Path) -> None:
+    logo_dir = tmp_path / "empty-logo-dir"
+    logo_dir.mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        ui_module._header_logo_html("fr", logo_dir)
 
 
 def test_refresh_conversation_options_updates_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -294,6 +329,7 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
             self.args = args
             self.kwargs = kwargs
             self.click_calls = []
+            self.change_calls = []
             created_components.append(self)
 
         def click(self, *args, **kwargs):
@@ -307,6 +343,7 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
             return self
 
         def change(self, *args, **kwargs):
+            self.change_calls.append({"args": args, "kwargs": kwargs})
             return self
 
     fake_gr = SimpleNamespace(
@@ -327,14 +364,21 @@ def test_build_ui_constructs_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     monkeypatch.setitem(__import__("sys").modules, "gradio", fake_gr)
-    demo = ui_module.build_ui(orchestrator=SimpleNamespace())
+    logo_dir = Path(__file__).resolve().parents[1] / "assets" / "logo"
+    demo = ui_module.build_ui(orchestrator=SimpleNamespace(), logo_dir=logo_dir)
     assert isinstance(demo, _Blocks)
 
     mic_input = next(c for c in created_components if c.kwargs.get("elem_id") == "mic-input")
     audio_send_btn = next(c for c in created_components if c.args and c.args[0] == "Send Audio")
+    header_logo = next(c for c in created_components if c.kwargs.get("elem_id") == "header-logo")
+    language_dropdown = next(c for c in created_components if c.kwargs.get("show_label") is False and "choices" in c.kwargs)
     assert audio_send_btn.click_calls
     first_click_outputs = audio_send_btn.click_calls[0]["kwargs"]["outputs"]
     assert mic_input in first_click_outputs
+    assert isinstance(header_logo.args[0], str)
+    assert header_logo.args[0].startswith('<img src="data:image/png;base64,')
+    assert language_dropdown.change_calls
+    assert language_dropdown.change_calls[0]["kwargs"]["outputs"]
 
 
 def test_handle_language_change_resets_state() -> None:

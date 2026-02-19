@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo/kaiwacoach_logo.png" alt="KaiwaCoach logo" width="220"/>
+  <img src="assets/logo/kaiwacoach_logo_ja.png" alt="KaiwaCoach logo" width="800"/>
 </p>
 
 # KaiwaCoach
@@ -228,7 +228,7 @@ The project currently reports system-level evidence in three areas:
 
 Latest full local snapshot:
 
-- `156 passed`
+- `159 passed`
 
 ### Schema and repair robustness
 

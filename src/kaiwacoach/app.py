@@ -65,7 +65,7 @@ def main(launch_ui: bool = True) -> None:
     )
     atexit.register(audio_cache.cleanup)
     if launch_ui:
-        demo = build_ui(orchestrator)
+        demo = build_ui(orchestrator, logo_dir=Path(config.ui.logo_dir))
         demo.launch()
 
 

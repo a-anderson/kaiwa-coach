@@ -101,6 +101,11 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True)
+class UIConfig:
+    logo_dir: str
+
+
+@dataclass(frozen=True)
 class AppConfig:
     session: SessionConfig
     models: ModelsConfig
@@ -108,6 +113,7 @@ class AppConfig:
     storage: StorageConfig
     tts: TTSConfig
     logging: LoggingConfig
+    ui: UIConfig
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -134,6 +140,7 @@ class AppConfig:
             },
             "tts": {"voice": self.tts.voice, "speed": self.tts.speed},
             "logging": {"timing_logs": self.logging.timing_logs},
+            "ui": {"logo_dir": self.ui.logo_dir},
         }
 
 
@@ -280,6 +287,7 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
         "KAIWACOACH_TTS_VOICE": (("tts", "voice"), _to_str),
         "KAIWACOACH_TTS_SPEED": (("tts", "speed"), _to_float),
         "KAIWACOACH_LOGGING_TIMING_LOGS": (("logging", "timing_logs"), _to_bool),
+        "KAIWACOACH_UI_LOGO_DIR": (("ui", "logo_dir"), _to_str),
     }
 
     result = dict(config)
@@ -419,6 +427,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         "storage": {"root_dir": str(repo_root / "storage"), "expected_sample_rate": 16000},
         "tts": {"voice": "default", "speed": 1.0},
         "logging": {"timing_logs": True},
+        "ui": {"logo_dir": str(repo_root / "assets" / "logo")},
     }
     file_data = _parse_config_file(resolved_path)
     merged = _deep_merge(defaults, file_data)
@@ -468,6 +477,9 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         logging=LoggingConfig(
             timing_logs=bool(merged.get("logging", {}).get("timing_logs", True)),
         ),
+        ui=UIConfig(
+            logo_dir=str(merged["ui"]["logo_dir"]),
+        ),
     )
 
     _validate_config(config)
@@ -505,3 +517,5 @@ def _validate_config(config: AppConfig) -> None:
         raise ValueError("storage.root_dir must be set")
     if config.storage.expected_sample_rate is not None and config.storage.expected_sample_rate <= 0:
         raise ValueError("storage.expected_sample_rate must be > 0 or null")
+    if not config.ui.logo_dir:
+        raise ValueError("ui.logo_dir must be set")

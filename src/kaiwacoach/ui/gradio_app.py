@@ -10,6 +10,7 @@ Notes
 from __future__ import annotations
 
 from dataclasses import dataclass
+import base64
 from pathlib import Path
 import logging
 import time
@@ -22,6 +23,7 @@ from kaiwacoach.storage.blobs import AudioMeta
 
 _logger = logging.getLogger(__name__)
 AudioInputValue = tuple[int, object] | str | Path | None
+_LOGO_FALLBACK_LANGUAGE = "ja"
 
 
 @dataclass(frozen=True)
@@ -75,10 +77,10 @@ _LANGUAGE_THEMES: dict[str, dict[str, str]] = {
         "checkbox": "#264db6",
     },
     "it": {
-        "primary": "#166534",
+        "primary": "#1d8143",
         "user": "#e9f6ee",
         "bot": "#fce8e8",
-        "checkbox": "#166534",
+        "checkbox": "#1d8143",
     },
     "es": {
         "primary": "#e27a2b",
@@ -87,10 +89,10 @@ _LANGUAGE_THEMES: dict[str, dict[str, str]] = {
         "checkbox": "#e27a2b",
     },
     "pt-br": {
-        "primary": "#166534",
+        "primary": "#1d8143",
         "user": "#e7f5ec",
         "bot": "#e9eef9",
-        "checkbox": "#166534",
+        "checkbox": "#1d8143",
     },
     "en": {
         "primary": "#264db6",
@@ -190,9 +192,60 @@ _THEME_STYLE_TEMPLATE = Template(
 """
 )
 
+_UI_LAYOUT_CSS = """
+#input-grid {align-items: stretch;}
+#input-grid > div {flex: 1 1 0;}
+#text-input, #audio-input {min-height: 200px;}
+#text-input textarea {min-height: 140px;}
+#audio-input .wrap {min-height: 140px;}
+#header-row {align-items: center; justify-content: space-between; gap: 0;}
+#header-left {display: flex; align-items: center;}
+#header-right {display: flex; justify-content: flex-end;}
+#header-logo {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+}
+#header-logo, #header-logo > .wrap {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+#header-logo img {
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 50px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin-right: auto !important;
+}
+#delete-confirm-row, #delete-all-confirm-row,
+#delete-confirm-buttons, #delete-all-confirm-buttons {
+  background: #ffecec;
+  border-radius: 6px;
+  padding: 6px;
+}
+"""
+
 
 def _theme_config(language: str) -> dict[str, str]:
     return _LANGUAGE_THEMES.get(language, _LANGUAGE_THEMES["en"])
+
+
+def _logo_path_for_language(language: str, logo_dir: Path) -> str:
+    code = language if language in SUPPORTED_LANGUAGES else _LOGO_FALLBACK_LANGUAGE
+    path = logo_dir / f"kaiwacoach_logo_{code}.png"
+    if path.exists():
+        return str(path)
+    fallback = logo_dir / f"kaiwacoach_logo_{_LOGO_FALLBACK_LANGUAGE}.png"
+    return str(fallback)
+
+
+def _header_logo_html(language: str, logo_dir: Path) -> str:
+    path = Path(_logo_path_for_language(language, logo_dir))
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f'<img src="data:image/png;base64,{encoded}" alt="KaiwaCoach logo" />'
 
 
 def _waveform_options(_language: str) -> dict[str, str]:
@@ -209,7 +262,7 @@ def _waveform_options(_language: str) -> dict[str, str]:
     }
 
 
-def _theme_updates_for_language(language: str):
+def _theme_updates_for_language(language: str, logo_dir: Path):
     import gradio as gr  # type: ignore
 
     opts = _waveform_options(language)
@@ -240,6 +293,7 @@ def _theme_updates_for_language(language: str):
             autoplay=True,
             label="Last assistant audio",
         ),
+        _header_logo_html(language, logo_dir),
     )
 
 
@@ -868,7 +922,7 @@ def _handle_language_change(
     return _handle_reset(orchestrator)
 
 
-def build_ui(orchestrator: ConversationOrchestrator):
+def build_ui(orchestrator: ConversationOrchestrator, logo_dir: Path):
     import gradio as gr  # type: ignore
     language_choices = [
         ("🇯🇵 Japanese", "ja"),
@@ -886,35 +940,19 @@ def build_ui(orchestrator: ConversationOrchestrator):
     conversation_choices = _load_conversation_options(orchestrator)
     load_enabled = bool(conversation_choices)
 
-    with gr.Blocks(
-        css="""
-#input-grid {align-items: stretch;}
-#input-grid > div {flex: 1 1 0;}
-#text-input, #audio-input {min-height: 200px;}
-#text-input textarea {min-height: 140px;}
-#audio-input .wrap {min-height: 140px;}
-#header-row {align-items: center; justify-content: space-between; gap: 0;}
-#header-row h1 {margin: 0; text-align: left;}
-#header-left {display: flex; align-items: center;}
-#header-right {display: flex; justify-content: flex-end;}
-#delete-confirm-row, #delete-all-confirm-row,
-#delete-confirm-buttons, #delete-all-confirm-buttons {
-  background: #ffecec;
-  border-radius: 6px;
-  padding: 6px;
-}
-"""
-    ) as demo:
+    with gr.Blocks(css=_UI_LAYOUT_CSS) as demo:
         theme_html = gr.HTML(_theme_html(default_language))
         with gr.Row(elem_id="header-row"):
-            with gr.Column(elem_id="header-left"):
-                gr.Markdown("# KaiwaCoach")
-            with gr.Column(elem_id="header-right"):
+            with gr.Column(scale=2, min_width=360, elem_id="header-left"):
+                header_logo = gr.HTML(_header_logo_html(default_language, logo_dir), elem_id="header-logo")
+            with gr.Column(scale=1, min_width=280, elem_id="header-right"):
                 language_dropdown = gr.Dropdown(
                     choices=language_choices,
                     value=default_language,
                     interactive=True,
                     show_label=False,
+                    container=False,
+                    elem_id="language-dropdown",
                 )
         error_output = gr.Markdown(visible=False)
         with gr.Row():
@@ -944,6 +982,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                     label="",
                     show_label=False,
                     interactive=True,
+                    container=False,
                 )
                 with gr.Row():
                     refresh_conversations_btn = gr.Button("Refresh")
@@ -991,7 +1030,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
         timings_state = gr.State({})
         suppress_language_change_state = gr.State(False)
         loaded_language_state = gr.State(None)
-        theme_audio_outputs = [theme_html, audio_input, user_audio_output, assistant_audio_output]
+        theme_audio_outputs = [theme_html, audio_input, user_audio_output, assistant_audio_output, header_logo]
         reset_outputs = [
             chat,
             conversation_id_state,
@@ -1048,7 +1087,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 inputs=[language_dropdown, suppress_language_change_state],
                 outputs=reset_outputs,
             ).then(
-                _theme_updates_for_language,
+                lambda language: _theme_updates_for_language(language, logo_dir),
                 inputs=[language_dropdown],
                 outputs=theme_audio_outputs,
             )
@@ -1072,7 +1111,7 @@ def build_ui(orchestrator: ConversationOrchestrator):
                 inputs=[loaded_language_state],
                 outputs=[language_dropdown],
             ).then(
-                _theme_updates_for_language,
+                lambda language: _theme_updates_for_language(language, logo_dir),
                 inputs=[language_dropdown],
                 outputs=theme_audio_outputs,
             ).then(
