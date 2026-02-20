@@ -15,13 +15,13 @@ It supports text and microphone turns, structured correction feedback, and TTS p
 
 All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) file.
 
-### Audio Input (Japanese)
+### Audio Input
 
 <p align="center">
   <img src="assets/demos/audio_input.gif" alt="KaiwaCoach audio input demo" style="max-width: 800px; width: 100%; height: auto;" />
 </p>
 
-### Text Input (French)
+### Text Input
 
 <p align="center">
   <img src="assets/demos/text_input.gif" alt="KaiwaCoach text input demo" style="max-width: 800px; width: 100%; height: auto;" />
