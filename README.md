@@ -9,7 +9,7 @@
 ![Python: 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
 
 KaiwaCoach is an offline-first language coaching app for Apple Silicon macOS.  
-It supports text and microphone turns, structured correction feedback, and TTS playback, with clear model orchestration and persistence boundaries.
+It supports text and microphone turns, structured correction feedback, and TTS playback, with a clear separation between the UI, model pipeline, and persistent storage.
 
 ## Demos
 
@@ -74,6 +74,20 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - Role outputs are schema-validated with one repair attempt.
 - Turn processing uses deterministic defaults and explicit timing logs.
 - Before TTS, Japanese text is verified to ensure it was not accidentally altered.
+
+## Build Learnings
+
+This project also served as a learning exercise for two areas:
+
+- using an LLM coding assistant effectively during a real software project
+- integrating local ASR, LLM, and TTS components into a reliable application
+
+I found both areas benefited from the same techniques: smaller scoped changes, clear constraints, regression tests, and review-style iteration rather than trying to solve everything in one step.
+
+More detailed notes:
+
+- [LLM-Assisted Coding Learnings](docs/llm_assisted_coding_learnings.md)
+- [Model Integration Learnings](docs/model_integration_learnings.md)
 
 ## Tech Stack
 
@@ -215,7 +229,7 @@ poetry run python scripts/llm_smoke.py --language ja
 
 ## Evaluation
 
-The project currently reports system-level evidence in three areas:
+The project currently provides evidence in three areas:
 
 1. **Automated reliability checks**
 2. **Schema/repair robustness checks**
@@ -228,9 +242,9 @@ The project currently reports system-level evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot:
+Latest full local snapshot (2026-02-24):
 
-- `159 passed`
+- `162 passed`
 
 ### Schema and repair robustness
 
@@ -263,9 +277,11 @@ Instrumentation lives in:
 
 Current implementation status and post-MVP work are tracked in:
 
-- [docs/KaiwaCoach_Implementation_Checklist_v1.1.md](docs/KaiwaCoach_Implementation_Checklist_v1.1.md)
+- [docs/planning/KaiwaCoach_Implementation_Checklist_v1.1.md](docs/planning/KaiwaCoach_Implementation_Checklist_v1.1.md)
 
-## Contributing
+## Development Notes
+
+This repo is not currently accepting external contributions, but these notes document project conventions.
 
 - Keep prompts in [src/kaiwacoach/prompts/](src/kaiwacoach/prompts/)
 - Preserve module boundaries (UI/orchestrator/models/storage/textnorm)
