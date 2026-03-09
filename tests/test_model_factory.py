@@ -26,8 +26,12 @@ def _asr_config(asr_id: str = "test-asr-model", language: str = "ja") -> SimpleN
 
 # --- build_asr (non-slow: WhisperASR does not load the model on init) ---
 
-def test_build_asr_returns_whisper_asr() -> None:
-    """build_asr should return a WhisperASR instance."""
+# Routing tests below (test_build_*_routes_to_*) document the *current* backend
+# selection for each model type. They are expected to change when new backends
+# are added and the routing logic in factory.py is updated.
+
+def test_build_asr_routes_to_whisper_asr() -> None:
+    """build_asr should route to WhisperASR for the current default config."""
     assert isinstance(build_asr(_asr_config()), WhisperASR)
 
 
@@ -51,8 +55,8 @@ def test_build_asr_satisfies_asr_protocol() -> None:
 # --- build_llm (slow: MlxLmBackend loads the model on init) ---
 
 @pytest.mark.slow
-def test_build_llm_returns_qwen_llm() -> None:
-    """build_llm should return a QwenLLM wired from real config."""
+def test_build_llm_routes_to_qwen_llm() -> None:
+    """build_llm should route to QwenLLM for the current default config."""
     from kaiwacoach.settings import load_config
     config = load_config()
     try:
@@ -72,8 +76,8 @@ def test_build_llm_returns_qwen_llm() -> None:
 # --- build_tts (slow: MlxAudioBackend loads the model on init) ---
 
 @pytest.mark.slow
-def test_build_tts_returns_kokoro_tts(tmp_path: Path) -> None:
-    """build_tts should return a KokoroTTS wired from real config."""
+def test_build_tts_routes_to_kokoro_tts(tmp_path: Path) -> None:
+    """build_tts should route to KokoroTTS for the current default config."""
     from kaiwacoach.settings import load_config
     config = load_config()
     cache = SessionAudioCache(root_dir=tmp_path)

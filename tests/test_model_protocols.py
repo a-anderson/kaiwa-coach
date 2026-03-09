@@ -15,6 +15,11 @@ from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
 
 
 # --- Stubs ---
+# These stubs are intentionally minimal — they only satisfy the internal backend
+# protocols (e.g. TTSBackend.synthesize) so the wrappers can be constructed
+# without loading real ML models. They are distinct from the behavior-tracking
+# stubs in individual model test files (e.g. test_tts_kokoro.py), which capture
+# call arguments and simulate more complex interactions.
 
 class _ASRTranscriber:
     def __call__(self, path: Path, language: str) -> Tuple[str, Dict[str, Any]]:

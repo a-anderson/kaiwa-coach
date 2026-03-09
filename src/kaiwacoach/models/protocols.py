@@ -36,6 +36,11 @@ class TTSResult:
     meta: Dict[str, Any]
 
 
+# @runtime_checkable is applied to all three protocols to enable isinstance
+# checks in tests (e.g. assert isinstance(build_asr(config), ASRProtocol)).
+# No production code performs isinstance checks against these protocols;
+# structural compatibility is relied upon at runtime.
+
 @runtime_checkable
 class ASRProtocol(Protocol):
     @property
