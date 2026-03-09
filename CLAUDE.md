@@ -143,7 +143,10 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Slow tests (`@pytest.mark.slow`) require local models; CI runs only non-slow tests.
 - Prefer `poetry run pytest -q <targeted tests>` during iteration, then run broader suites before claiming completion.
 - When fixing a bug, add or adjust at least one regression test that would have caught it.
-- For UI callback changes: read the existing tests first — they encode required Gradio output ordering. Add targeted tests for callback output shape/order.
+- Every LLM role and repair prompt path must have schema tests.
+- Storage changes require round-trip tests covering DB and audio blobs.
+- End-to-end smoke tests are required for single text turn and single audio turn paths.
+- For UI callback changes: read the existing tests first — they encode required Gradio output ordering. Add targeted tests for callback output shape/order. Expect both manual UI validation and test updates to be required when touching `gradio_app.py`.
 - For startup/config wiring changes: add tests in `tests/test_app_startup.py`.
 - If a change affects user-visible flow (language switching, audio submit, history load, delete), mention manual verification steps explicitly.
 
@@ -154,3 +157,4 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - When refactoring: move code first, then change behaviour in a separate step.
 - Add docstrings/comments only for non-obvious behaviour, tradeoffs, or framework quirks.
 - Start with the simplest solution that is likely to work. If choosing a more complex option, document why the simpler one was insufficient.
+- Keep changes focused and diffs small; avoid broad refactors unless explicitly requested.
