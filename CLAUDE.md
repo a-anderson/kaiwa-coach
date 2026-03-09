@@ -29,7 +29,13 @@ macOS setup (required once for local model dependencies):
 poetry run bash scripts/setup_macos.sh
 ```
 
+`pytest.ini` sets `pythonpath = src`, so tests can `import kaiwacoach` directly without a `src.` prefix — no `conftest.py` path manipulation is needed.
+
 `tools/export_conversation.py` — stub for a planned conversation export utility; not yet implemented.
+
+## Runtime data (gitignored, never commit)
+
+`storage/`, `*.db`, `audio/`, and `exports/` are all local-only runtime directories. They are gitignored and should never be committed.
 
 ## Environment — do not modify
 
