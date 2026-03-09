@@ -11,7 +11,7 @@ import kaiwacoach.app as app_module
 
 
 def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """main should construct components with config values."""
+    """main should call factory functions with the loaded config."""
     calls = SimpleNamespace(asr=None, llm=None, tts=None, db=None, prompts=None, orchestrator=None)
 
     def _load_config():
@@ -24,31 +24,21 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
             logging=SimpleNamespace(timing_logs=True),
         )
 
-    class _ASR:
-        def __init__(self, model_id: str, language: str) -> None:
-            calls.asr = (model_id, language)
-
-    class _Backend:
+    class _FakeModel:
         def __init__(self, model_id: str) -> None:
-            calls.llm = (model_id,)
+            self.model_id = model_id
 
-        def count_tokens(self, _text: str) -> int:
-            return 0
+    def _build_asr(cfg):
+        calls.asr = cfg
+        return _FakeModel(cfg.models.asr_id)
 
-    class _LLM:
-        def __init__(
-            self,
-            model_id: str,
-            max_context_tokens: int,
-            role_max_new_tokens,
-            backend,
-            token_counter=None,
-        ) -> None:
-            calls.llm = (model_id, max_context_tokens, dict(role_max_new_tokens), backend, token_counter)
+    def _build_llm(cfg):
+        calls.llm = cfg
+        return _FakeModel(cfg.models.llm_id)
 
-    class _TTS:
-        def __init__(self, model_id: str, cache) -> None:
-            calls.tts = (model_id, cache)
+    def _build_tts(cfg, cache):
+        calls.tts = (cfg, cache)
+        return _FakeModel(cfg.models.tts_id)
 
     class _DB:
         def __init__(self, db_path: str | Path, schema_path: str | Path) -> None:
@@ -76,10 +66,9 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
             self.cleaned = True
 
     monkeypatch.setattr(app_module, "load_config", _load_config)
-    monkeypatch.setattr(app_module, "WhisperASR", _ASR)
-    monkeypatch.setattr(app_module, "MlxLmBackend", _Backend)
-    monkeypatch.setattr(app_module, "QwenLLM", _LLM)
-    monkeypatch.setattr(app_module, "KokoroTTS", _TTS)
+    monkeypatch.setattr(app_module, "build_asr", _build_asr)
+    monkeypatch.setattr(app_module, "build_llm", _build_llm)
+    monkeypatch.setattr(app_module, "build_tts", _build_tts)
     monkeypatch.setattr(app_module, "SessionAudioCache", _Cache)
     monkeypatch.setattr(app_module, "SQLiteWriter", _DB)
     monkeypatch.setattr(app_module, "PromptLoader", _PromptLoader)
@@ -88,9 +77,10 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     app_module.main(launch_ui=False)
 
-    assert calls.asr == ("asr", "ja")
-    assert calls.llm[0] == "llm"
-    assert calls.tts[0] == "tts"
+    assert calls.asr.models.asr_id == "asr"
+    assert calls.asr.session.language == "ja"
+    assert calls.llm.models.llm_id == "llm"
+    assert calls.tts[0].models.tts_id == "tts"
     assert calls.db[0].name == "kaiwacoach.sqlite"
     assert calls.db[1].name == "schema.sql"
     assert calls.prompts.name == "prompts"
@@ -114,31 +104,8 @@ def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, t
             ui=SimpleNamespace(logo_dir=str(tmp_path / "assets" / "logo")),
         )
 
-    class _ASR:
-        def __init__(self, model_id: str, language: str) -> None:
-            return None
-
-    class _Backend:
-        def __init__(self, model_id: str) -> None:
-            return None
-
-        def count_tokens(self, _text: str) -> int:
-            return 0
-
-    class _LLM:
-        def __init__(
-            self,
-            model_id: str,
-            max_context_tokens: int,
-            role_max_new_tokens,
-            backend,
-            token_counter=None,
-        ) -> None:
-            return None
-
-    class _TTS:
-        def __init__(self, model_id: str, cache) -> None:
-            return None
+    class _FakeModel:
+        pass
 
     class _DB:
         def __init__(self, db_path: str | Path, schema_path: str | Path) -> None:
@@ -174,10 +141,9 @@ def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, t
         return _Demo()
 
     monkeypatch.setattr(app_module, "load_config", _load_config)
-    monkeypatch.setattr(app_module, "WhisperASR", _ASR)
-    monkeypatch.setattr(app_module, "MlxLmBackend", _Backend)
-    monkeypatch.setattr(app_module, "QwenLLM", _LLM)
-    monkeypatch.setattr(app_module, "KokoroTTS", _TTS)
+    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _FakeModel())
+    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _FakeModel())
+    monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _FakeModel())
     monkeypatch.setattr(app_module, "SessionAudioCache", _Cache)
     monkeypatch.setattr(app_module, "SQLiteWriter", _DB)
     monkeypatch.setattr(app_module, "PromptLoader", _PromptLoader)
