@@ -64,7 +64,35 @@ poetry run bash scripts/setup_macos.sh
 
 ## Key conventions
 
+- Prettier runs automatically as the code formatter.
 - Prompts live in `src/kaiwacoach/prompts/` as `.md` files with `{var}` placeholders — never inline prompts in Python code.
-- The textnorm pipeline applies invariant checks before TTS: if Japanese text is altered unexpectedly, it falls back rather than propagating a corrupted string.
 - Slow tests (marked `@pytest.mark.slow`) require local models to be installed; CI only runs non-slow tests.
-- `SQLiteWriter._ALLOWED_UPDATE_COLUMNS` must be kept in sync with schema changes.
+
+## Editing prompts
+
+After changing any `.md` file in `src/kaiwacoach/prompts/`, run the prompt-specific tests then do a manual smoke test with the app:
+
+```bash
+poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py tests/test_prompt_loader.py
+poetry run python -m kaiwacoach.app   # verify the affected role works end-to-end
+```
+
+## Textnorm (Japanese)
+
+The Japanese normalisation pipeline (`textnorm/`) is sensitive — its invariant tests break easily. The core rule: **Japanese character spans (hiragana, katakana, kanji) must be preserved byte-identical** through any normalisation step. If a candidate text violates this, `enforce_japanese_invariant()` falls back to the original and logs a warning rather than propagating corrupt text. When changing textnorm code, run the full textnorm suite:
+
+```bash
+poetry run pytest -q tests/test_invariants.py tests/test_jp_katakana.py tests/test_jp_normalisation_golden.py tests/test_jp_tts_normalisation.py tests/test_protected_spans.py
+```
+
+Golden-case inputs and expected outputs live in `tests/fixtures/jp_normalisation_cases.json`.
+
+## SQLite schema changes
+
+When modifying `src/kaiwacoach/storage/schema.sql`, also update:
+
+1. **`_ALLOWED_UPDATE_COLUMNS`** in `storage/db.py` — add/remove column names to match the new schema.
+2. **`_schema_needs_reset`** in `storage/db.py` — update the `required_columns` set if you add or remove columns on the `conversations` table.
+3. **`schema_version`** — bump the version integer in `schema.sql`.
+
+Prefer nullable columns or columns with defaults for additive changes. The current behaviour on a column-set mismatch is a full local DB reset (acceptable for single-user MVP; note this in any schema PR).
