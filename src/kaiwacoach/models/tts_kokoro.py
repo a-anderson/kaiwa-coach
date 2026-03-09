@@ -49,6 +49,10 @@ class KokoroTTS:
         self._backend = backend or MlxAudioBackend(model_id)
         self._cache_index: Dict[str, str] = {}
 
+    @property
+    def model_id(self) -> str:
+        return self._model_id
+
     def synthesize(
         self,
         conversation_id: str,

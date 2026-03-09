@@ -169,6 +169,10 @@ class QwenLLM:
         return self._token_counter(text)
 
     @property
+    def model_id(self) -> str:
+        return self._model_id
+
+    @property
     def max_context_tokens(self) -> int:
         return self._max_context_tokens
 
