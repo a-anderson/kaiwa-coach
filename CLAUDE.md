@@ -57,7 +57,9 @@ The Python environment is pre-created and owned by the maintainer.
 |---|---|
 | `src/kaiwacoach/ui/gradio_app.py` | Gradio layout and callback wiring only — no model logic |
 | `src/kaiwacoach/orchestrator.py` | Turn lifecycle: sequencing, timing, persistence; steps are pure functions |
-| `src/kaiwacoach/models/` | Typed wrappers for ASR (`asr_whisper.py`), LLM (`llm_qwen.py`), TTS (`tts_kokoro.py`), JSON enforcement (`json_enforcement.py`) — no DB or UI dependencies |
+| `src/kaiwacoach/models/protocols.py` | Shared result types (`ASRResult`, `LLMResult`, `TTSResult`) and `@runtime_checkable` protocols (`ASRProtocol`, `LLMProtocol`, `TTSProtocol`) — concrete files import result types from here |
+| `src/kaiwacoach/models/factory.py` | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here |
+| `src/kaiwacoach/models/` | Concrete wrappers: `asr_whisper.py`, `llm_qwen.py`, `tts_kokoro.py`; JSON enforcement: `json_enforcement.py` — no DB or UI dependencies |
 | `src/kaiwacoach/prompts/` | Markdown prompt templates + `loader.py` (renders with `{var}` substitution, returns SHA256) |
 | `src/kaiwacoach/textnorm/` | All normalisation logic — no normalisation inside model wrappers |
 | `src/kaiwacoach/storage/` | `db.py` (SQLite single-writer queue, single source of truth — no hidden caches), `blobs.py` (audio file cache) |

@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, Tuple
 
 from kaiwacoach.constants import DEFAULT_VOICES
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
-
-
-@dataclass(frozen=True)
-class TTSResult:
-    audio_path: str
-    meta: Dict[str, Any]
+from kaiwacoach.models.protocols import TTSResult
 
 
 class TTSBackend(Protocol):
@@ -48,6 +42,10 @@ class KokoroTTS:
         self._cache = cache
         self._backend = backend or MlxAudioBackend(model_id)
         self._cache_index: Dict[str, str] = {}
+
+    @property
+    def model_id(self) -> str:
+        return self._model_id
 
     def synthesize(
         self,

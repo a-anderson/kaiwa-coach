@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
-from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
+from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
-from kaiwacoach.models.llm_qwen import QwenLLM
-from kaiwacoach.models.tts_kokoro import KokoroTTS, TTSResult
+from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
+from kaiwacoach.models.tts_kokoro import TTSResult
 from kaiwacoach.prompts.loader import PromptLoader
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
 from kaiwacoach.storage.db import SQLiteWriter
@@ -61,13 +61,13 @@ class ConversationOrchestrator:
     def __init__(
         self,
         db: SQLiteWriter,
-        llm: QwenLLM,
+        llm: LLMProtocol,
         prompt_loader: PromptLoader,
         language: str,
-        tts: KokoroTTS | None = None,
+        tts: TTSProtocol | None = None,
         tts_voice: str | None = None,
         tts_speed: float = 1.0,
-        asr: WhisperASR | None = None,
+        asr: ASRProtocol | None = None,
         audio_cache: SessionAudioCache | None = None,
         timing_logs_enabled: bool = True,
     ) -> None:

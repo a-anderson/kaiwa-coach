@@ -6,9 +6,7 @@ import atexit
 import logging
 from pathlib import Path
 
-from kaiwacoach.models.asr_whisper import WhisperASR
-from kaiwacoach.models.llm_qwen import MlxLmBackend, QwenLLM
-from kaiwacoach.models.tts_kokoro import KokoroTTS
+from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.prompts.loader import PromptLoader
 from kaiwacoach.settings import load_config
@@ -34,22 +32,9 @@ def main(launch_ui: bool = True) -> None:
     atexit.register(db.close)
 
     audio_cache = SessionAudioCache(expected_sample_rate=config.storage.expected_sample_rate)
-    asr = WhisperASR(
-        model_id=config.models.asr_id,
-        language=config.session.language,
-    )
-    llm_backend = MlxLmBackend(config.models.llm_id)
-    llm = QwenLLM(
-        model_id=config.models.llm_id,
-        max_context_tokens=config.llm.max_context_tokens,
-        role_max_new_tokens=config.llm.role_max_new_tokens.__dict__,
-        backend=llm_backend,
-        token_counter=llm_backend.count_tokens,
-    )
-    tts = KokoroTTS(
-        model_id=config.models.tts_id,
-        cache=audio_cache,
-    )
+    asr = build_asr(config)
+    llm = build_llm(config)
+    tts = build_tts(config, audio_cache)
     prompt_loader = PromptLoader(Path(__file__).resolve().parent / "prompts")
     orchestrator = ConversationOrchestrator(
         db=db,
