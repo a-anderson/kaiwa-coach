@@ -29,6 +29,8 @@ macOS setup (required once for local model dependencies):
 poetry run bash scripts/setup_macos.sh
 ```
 
+`tools/export_conversation.py` — stub for a planned conversation export utility; not yet implemented.
+
 ## Environment — do not modify
 
 The Python environment is pre-created and owned by the maintainer.
