@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Tuple
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
-
-
-@dataclass(frozen=True)
-class ASRResult:
-    text: str
-    meta: Dict[str, Any]
+from kaiwacoach.models.protocols import ASRResult
 
 
 class WhisperASR:

@@ -1,19 +1,39 @@
-"""Protocols for ASR, LLM, and TTS model wrappers.
+"""Protocols and shared result types for ASR, LLM, and TTS model wrappers.
 
-These protocols define the interfaces the orchestrator depends on.
-Concrete implementations (WhisperASR, QwenLLM, KokoroTTS) satisfy them
-structurally — no explicit inheritance required.
+Result types (ASRResult, LLMResult, TTSResult) are defined here so that the
+protocols and any future concrete implementations share a common vocabulary
+without creating circular dependencies.
+
+Concrete implementations (WhisperASR, QwenLLM, KokoroTTS) import the result
+types from this module and satisfy the protocols structurally — no explicit
+inheritance required.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
 
-from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult
-from kaiwacoach.models.llm_qwen import LLMResult
-from kaiwacoach.models.tts_kokoro import TTSResult
+
+
+@dataclass(frozen=True)
+class ASRResult:
+    text: str
+    meta: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LLMResult:
+    text: str
+    meta: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class TTSResult:
+    audio_path: str
+    meta: Dict[str, Any]
 
 
 @runtime_checkable

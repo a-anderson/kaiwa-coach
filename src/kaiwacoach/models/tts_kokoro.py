@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, Tuple
 
 from kaiwacoach.constants import DEFAULT_VOICES
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
-
-
-@dataclass(frozen=True)
-class TTSResult:
-    audio_path: str
-    meta: Dict[str, Any]
+from kaiwacoach.models.protocols import TTSResult
 
 
 class TTSBackend(Protocol):

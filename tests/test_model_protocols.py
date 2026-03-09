@@ -7,10 +7,10 @@ from typing import Any, Dict, Tuple
 
 import pytest
 
-from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
+from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.tts_kokoro import KokoroTTS
-from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
+from kaiwacoach.models.protocols import ASRProtocol, ASRResult, LLMProtocol, TTSProtocol
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
 
 

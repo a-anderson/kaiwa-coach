@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 import inspect
 import hashlib
 from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple
 
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
-
-
-@dataclass(frozen=True)
-class LLMResult:
-    text: str
-    meta: Dict[str, Any]
+from kaiwacoach.models.protocols import LLMResult
 
 
 class LLMBackend(Protocol):

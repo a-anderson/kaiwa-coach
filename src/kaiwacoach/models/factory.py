@@ -11,12 +11,13 @@ import dataclasses
 
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.llm_qwen import MlxLmBackend, QwenLLM
+from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
 from kaiwacoach.settings import AppConfig
 from kaiwacoach.storage.blobs import SessionAudioCache
 
 
-def build_asr(config: AppConfig) -> WhisperASR:
+def build_asr(config: AppConfig) -> ASRProtocol:
     """Return an ASR wrapper configured from config.
 
     All ASR models currently use the MLX Whisper backend.
@@ -28,7 +29,7 @@ def build_asr(config: AppConfig) -> WhisperASR:
     )
 
 
-def build_llm(config: AppConfig) -> QwenLLM:
+def build_llm(config: AppConfig) -> LLMProtocol:
     """Return an LLM wrapper configured from config.
 
     All LLM models currently use the MLX-LM backend.
@@ -44,7 +45,7 @@ def build_llm(config: AppConfig) -> QwenLLM:
     )
 
 
-def build_tts(config: AppConfig, cache: SessionAudioCache) -> KokoroTTS:
+def build_tts(config: AppConfig, cache: SessionAudioCache) -> TTSProtocol:
     """Return a TTS wrapper configured from config.
 
     All TTS models currently use the MLX Audio (Kokoro) backend.
