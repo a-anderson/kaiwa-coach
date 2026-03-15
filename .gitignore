@@ -63,3 +63,6 @@ exports/
 # Local storage (repo root only)
 /storage/
 AGENTS.md
+
+# Local config overrides (use config.example.yaml as the template)
+/config.yaml
