@@ -159,6 +159,52 @@ def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, t
     assert calls.launched is True
 
 
+# --- startup model logging ---
+
+def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capfd: pytest.CaptureFixture[str]) -> None:
+    """main should log ASR, LLM, and TTS model IDs at INFO level before loading models.
+
+    capfd is used instead of caplog because main() calls logging.basicConfig(force=True),
+    which removes caplog's handler before it can capture anything.
+    """
+    def _load_config():
+        return SimpleNamespace(
+            models=SimpleNamespace(
+                asr_id="mlx-community/whisper-large-v3-mlx",
+                llm_id="mlx-community/Qwen3-14B-bf16",
+                tts_id="mlx-community/Kokoro-82M-bf16",
+            ),
+            session=SimpleNamespace(language="ja"),
+            llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
+            storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
+            tts=SimpleNamespace(voice="default", speed=1.0),
+            logging=SimpleNamespace(timing_logs=True),
+        )
+
+    class _Noop:
+        def __init__(self, **_kw) -> None: pass
+        def start(self) -> None: pass
+        def close(self) -> None: pass
+        def cleanup(self) -> None: pass
+
+    monkeypatch.setattr(app_module, "load_config", _load_config)
+    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _Noop())
+    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _Noop())
+    monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _Noop())
+    monkeypatch.setattr(app_module, "SessionAudioCache", lambda **_kw: _Noop())
+    monkeypatch.setattr(app_module, "SQLiteWriter", lambda **_kw: _Noop())
+    monkeypatch.setattr(app_module, "PromptLoader", lambda root_dir: _Noop())
+    monkeypatch.setattr(app_module, "ConversationOrchestrator", lambda **_kw: _Noop())
+    monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
+
+    app_module.main(launch_ui=False)
+    stderr = capfd.readouterr().err
+
+    assert "mlx-community/whisper-large-v3-mlx" in stderr
+    assert "mlx-community/Qwen3-14B-bf16" in stderr
+    assert "mlx-community/Kokoro-82M-bf16" in stderr
+
+
 # --- load_config: LLM model ID overrides ---
 
 def test_load_config_accepts_bf16_llm_id_via_env(monkeypatch: pytest.MonkeyPatch) -> None:

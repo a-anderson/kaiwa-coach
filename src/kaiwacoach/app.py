@@ -6,6 +6,8 @@ import atexit
 import logging
 from pathlib import Path
 
+log = logging.getLogger(__name__)
+
 from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.prompts.loader import PromptLoader
@@ -23,6 +25,12 @@ def main(launch_ui: bool = True) -> None:
         force=True,
     )
     config = load_config()
+    log.info(
+        "Models: ASR=%s | LLM=%s | TTS=%s",
+        config.models.asr_id,
+        config.models.llm_id,
+        config.models.tts_id,
+    )
     storage_root = Path(config.storage.root_dir)
     storage_root.mkdir(parents=True, exist_ok=True)
     db_path = storage_root / "kaiwacoach.sqlite"
