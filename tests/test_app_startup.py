@@ -8,6 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.app as app_module
+from kaiwacoach.config.models import LLM_MODEL_ID_BF16
+from kaiwacoach.settings import load_config
 
 
 def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -155,3 +157,23 @@ def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, t
 
     assert calls.build_ui_logo_dir == Path(tmp_path / "assets" / "logo")
     assert calls.launched is True
+
+
+# --- load_config: LLM model ID overrides ---
+
+def test_load_config_accepts_bf16_llm_id_via_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should accept the bf16 model ID when set via KAIWACOACH_MODELS_LLM_ID."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", LLM_MODEL_ID_BF16)
+
+    config = load_config()
+
+    assert config.models.llm_id == LLM_MODEL_ID_BF16
+
+
+def test_load_config_bf16_llm_id_roundtrips_to_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The bf16 model ID should survive the load_config → to_dict round-trip."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", LLM_MODEL_ID_BF16)
+
+    config = load_config()
+
+    assert config.to_dict()["models"]["llm_id"] == LLM_MODEL_ID_BF16
