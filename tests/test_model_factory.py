@@ -57,8 +57,8 @@ def test_build_asr_satisfies_asr_protocol() -> None:
 
 # --- model ID constants ---
 
-def test_llm_model_id_bf16_constant_value() -> None:
-    """LLM_MODEL_ID_BF16 should point to the bf16 Qwen3-14B variant."""
+def test_llm_model_id_bf16_matches_expected_hub_path() -> None:
+    """LLM_MODEL_ID_BF16 should point to the bf16 Qwen3-14B variant on the MLX hub."""
     assert LLM_MODEL_ID_BF16 == "mlx-community/Qwen3-14B-bf16"
 
 

@@ -182,7 +182,8 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
         )
 
     class _Noop:
-        def __init__(self, **_kw) -> None: pass
+        """Minimal stub satisfying the interface of any component main() constructs."""
+        def __init__(self, *_args: object, **_kw: object) -> None: pass
         def start(self) -> None: pass
         def close(self) -> None: pass
         def cleanup(self) -> None: pass
@@ -191,10 +192,10 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(app_module, "build_asr", lambda cfg: _Noop())
     monkeypatch.setattr(app_module, "build_llm", lambda cfg: _Noop())
     monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _Noop())
-    monkeypatch.setattr(app_module, "SessionAudioCache", lambda **_kw: _Noop())
-    monkeypatch.setattr(app_module, "SQLiteWriter", lambda **_kw: _Noop())
-    monkeypatch.setattr(app_module, "PromptLoader", lambda root_dir: _Noop())
-    monkeypatch.setattr(app_module, "ConversationOrchestrator", lambda **_kw: _Noop())
+    monkeypatch.setattr(app_module, "SessionAudioCache", _Noop)
+    monkeypatch.setattr(app_module, "SQLiteWriter", _Noop)
+    monkeypatch.setattr(app_module, "PromptLoader", _Noop)
+    monkeypatch.setattr(app_module, "ConversationOrchestrator", _Noop)
     monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
 
     app_module.main(launch_ui=False)

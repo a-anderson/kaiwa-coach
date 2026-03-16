@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 
 def main(launch_ui: bool = True) -> None:
     """Load and validate configuration, then start the application."""
+    # TODO: accept a configure_logging flag so tests can opt out of basicConfig
+    # and use caplog instead of capfd for log-level assertions.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
