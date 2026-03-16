@@ -6,8 +6,6 @@ import atexit
 import logging
 from pathlib import Path
 
-log = logging.getLogger(__name__)
-
 from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.prompts.loader import PromptLoader
@@ -15,6 +13,8 @@ from kaiwacoach.settings import load_config
 from kaiwacoach.storage.blobs import SessionAudioCache
 from kaiwacoach.storage.db import SQLiteWriter
 from kaiwacoach.ui.gradio_app import build_ui
+
+log = logging.getLogger(__name__)
 
 
 def main(launch_ui: bool = True) -> None:

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.models.factory as factory_module
-from kaiwacoach.config.models import LLM_MODEL_ID, LLM_MODEL_ID_BF16
+from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.models.llm_qwen import QwenLLM
@@ -71,10 +71,10 @@ def test_llm_model_id_constants_are_distinct() -> None:
 
 
 class _StubBackend:
-    """Stub MlxLmBackend that records the model_id it was constructed with."""
+    """Stub MlxLmBackend — satisfies LLMBackend protocol without loading a model."""
 
     def __init__(self, model_id: str) -> None:
-        self.model_id = model_id
+        pass
 
     def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
         return ""
@@ -83,35 +83,35 @@ class _StubBackend:
         return 0
 
 
-def _llm_config(llm_id: str) -> AppConfig:
+def _llm_config(llm_id: str, tmp_path: Path) -> AppConfig:
     """Minimal AppConfig sufficient for build_llm."""
     return AppConfig(
         session=SessionConfig(language="ja"),
-        models=ModelsConfig(asr_id="asr", llm_id=llm_id, tts_id="tts"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id=llm_id, tts_id=TTS_MODEL_ID),
         llm=LLMConfig(),
-        storage=StorageConfig(root_dir="/tmp/storage"),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
         tts=TTSConfig(),
         logging=LoggingConfig(),
-        ui=UIConfig(logo_dir="/tmp/logo"),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
     )
 
 
-def test_build_llm_wires_bf16_model_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_llm_wires_bf16_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """build_llm should wire the bf16 model ID through to QwenLLM when configured."""
     monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
 
-    llm = build_llm(_llm_config(LLM_MODEL_ID_BF16))
+    llm = build_llm(_llm_config(LLM_MODEL_ID_BF16, tmp_path))
 
     assert isinstance(llm, QwenLLM)
     assert llm.model_id == LLM_MODEL_ID_BF16
     assert isinstance(llm, LLMProtocol)
 
 
-def test_build_llm_wires_8bit_model_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_llm_wires_8bit_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """build_llm should wire the 8-bit model ID through to QwenLLM when configured."""
     monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
 
-    llm = build_llm(_llm_config(LLM_MODEL_ID))
+    llm = build_llm(_llm_config(LLM_MODEL_ID, tmp_path))
 
     assert isinstance(llm, QwenLLM)
     assert llm.model_id == LLM_MODEL_ID

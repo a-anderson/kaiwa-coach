@@ -9,8 +9,9 @@ LLM_MODEL_ID_BF16 = "mlx-community/Qwen3-14B-bf16"
 
 TTS_MODEL_ID = "mlx-community/Kokoro-82M-bf16"
 
-SUPPORTED_MODELS = {
-    "asr": ASR_MODEL_ID,
-    "llm": LLM_MODEL_ID,
-    "tts": TTS_MODEL_ID,
+# All validated model IDs per type. Adding a new model requires updating this dict.
+SUPPORTED_MODELS: dict[str, frozenset[str]] = {
+    "asr": frozenset({ASR_MODEL_ID}),
+    "llm": frozenset({LLM_MODEL_ID, LLM_MODEL_ID_BF16}),
+    "tts": frozenset({TTS_MODEL_ID}),
 }

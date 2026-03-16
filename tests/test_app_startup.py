@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.app as app_module
-from kaiwacoach.config.models import LLM_MODEL_ID_BF16
+from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.settings import load_config
 
 
@@ -223,3 +223,37 @@ def test_load_config_bf16_llm_id_roundtrips_to_dict(monkeypatch: pytest.MonkeyPa
     config = load_config()
 
     assert config.to_dict()["models"]["llm_id"] == LLM_MODEL_ID_BF16
+
+
+# --- model ID validation ---
+
+def test_load_config_rejects_unknown_llm_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should raise ValueError for an unrecognised LLM model ID."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "mlx-community/unknown-model")
+
+    with pytest.raises(ValueError, match="Unsupported models.llm_id"):
+        load_config()
+
+
+def test_load_config_rejects_unknown_asr_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should raise ValueError for an unrecognised ASR model ID."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_ASR_ID", "mlx-community/unknown-asr")
+
+    with pytest.raises(ValueError, match="Unsupported models.asr_id"):
+        load_config()
+
+
+def test_load_config_rejects_unknown_tts_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should raise ValueError for an unrecognised TTS model ID."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_TTS_ID", "mlx-community/unknown-tts")
+
+    with pytest.raises(ValueError, match="Unsupported models.tts_id"):
+        load_config()
+
+
+def test_load_config_error_message_lists_valid_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The validation error for an unknown LLM ID should list the valid alternatives."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "typo-model")
+
+    with pytest.raises(ValueError, match=LLM_MODEL_ID):
+        load_config()
