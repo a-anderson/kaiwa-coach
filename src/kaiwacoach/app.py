@@ -17,15 +17,14 @@ from kaiwacoach.ui.gradio_app import build_ui
 log = logging.getLogger(__name__)
 
 
-def main(launch_ui: bool = True) -> None:
+def main(launch_ui: bool = True, configure_logging: bool = True) -> None:
     """Load and validate configuration, then start the application."""
-    # TODO: accept a configure_logging flag so tests can opt out of basicConfig
-    # and use caplog instead of capfd for log-level assertions.
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        force=True,
-    )
+    if configure_logging:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+            force=True,
+        )
     config = load_config()
     log.info(
         "Models: ASR=%s | LLM=%s | TTS=%s",

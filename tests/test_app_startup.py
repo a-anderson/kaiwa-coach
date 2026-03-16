@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -161,12 +162,8 @@ def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, t
 
 # --- startup model logging ---
 
-def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capfd: pytest.CaptureFixture[str]) -> None:
-    """main should log ASR, LLM, and TTS model IDs at INFO level before loading models.
-
-    capfd is used instead of caplog because main() calls logging.basicConfig(force=True),
-    which removes caplog's handler before it can capture anything.
-    """
+def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """main should log ASR, LLM, and TTS model IDs at INFO level before loading models."""
     def _load_config():
         return SimpleNamespace(
             models=SimpleNamespace(
@@ -198,12 +195,12 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(app_module, "ConversationOrchestrator", _Noop)
     monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
 
-    app_module.main(launch_ui=False)
-    stderr = capfd.readouterr().err
+    with caplog.at_level(logging.INFO, logger="kaiwacoach.app"):
+        app_module.main(launch_ui=False, configure_logging=False)
 
-    assert "mlx-community/whisper-large-v3-mlx" in stderr
-    assert "mlx-community/Qwen3-14B-bf16" in stderr
-    assert "mlx-community/Kokoro-82M-bf16" in stderr
+    assert "mlx-community/whisper-large-v3-mlx" in caplog.text
+    assert "mlx-community/Qwen3-14B-bf16" in caplog.text
+    assert "mlx-community/Kokoro-82M-bf16" in caplog.text
 
 
 # --- load_config: LLM model ID overrides ---
