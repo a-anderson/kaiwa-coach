@@ -694,9 +694,16 @@ class ConversationOrchestrator:
         if correction_result.model is not None:
             corrected_text = getattr(correction_result.model, "corrected", user_text)
 
+        # Escape braces so format_map doesn't treat LLM-generated error strings as placeholders.
+        errors_text = "\n".join(f"- {e}" for e in errors) if errors else "(none)"
+        errors_text = errors_text.replace("{", "{{").replace("}", "}}")
         explain_prompt = self._prompt_loader.render(
             "explain.md",
-            {"language": self._language, "user_text": user_text, "corrected_text": corrected_text},
+            {
+                "user_text": user_text,
+                "corrected_text": corrected_text,
+                "errors": errors_text,
+            },
         )
         start = time.perf_counter()
         explain_raw, explain_result, _ = self._generate_with_repair(

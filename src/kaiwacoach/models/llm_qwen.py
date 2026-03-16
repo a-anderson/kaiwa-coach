@@ -110,8 +110,12 @@ class QwenLLM:
         if role not in self._role_max_new_tokens:
             raise ValueError(f"Unknown role: {role}")
 
+        # Apply no-think prefix before token counting, hashing, and generation
+        # so all metadata reflects the prompt actually sent to the model.
+        effective_prompt = prompt + "<think>\n\n</think>" if role in self._NO_THINK_ROLES else prompt
+
         if self._token_counter is not None:
-            prompt_tokens = self._token_counter(prompt)
+            prompt_tokens = self._token_counter(effective_prompt)
             if prompt_tokens > self._max_context_tokens:
                 raise ValueError(
                     f"Prompt exceeds max_context_tokens ({prompt_tokens} > {self._max_context_tokens})."
@@ -125,7 +129,7 @@ class QwenLLM:
         else:
             effective_max_new_tokens = min(max_new_tokens, role_cap)
 
-        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        prompt_hash = hashlib.sha256(effective_prompt.encode("utf-8")).hexdigest()
         cache_key = (prompt_hash, role, effective_max_new_tokens)
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -135,7 +139,7 @@ class QwenLLM:
 
         start = time.perf_counter()
         text, meta = self._generator(
-            prompt=prompt,
+            prompt=effective_prompt,
             max_new_tokens=effective_max_new_tokens,
             role=role,
         )
@@ -197,6 +201,13 @@ class QwenLLM:
         """
         result = self.generate(prompt=prompt, role=role, max_new_tokens=max_new_tokens)
         return parse_with_schema(role=role, text=result.text, repair_fn=repair_fn)
+
+    # Roles that should suppress Qwen3 thinking mode. Appending the empty
+    # think block signals to the model that the reasoning phase is complete
+    # and it should output the answer directly, avoiding wasted token budget.
+    _NO_THINK_ROLES: frozenset[str] = frozenset(
+        {"error_detection", "correction", "native_reformulation", "explanation", "jp_tts_normalisation"}
+    )
 
     def _default_generator(self, **_: Any) -> tuple[str, Dict[str, Any]]:
         """Default generator hook (uses the configured backend).

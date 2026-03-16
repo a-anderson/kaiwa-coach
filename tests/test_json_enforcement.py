@@ -50,6 +50,26 @@ def test_parse_with_schema_fails_after_repair() -> None:
     assert result.repaired is True
 
 
+def test_extracts_json_after_think_tags() -> None:
+    text = '<think>Let me compare {user} vs corrected...</think>\n{"explanation": "Fixed spelling."}'
+    obj = extract_first_json_object(text)
+    assert obj == {"explanation": "Fixed spelling."}
+
+
+def test_extracts_json_after_think_tags_no_braces_in_think() -> None:
+    text = "<think>Analysing the sentence.</think>\n{\"corrected\": \"Bonjour.\"}"
+    obj = extract_first_json_object(text)
+    assert obj == {"corrected": "Bonjour."}
+
+
+def test_parse_with_schema_strips_think_tags() -> None:
+    text = "<think>reasoning here</think>{\"explanation\": \"Fixed capitalization.\"}"
+    result = parse_with_schema("explanation", text)
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.explanation == "Fixed capitalization."
+
+
 def test_unknown_role_returns_error() -> None:
     result = parse_with_schema("unknown", '{"x": 1}')
     assert result.model is None

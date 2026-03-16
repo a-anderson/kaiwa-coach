@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -73,7 +74,7 @@ class LLMRoleCaps:
     error_detection: int = 48
     correction: int = 48
     native_reformulation: int = 48
-    explanation: int = 72
+    explanation: int = 96
     jp_tts_normalisation: int = 192
 
 
@@ -415,14 +416,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         },
         "llm": {
             "max_context_tokens": 4096,
-            "role_max_new_tokens": {
-                "conversation": 256,
-                "error_detection": 48,
-                "correction": 48,
-                "native_reformulation": 48,
-                "explanation": 72,
-                "jp_tts_normalisation": 192,
-            },
+            "role_max_new_tokens": dataclasses.asdict(LLMRoleCaps()),
         },
         "storage": {"root_dir": str(repo_root / "storage"), "expected_sample_rate": 16000},
         "tts": {"voice": "default", "speed": 1.0},

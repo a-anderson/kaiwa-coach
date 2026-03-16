@@ -30,6 +30,7 @@ PROMPT_VARIABLES = {
         "language": "ja",
         "user_text": "こんにちは",
         "corrected_text": "こんにちは。",
+        "errors": "- Missing period at end of sentence",
     },
     "jp_tts_normalise.md": {
         "original_text": "これはテストです",

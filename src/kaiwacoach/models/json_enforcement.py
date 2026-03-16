@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple, Type
+
+_THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 from pydantic import BaseModel, Field, StrictStr, ValidationError, conlist
 
@@ -71,8 +74,9 @@ def extract_first_json_object(text: str) -> Dict[str, Any]:
     ValueError
         If the parsed value is not a JSON object.
     """
+    cleaned = _THINK_TAG_RE.sub("", text).strip()
     decoder = json.JSONDecoder()
-    obj, _ = decoder.raw_decode(text)
+    obj, _ = decoder.raw_decode(cleaned)
     if not isinstance(obj, dict):
         raise ValueError("First JSON value is not an object.")
     return obj
