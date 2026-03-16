@@ -162,6 +162,52 @@ def test_negative_max_new_tokens_uses_role_cap() -> None:
     assert backend.calls == 1
 
 
+def test_no_think_suffix_added_for_json_roles() -> None:
+    """JSON extraction roles should receive the no-think suffix."""
+    received_prompts: list[str] = []
+
+    class _CapturingBackend:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+            received_prompts.append(prompt)
+            return '{"explanation": "ok"}'
+
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"explanation": 96, "conversation": 256},
+        backend=_CapturingBackend(),
+    )
+
+    llm.generate("my prompt", role="explanation")
+    assert received_prompts[-1].endswith("<think>\n\n</think>")
+
+    llm.generate("my prompt", role="conversation")
+    assert received_prompts[-1] == "my prompt"
+
+
+def test_no_think_suffix_reflected_in_prompt_hash() -> None:
+    """The prompt hash stored in meta should match the effective prompt sent to the model."""
+    import hashlib
+
+    received: list[str] = []
+
+    class _CapturingBackend:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+            received.append(prompt)
+            return '{"corrected": "ok"}'
+
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"correction": 48},
+        backend=_CapturingBackend(),
+    )
+
+    result = llm.generate("my prompt", role="correction")
+    effective = received[-1]
+    assert result.meta["prompt_hash"] == hashlib.sha256(effective.encode()).hexdigest()
+
+
 def test_mlx_backend_uses_generate_and_sampler() -> None:
     """MLX-LM backend should call generate with a sampler."""
     captured: Dict[str, object] = {}
