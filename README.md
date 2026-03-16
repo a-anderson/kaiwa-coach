@@ -150,6 +150,23 @@ For full details (keys, env vars, and load behaviour), see the [Configuration gu
 
 Use [config.example.yaml](config.example.yaml) as the file-based template.
 
+### LLM model variant
+
+The default LLM is `mlx-community/Qwen3-14B-8bit` (8-bit quantised). To use the full-precision bf16 variant, set in `config.yaml`:
+
+```yaml
+models:
+  llm_id: "mlx-community/Qwen3-14B-bf16"
+```
+
+Or via environment variable:
+
+```bash
+KAIWACOACH_MODELS_LLM_ID=mlx-community/Qwen3-14B-bf16 poetry run python -m kaiwacoach.app
+```
+
+The active ASR, LLM, and TTS model IDs are logged at startup so the configured variant is always visible.
+
 ## Usage
 
 ### Text turn
@@ -225,6 +242,7 @@ poetry run python scripts/llm_smoke.py --language ja
 
 ## Performance and Reliability
 
+- Active ASR, LLM, and TTS model IDs are logged at startup.
 - Turn stage timings are logged (ASR, LLM, corrections, TTS, total).
 - Role token caps and context limits are configurable for latency control.
 - Schema enforcement prevents invalid role outputs from silently propagating.
@@ -244,9 +262,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-03-09):
+Latest full local snapshot (2026-03-16):
 
-- `177 passed`
+- `188 passed`
 
 ### Schema and repair robustness
 

@@ -8,11 +8,14 @@ from types import SimpleNamespace
 
 import pytest
 
+import kaiwacoach.models.factory as factory_module
+from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
+from kaiwacoach.settings import AppConfig, LLMConfig, LLMRoleCaps, LoggingConfig, ModelsConfig, SessionConfig, StorageConfig, TTSConfig, UIConfig
 from kaiwacoach.storage.blobs import SessionAudioCache
 
 
@@ -50,6 +53,68 @@ def test_build_asr_wires_language() -> None:
 def test_build_asr_satisfies_asr_protocol() -> None:
     """build_asr output should satisfy ASRProtocol."""
     assert isinstance(build_asr(_asr_config()), ASRProtocol)
+
+
+# --- model ID constants ---
+
+def test_llm_model_id_bf16_matches_expected_hub_path() -> None:
+    """LLM_MODEL_ID_BF16 should point to the bf16 Qwen3-14B variant on the MLX hub."""
+    assert LLM_MODEL_ID_BF16 == "mlx-community/Qwen3-14B-bf16"
+
+
+def test_llm_model_id_constants_are_distinct() -> None:
+    """The 8-bit and bf16 constants must refer to different model IDs."""
+    assert LLM_MODEL_ID != LLM_MODEL_ID_BF16
+
+
+# --- build_llm (non-slow with stubbed backend) ---
+
+
+class _StubBackend:
+    """Stub MlxLmBackend — satisfies LLMBackend protocol without loading a model."""
+
+    def __init__(self, model_id: str) -> None:
+        pass
+
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        return ""
+
+    def count_tokens(self, text: str) -> int:
+        return 0
+
+
+def _llm_config(llm_id: str, tmp_path: Path) -> AppConfig:
+    """Minimal AppConfig sufficient for build_llm."""
+    return AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id=llm_id, tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+
+def test_build_llm_wires_bf16_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm should wire the bf16 model ID through to QwenLLM when configured."""
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    llm = build_llm(_llm_config(LLM_MODEL_ID_BF16, tmp_path))
+
+    assert isinstance(llm, QwenLLM)
+    assert llm.model_id == LLM_MODEL_ID_BF16
+    assert isinstance(llm, LLMProtocol)
+
+
+def test_build_llm_wires_8bit_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm should wire the 8-bit model ID through to QwenLLM when configured."""
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    llm = build_llm(_llm_config(LLM_MODEL_ID, tmp_path))
+
+    assert isinstance(llm, QwenLLM)
+    assert llm.model_id == LLM_MODEL_ID
 
 
 # --- build_llm (slow: MlxLmBackend loads the model on init) ---

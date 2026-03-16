@@ -503,12 +503,29 @@ def _validate_config(config: AppConfig) -> None:
     ValueError
         If any configuration values are invalid.
     """
+    from kaiwacoach.config.models import SUPPORTED_MODELS
+
     if not config.models.asr_id:
         raise ValueError("models.asr_id must be set")
+    if config.models.asr_id not in SUPPORTED_MODELS["asr"]:
+        raise ValueError(
+            f"Unsupported models.asr_id: {config.models.asr_id!r}. "
+            f"Must be one of {sorted(SUPPORTED_MODELS['asr'])}."
+        )
     if not config.models.llm_id:
         raise ValueError("models.llm_id must be set")
+    if config.models.llm_id not in SUPPORTED_MODELS["llm"]:
+        raise ValueError(
+            f"Unsupported models.llm_id: {config.models.llm_id!r}. "
+            f"Must be one of {sorted(SUPPORTED_MODELS['llm'])}."
+        )
     if not config.models.tts_id:
         raise ValueError("models.tts_id must be set")
+    if config.models.tts_id not in SUPPORTED_MODELS["tts"]:
+        raise ValueError(
+            f"Unsupported models.tts_id: {config.models.tts_id!r}. "
+            f"Must be one of {sorted(SUPPORTED_MODELS['tts'])}."
+        )
     if config.llm.max_context_tokens <= 0:
         raise ValueError("llm.max_context_tokens must be > 0")
     if config.tts.speed <= 0:

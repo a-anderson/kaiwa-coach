@@ -5,7 +5,7 @@ session:
 
 models:
   asr_id: "mlx-community/whisper-large-v3-mlx"
-  llm_id: "mlx-community/Qwen3-14B-8bit"
+  llm_id: "mlx-community/Qwen3-14B-8bit"  # or "mlx-community/Qwen3-14B-bf16" for full precision
   tts_id: "mlx-community/Kokoro-82M-bf16"
 
 llm:

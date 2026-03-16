@@ -132,7 +132,7 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ✅ Implement `models/llm_qwen.py`  
 ✅ Load LLM via `settings.py` (default set in `config/models.py`)  
 ✅ Integrate MLX-LM backend in `models/llm_qwen.py`  
-🔁 Support optional BF16 mode  
+✅ Support optional BF16 mode
 ✅ Use MLX tokenizer for prompt token counting  
 ✅ Enforce:
 
