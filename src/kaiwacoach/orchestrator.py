@@ -145,6 +145,7 @@ class ConversationOrchestrator:
         start = time.perf_counter()
         self._db.run_write(_insert_user)
         timings["user_insert_seconds"] = time.perf_counter() - start
+        self._maybe_set_auto_title(conversation_id, user_text)
 
         if on_stage:
             on_stage("llm", "running", {})
@@ -259,6 +260,7 @@ class ConversationOrchestrator:
             start = time.perf_counter()
             self._db.run_write(_insert_user)
             timings["user_insert_seconds"] = time.perf_counter() - start
+            self._maybe_set_auto_title(conversation_id, asr_result.text)
 
             if on_stage:
                 on_stage("llm", "running", {})
@@ -1262,6 +1264,24 @@ class ConversationOrchestrator:
         )
         result = self._llm.generate(prompt=repair_prompt.text, role=role)
         return result.text
+
+    def _maybe_set_auto_title(self, conversation_id: str, user_text: str) -> None:
+        """Set the conversation title from the first user message if no title exists yet."""
+        with self._db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT title FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            if row is None or row[0]:
+                return  # already titled or conversation missing
+            count = conn.execute(
+                "SELECT COUNT(*) FROM user_turns WHERE conversation_id = ?", (conversation_id,)
+            ).fetchone()[0]
+        if count != 1:
+            return  # not the first turn
+        title = user_text.strip()
+        if len(title) > 50:
+            title = title[:49] + "…"
+        self._db.execute_update("conversations", {"title": title}, {"id": conversation_id})
 
     def _update_assistant_meta(self, assistant_turn_id: str, updates: Dict[str, Any]) -> None:
         def _update(conn) -> None:

@@ -45,7 +45,7 @@
         {#if $uiStore.shadowingTurnId}
           <ShadowingPanel />
         {/if}
-        <InputArea />
+        <InputArea on:turncomplete={() => sidebarRef.refresh()} />
       {/if}
     </main>
   </div>

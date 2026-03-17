@@ -6,6 +6,9 @@
   import PipelineProgress from './PipelineProgress.svelte'
   import AudioRecorder from './AudioRecorder.svelte'
   import type { TurnRecord, CorrectionData, SSEStageEvent, SSECompleteEvent, SSEErrorEvent } from '../lib/types/api'
+  import { createEventDispatcher } from 'svelte'
+
+  const dispatch = createEventDispatcher<{ turncomplete: void }>()
 
   let text = ''
   let correctionsEnabled = true
@@ -94,6 +97,7 @@
             return { ...s, turns: [...s.turns, finalTurn], pendingTurn: null }
           })
           uiStore.update((s) => ({ ...s, autoplayTurnId: result.assistant_turn_id }))
+          dispatch('turncomplete')
         } else if (frame.event === 'error') {
           submitError = (frame.data as SSEErrorEvent).message ?? 'Turn failed'
         }
