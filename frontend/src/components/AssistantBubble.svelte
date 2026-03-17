@@ -29,7 +29,7 @@
         title="Download audio"
         aria-label="Download audio"
       >
-        ↓
+        ↓ Download
       </a>
     {/if}
     <span class="actions-right">

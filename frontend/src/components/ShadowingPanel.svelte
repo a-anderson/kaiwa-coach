@@ -107,6 +107,15 @@
       <p class="col-title">Reference</p>
       {#if turn?.assistant_audio_url}
         <AudioPlayer src={turn.assistant_audio_url} />
+        <a
+          class="download-btn"
+          href={turn.assistant_audio_url}
+          download
+          title="Download reference audio"
+          aria-label="Download reference audio"
+        >
+          ↓ Download
+        </a>
       {:else}
         <p class="no-audio">No audio — regenerate first.</p>
       {/if}
@@ -220,6 +229,19 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin: 0;
+  }
+
+  .download-btn {
+    align-self: flex-start;
+    margin-top: auto;
+    font-size: 0.78rem;
+    color: #aaa;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .download-btn:hover {
+    color: var(--kc-secondary, #555);
   }
 
   .no-audio {
