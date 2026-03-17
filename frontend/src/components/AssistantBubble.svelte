@@ -48,7 +48,7 @@
     padding: 10px 14px;
     border-radius: 16px 16px 16px 4px;
     background: var(--kc-bot-bubble, #f9f9f9);
-    border: 1px solid #e8e8e8;
+    border: 1px solid color-mix(in srgb, var(--kc-secondary, #aaa) 30%, transparent);
     align-self: flex-start;
   }
 
