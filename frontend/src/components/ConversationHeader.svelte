@@ -62,7 +62,7 @@
         {#if regenPending}
           ↺ {regenProgress}/{regenTotal}
         {:else}
-          ↺ Regen all audio
+          ↺ Regenerate all audio
         {/if}
       </button>
     </div>
