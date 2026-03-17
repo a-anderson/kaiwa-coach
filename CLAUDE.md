@@ -163,9 +163,10 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Every LLM role and repair prompt path must have schema tests.
 - Storage changes require round-trip tests covering DB and audio blobs.
 - End-to-end smoke tests are required for single text turn and single audio turn paths.
-- For frontend changes that affect user-visible flow (language switching, audio submit, history load, delete, shadowing), mention manual verification steps explicitly.
 - For startup/config wiring changes: add tests in `tests/test_app_startup.py`.
-- If a change affects user-visible flow (language switching, audio submit, history load, delete), mention manual verification steps explicitly.
+- For frontend changes that affect user-visible flow (language switching, audio submit, history load, delete, shadowing), mention manual verification steps explicitly.
+
+**Frontend testing**: The frontend does not have an automated test suite. This is intentional — components are thin glue code binding stores to the DOM, and all application logic with meaningful test value lives in the Python backend. Do not add a JavaScript test framework unless the frontend acquires substantial standalone logic (e.g. non-trivial state machines or derived computations). For user-visible frontend changes, manual verification is the expected quality gate.
 
 ## Code quality
 

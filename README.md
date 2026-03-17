@@ -242,6 +242,25 @@ Run slow/integration tests:
 poetry run pytest -q -m slow
 ```
 
+### Frontend testing
+
+The frontend does not have an automated test suite. This is a deliberate decision based on the current architecture and scope of the project.
+
+The frontend is a thin Svelte SPA whose components are primarily glue code: they bind Svelte stores to the DOM, forward user events to the API layer, and render reactive state. The application logic that warrants automated verification — the turn pipeline, correction processing, schema validation, persistence, and SSE stream handling — lives entirely in the Python backend, which is covered by the existing test suite.
+
+Adding a JavaScript test framework (e.g. Vitest with `@testing-library/svelte`) would introduce meaningful tooling overhead for tests that would largely exercise Svelte's own reactivity system rather than project-specific behaviour. The one frontend function with non-trivial logic (`buildHistory` in `InputArea.svelte`) is a pure string transform that is implicitly exercised through the end-to-end turn flow tests.
+
+For changes that affect user-visible frontend behaviour, manual verification against the following scenarios is the expected quality gate:
+
+- Language switching creates a new conversation; prior empty conversations are deleted
+- Sending a text or audio turn produces progressive rendering (user message → typing indicator → assistant reply → audio)
+- Loading a historical conversation restores the correct language, turns, and corrections
+- Deleting a single conversation or all history removes it from the sidebar
+- Shadowing mode opens, records, and closes correctly
+- Audio regeneration updates the turn in place without a page reload
+
+If the frontend acquires significant standalone logic in future — for example, client-side state machines, complex derived computations, or custom hooks — introducing Vitest at that point would be appropriate.
+
 ## Smoke Scripts
 
 These scripts verify that local models are installed correctly, can be loaded, and can run one basic inference path.
