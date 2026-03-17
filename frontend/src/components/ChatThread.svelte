@@ -12,12 +12,15 @@
 </script>
 
 <div class="thread" bind:this={container}>
-  {#if $sessionStore.turns.length === 0}
+  {#if $sessionStore.turns.length === 0 && !$sessionStore.pendingTurn}
     <p class="empty">No messages yet — start the conversation!</p>
   {:else}
     {#each $sessionStore.turns as turn (turn.user_turn_id)}
       <TurnPair {turn} />
     {/each}
+    {#if $sessionStore.pendingTurn}
+      <TurnPair turn={$sessionStore.pendingTurn} />
+    {/if}
   {/if}
 </div>
 

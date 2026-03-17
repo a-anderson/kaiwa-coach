@@ -45,6 +45,14 @@
     <CorrectionCard correction={turn.correction} />
   {/if}
 
+  {#if turn.user_turn_id === 'pending' && !turn.reply_text}
+    <div class="typing-bubble" aria-label="Assistant is typing">
+      <span class="dot" />
+      <span class="dot" />
+      <span class="dot" />
+    </div>
+  {/if}
+
   {#if turn.reply_text}
     <AssistantBubble
       text={turn.reply_text}
@@ -73,5 +81,33 @@
     font-size: 0.75rem;
     color: #c0392b;
     margin: 0;
+  }
+
+  .typing-bubble {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 14px;
+    border-radius: 16px 16px 16px 4px;
+    background: var(--kc-bot-bubble, #f9f9f9);
+    border: 1px solid color-mix(in srgb, var(--kc-secondary, #aaa) 30%, transparent);
+    align-self: flex-start;
+    width: fit-content;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--kc-secondary, #aaa) 70%, transparent);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
   }
 </style>

@@ -38,13 +38,10 @@
     }
   }
 
-  /** Consume an SSE stream, updating UI state and appending the completed turn. */
+  /** Consume an SSE stream, progressively updating the pending turn then committing it. */
   async function drainStream(
     stream: AsyncGenerator<import('../lib/types/api').SSEEvent>,
-    userText: string,
-    userAudioUrl: string | null,
   ): Promise<void> {
-    let pendingCorrections: CorrectionData | null = null
     try {
       for await (const frame of stream) {
         if (frame.event === 'stage') {
@@ -53,24 +50,49 @@
             ...s,
             stageStatuses: { ...s.stageStatuses, [stage.stage]: stage.status },
           }))
-          if (stage.stage === 'corrections' && stage.status === 'complete' && stage.data) {
-            pendingCorrections = stage.data
+          if (stage.status === 'complete') {
+            if (stage.stage === 'asr' && stage.transcript) {
+              sessionStore.update((s) => ({
+                ...s,
+                pendingTurn: s.pendingTurn ? { ...s.pendingTurn, asr_text: stage.transcript! } : null,
+              }))
+            } else if (stage.stage === 'llm' && stage.reply) {
+              sessionStore.update((s) => ({
+                ...s,
+                pendingTurn: s.pendingTurn ? { ...s.pendingTurn, reply_text: stage.reply! } : null,
+              }))
+            } else if (stage.stage === 'corrections' && stage.data) {
+              sessionStore.update((s) => ({
+                ...s,
+                pendingTurn: s.pendingTurn ? { ...s.pendingTurn, correction: stage.data! } : null,
+              }))
+            } else if (stage.stage === 'tts' && stage.audio_url) {
+              sessionStore.update((s) => ({
+                ...s,
+                pendingTurn: s.pendingTurn
+                  ? { ...s.pendingTurn, assistant_audio_url: stage.audio_url!, has_assistant_audio: true }
+                  : null,
+              }))
+            }
           }
         } else if (frame.event === 'complete') {
           const result = frame.data as SSECompleteEvent
-          const newTurn: TurnRecord = {
-            user_turn_id: result.user_turn_id,
-            assistant_turn_id: result.assistant_turn_id,
-            user_text: userText || null,
-            asr_text: result.asr_text ?? null,
-            reply_text: result.reply_text,
-            correction: pendingCorrections,
-            has_user_audio: userAudioUrl !== null,
-            has_assistant_audio: result.audio_url !== null,
-            user_audio_url: userAudioUrl,
-            assistant_audio_url: result.audio_url,
-          }
-          sessionStore.update((s) => ({ ...s, turns: [...s.turns, newTurn] }))
+          sessionStore.update((s) => {
+            const p = s.pendingTurn
+            const finalTurn: TurnRecord = {
+              user_turn_id: result.user_turn_id,
+              assistant_turn_id: result.assistant_turn_id,
+              user_text: p?.user_text ?? null,
+              asr_text: result.asr_text ?? p?.asr_text ?? null,
+              reply_text: result.reply_text,
+              correction: p?.correction ?? null,
+              has_user_audio: p?.has_user_audio ?? false,
+              has_assistant_audio: result.audio_url !== null,
+              user_audio_url: p?.user_audio_url ?? null,
+              assistant_audio_url: result.audio_url,
+            }
+            return { ...s, turns: [...s.turns, finalTurn], pendingTurn: null }
+          })
           uiStore.update((s) => ({ ...s, autoplayTurnId: result.assistant_turn_id }))
         } else if (frame.event === 'error') {
           submitError = (frame.data as SSEErrorEvent).message ?? 'Turn failed'
@@ -91,16 +113,31 @@
     const convId = await ensureConversation()
     if (!convId) { text = trimmed; return }
 
-    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
     const history = buildHistory($sessionStore.turns)
+
+    sessionStore.update((s) => ({
+      ...s,
+      pendingTurn: {
+        user_turn_id: 'pending',
+        assistant_turn_id: null,
+        user_text: trimmed,
+        asr_text: null,
+        reply_text: null,
+        correction: null,
+        has_user_audio: false,
+        has_assistant_audio: false,
+        user_audio_url: null,
+        assistant_audio_url: null,
+      },
+    }))
+    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
 
     try {
       await drainStream(
         submitTextTurn({ conversationId: convId, text: trimmed, conversationHistory: history, correctionsEnabled, language: $sessionStore.language }),
-        trimmed,
-        null,
       )
     } finally {
+      sessionStore.update((s) => ({ ...s, pendingTurn: null }))
       uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
   }
@@ -113,19 +150,32 @@
     const convId = await ensureConversation()
     if (!convId) return
 
-    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
     const history = buildHistory($sessionStore.turns)
-
-    // Create a local object URL so the user bubble can play the recording.
     const localUrl = URL.createObjectURL(e.detail.blob)
+
+    sessionStore.update((s) => ({
+      ...s,
+      pendingTurn: {
+        user_turn_id: 'pending',
+        assistant_turn_id: null,
+        user_text: null,
+        asr_text: null,
+        reply_text: null,
+        correction: null,
+        has_user_audio: true,
+        has_assistant_audio: false,
+        user_audio_url: localUrl,
+        assistant_audio_url: null,
+      },
+    }))
+    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
 
     try {
       await drainStream(
         submitAudioTurn({ conversationId: convId, audioBlob: e.detail.blob, conversationHistory: history, correctionsEnabled, language: $sessionStore.language }),
-        '',
-        localUrl,
       )
     } finally {
+      sessionStore.update((s) => ({ ...s, pendingTurn: null }))
       uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
   }
