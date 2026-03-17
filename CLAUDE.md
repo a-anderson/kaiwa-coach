@@ -155,6 +155,8 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - For development, run the Vite dev server (`npm run dev` in `frontend/`) alongside the FastAPI backend — Vite proxies `/api` to `localhost:8000`.
 - For production, `npm run build` writes to `frontend/dist/`, which FastAPI serves as static files.
 
+**Progressive rendering**: In-flight turns are tracked via `pendingTurn: TurnRecord | null` in `sessionStore`. `InputArea` populates it immediately on submit and patches it as each SSE stage completes (ASR transcript → LLM reply → corrections → TTS audio). On SSE `complete`, it is moved into `turns` with real IDs. `ChatThread` renders `pendingTurn` separately below committed turns. When a turn completes, `InputArea` dispatches a `turncomplete` event that `App.svelte` catches to trigger a sidebar refresh (picking up the auto-set conversation title).
+
 ## Testing
 
 - Slow tests (`@pytest.mark.slow`) require local models; CI runs only non-slow tests.

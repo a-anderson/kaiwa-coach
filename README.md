@@ -203,12 +203,13 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 ### Conversation persistence
 
 - Past conversations are listed in the sidebar; click to load and resume.
+- Conversations are automatically titled from the first user message and update in the sidebar as soon as the turn completes.
 - Delete a single conversation or clear all history from the sidebar.
 
 ### Audio regeneration
 
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
-- Click **↺ Regen all audio** in the conversation header to regenerate all turns.
+- Click **↺ Regenerate all audio** in the conversation header to regenerate all turns.
 
 ### Shadowing mode
 
@@ -308,9 +309,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-03-16):
+Latest full local snapshot (2026-03-17):
 
-- `193 passed`
+- `197 passed`
 
 ### Schema and repair robustness
 
