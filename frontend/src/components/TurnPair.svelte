@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TurnRecord } from '../lib/types/api'
   import { sessionStore } from '../lib/stores/session'
+  import { uiStore } from '../lib/stores/ui'
   import { regenTurnAudio } from '../lib/api/regen'
   import UserBubble from './UserBubble.svelte'
   import AssistantBubble from './AssistantBubble.svelte'
@@ -51,6 +52,7 @@
       hasAudio={turn.has_assistant_audio}
       {regenPending}
       on:regen={handleRegen}
+      on:shadow={() => uiStore.update((s) => ({ ...s, shadowingTurnId: turn.assistant_turn_id }))}
     />
     {#if regenError}
       <p class="regen-error">{regenError}</p>

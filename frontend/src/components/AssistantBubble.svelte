@@ -7,7 +7,7 @@
   export let hasAudio: boolean = false
   export let regenPending: boolean = false
 
-  const dispatch = createEventDispatcher<{ regen: void }>()
+  const dispatch = createEventDispatcher<{ regen: void; shadow: void }>()
 </script>
 
 <div class="bubble assistant-bubble">
@@ -20,8 +20,18 @@
   {/if}
 
   <div class="actions">
+    {#if audioUrl}
+      <button
+        class="action-btn"
+        on:click={() => dispatch('shadow')}
+        title="Shadow this turn"
+        aria-label="Shadow this turn"
+      >
+        Shadow
+      </button>
+    {/if}
     <button
-      class="regen-btn"
+      class="action-btn"
       on:click={() => dispatch('regen')}
       disabled={regenPending}
       title="Regenerate audio"
@@ -63,11 +73,11 @@
     margin-top: 4px;
   }
 
-  .regen-btn {
+  .action-btn {
     background: none;
     border: none;
-    padding: 2px 4px;
-    font-size: 0.85rem;
+    padding: 2px 6px;
+    font-size: 0.78rem;
     color: #bbb;
     cursor: pointer;
     border-radius: 4px;
@@ -75,11 +85,11 @@
     line-height: 1;
   }
 
-  .regen-btn:not(:disabled):hover {
+  .action-btn:not(:disabled):hover {
     color: var(--kc-primary, #555);
   }
 
-  .regen-btn:disabled {
+  .action-btn:disabled {
     cursor: default;
     opacity: 0.5;
   }
