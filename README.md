@@ -211,6 +211,15 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
 - Click **↺ Regenerate all audio** in the conversation header to regenerate all turns.
 
+### Downloading audio
+
+- Click **↓ Download** on any assistant bubble to save the TTS audio file.
+- A download button is also available under the reference audio player in shadowing mode.
+
+### Autoplay
+
+Assistant audio plays automatically when a turn completes. Subsequent turns in a loaded conversation do not autoplay.
+
 ### Shadowing mode
 
 - Click **Shadow** on any assistant bubble to open the shadowing panel.
