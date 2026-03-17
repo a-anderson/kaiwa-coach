@@ -3,6 +3,7 @@
   import { themeStore } from './lib/stores/theme'
   import { sessionStore } from './lib/stores/session'
   import Sidebar from './components/Sidebar.svelte'
+  import ConversationHeader from './components/ConversationHeader.svelte'
   import ChatThread from './components/ChatThread.svelte'
   import InputArea from './components/InputArea.svelte'
 
@@ -19,6 +20,7 @@
         <p>Select or create a conversation to begin.</p>
       </div>
     {:else}
+      <ConversationHeader />
       <ChatThread />
       <InputArea />
     {/if}

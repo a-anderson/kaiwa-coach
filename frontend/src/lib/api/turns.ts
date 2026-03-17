@@ -28,3 +28,27 @@ export async function* submitTextTurn(
     yield frame as unknown as SSEEvent
   }
 }
+
+export interface AudioTurnParams {
+  conversationId: string
+  audioBlob: Blob
+  conversationHistory: string
+  correctionsEnabled: boolean
+  language: string
+}
+
+export async function* submitAudioTurn(
+  params: AudioTurnParams,
+): AsyncGenerator<SSEEvent> {
+  const form = new FormData()
+  form.append('conversation_id', params.conversationId)
+  form.append('conversation_history', params.conversationHistory)
+  form.append('corrections_enabled', String(params.correctionsEnabled))
+  form.append('language', params.language)
+  form.append('audio', params.audioBlob, 'recording.webm')
+
+  const gen = fetchSSE('/api/turns/audio', { method: 'POST', body: form })
+  for await (const frame of gen) {
+    yield frame as unknown as SSEEvent
+  }
+}

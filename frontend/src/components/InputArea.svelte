@@ -1,14 +1,16 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
   import { uiStore } from '../lib/stores/ui'
-  import { submitTextTurn } from '../lib/api/turns'
+  import { submitTextTurn, submitAudioTurn } from '../lib/api/turns'
   import { createConversation } from '../lib/api/conversations'
   import PipelineProgress from './PipelineProgress.svelte'
+  import AudioRecorder from './AudioRecorder.svelte'
   import type { TurnRecord, CorrectionData, SSEStageEvent, SSECompleteEvent, SSEErrorEvent } from '../lib/types/api'
 
   let text = ''
   let correctionsEnabled = true
   let submitError: string | null = null
+  let showRecorder = false
 
   /** Build the conversation_history string from loaded turns (see Appendix A.9). */
   function buildHistory(turns: TurnRecord[]): string {
@@ -21,40 +23,30 @@
     return lines.join('\n')
   }
 
-  async function handleSubmit(): Promise<void> {
-    const trimmed = text.trim()
-    if (!trimmed || $uiStore.isSubmitting) return
-
-    submitError = null
-    text = ''
-
-    // Auto-create a conversation if none is active.
+  /** Ensure a conversation exists, creating one if needed. Returns the id or null on error. */
+  async function ensureConversation(): Promise<string | null> {
     let convId = $sessionStore.conversationId
-    if (!convId) {
-      try {
-        const convo = await createConversation($sessionStore.language)
-        convId = convo.id
-        sessionStore.update((s) => ({ ...s, conversationId: convId! }))
-      } catch (e) {
-        submitError = e instanceof Error ? e.message : 'Failed to create conversation'
-        text = trimmed
-        return
-      }
-    }
-
-    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
-
-    const history = buildHistory($sessionStore.turns)
-    let pendingCorrections: CorrectionData | null = null
-
+    if (convId) return convId
     try {
-      for await (const frame of submitTextTurn({
-        conversationId: convId,
-        text: trimmed,
-        conversationHistory: history,
-        correctionsEnabled,
-        language: $sessionStore.language,
-      })) {
+      const convo = await createConversation($sessionStore.language)
+      convId = convo.id
+      sessionStore.update((s) => ({ ...s, conversationId: convId! }))
+      return convId
+    } catch (e) {
+      submitError = e instanceof Error ? e.message : 'Failed to create conversation'
+      return null
+    }
+  }
+
+  /** Consume an SSE stream, updating UI state and appending the completed turn. */
+  async function drainStream(
+    stream: AsyncGenerator<import('../lib/types/api').SSEEvent>,
+    userText: string,
+    userAudioUrl: string | null,
+  ): Promise<void> {
+    let pendingCorrections: CorrectionData | null = null
+    try {
+      for await (const frame of stream) {
         if (frame.event === 'stage') {
           const stage = frame.data as SSEStageEvent
           uiStore.update((s) => ({
@@ -69,13 +61,13 @@
           const newTurn: TurnRecord = {
             user_turn_id: result.user_turn_id,
             assistant_turn_id: result.assistant_turn_id,
-            user_text: trimmed,
-            asr_text: null,
+            user_text: userText || null,
+            asr_text: result.asr_text ?? null,
             reply_text: result.reply_text,
             correction: pendingCorrections,
-            has_user_audio: false,
+            has_user_audio: userAudioUrl !== null,
             has_assistant_audio: result.audio_url !== null,
-            user_audio_url: null,
+            user_audio_url: userAudioUrl,
             assistant_audio_url: result.audio_url,
           }
           sessionStore.update((s) => ({ ...s, turns: [...s.turns, newTurn] }))
@@ -85,6 +77,53 @@
       }
     } catch (e) {
       submitError = e instanceof Error ? e.message : 'Connection error'
+    }
+  }
+
+  async function handleSubmit(): Promise<void> {
+    const trimmed = text.trim()
+    if (!trimmed || $uiStore.isSubmitting) return
+
+    submitError = null
+    text = ''
+
+    const convId = await ensureConversation()
+    if (!convId) { text = trimmed; return }
+
+    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
+    const history = buildHistory($sessionStore.turns)
+
+    try {
+      await drainStream(
+        submitTextTurn({ conversationId: convId, text: trimmed, conversationHistory: history, correctionsEnabled, language: $sessionStore.language }),
+        trimmed,
+        null,
+      )
+    } finally {
+      uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
+    }
+  }
+
+  async function handleAudioRecorded(e: CustomEvent<{ blob: Blob }>): Promise<void> {
+    showRecorder = false
+    if ($uiStore.isSubmitting) return
+
+    submitError = null
+    const convId = await ensureConversation()
+    if (!convId) return
+
+    uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
+    const history = buildHistory($sessionStore.turns)
+
+    // Create a local object URL so the user bubble can play the recording.
+    const localUrl = URL.createObjectURL(e.detail.blob)
+
+    try {
+      await drainStream(
+        submitAudioTurn({ conversationId: convId, audioBlob: e.detail.blob, conversationHistory: history, correctionsEnabled, language: $sessionStore.language }),
+        '',
+        localUrl,
+      )
     } finally {
       uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
@@ -106,26 +145,42 @@
     <p class="error">{submitError}</p>
   {/if}
 
-  <div class="row">
-    <textarea
-      class="input"
-      bind:value={text}
-      on:keydown={handleKeydown}
-      placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
-      rows="1"
-      disabled={$uiStore.isSubmitting}
-      aria-label="Message input"
+  {#if showRecorder}
+    <AudioRecorder
+      on:recorded={handleAudioRecorded}
+      on:cancel={() => { showRecorder = false }}
     />
+  {:else}
+    <div class="row">
+      <button
+        class="mic-btn"
+        on:click={() => { showRecorder = true }}
+        disabled={$uiStore.isSubmitting}
+        aria-label="Record audio"
+      >
+        🎙
+      </button>
 
-    <button
-      class="send-btn"
-      on:click={handleSubmit}
-      disabled={$uiStore.isSubmitting || !text.trim()}
-      aria-label="Send message"
-    >
-      {$uiStore.isSubmitting ? '…' : '↑'}
-    </button>
-  </div>
+      <textarea
+        class="input"
+        bind:value={text}
+        on:keydown={handleKeydown}
+        placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+        rows="1"
+        disabled={$uiStore.isSubmitting}
+        aria-label="Message input"
+      />
+
+      <button
+        class="send-btn"
+        on:click={handleSubmit}
+        disabled={$uiStore.isSubmitting || !text.trim()}
+        aria-label="Send message"
+      >
+        {$uiStore.isSubmitting ? '…' : '↑'}
+      </button>
+    </div>
+  {/if}
 
   <div class="options">
     <label class="toggle-label">
@@ -180,6 +235,7 @@
     color: #aaa;
   }
 
+  .mic-btn,
   .send-btn {
     width: 38px;
     height: 38px;
@@ -194,6 +250,18 @@
     align-items: center;
     justify-content: center;
     transition: opacity 0.15s;
+  }
+
+  .mic-btn {
+    background: transparent;
+    border: 1px solid #d0d0d0;
+    color: #555;
+    font-size: 1rem;
+  }
+
+  .mic-btn:not(:disabled):hover {
+    border-color: var(--kc-primary, #555);
+    color: var(--kc-primary, #555);
   }
 
   .send-btn:disabled {

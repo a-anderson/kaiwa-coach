@@ -890,8 +890,21 @@ class ConversationOrchestrator:
             raise RuntimeError("TTS regeneration failed.")
         return result
 
-    def regenerate_conversation_audio(self, conversation_id: str) -> list[TTSResult]:
-        """Regenerate TTS audio for every assistant turn in a conversation."""
+    def regenerate_conversation_audio(
+        self,
+        conversation_id: str,
+        on_turn: Callable[[str, str | None], None] | None = None,
+    ) -> list[TTSResult]:
+        """Regenerate TTS audio for every assistant turn in a conversation.
+
+        Parameters
+        ----------
+        conversation_id:
+            Conversation identifier.
+        on_turn:
+            Optional callback invoked after each turn is synthesised.
+            Receives ``(assistant_turn_id, audio_path_or_none)``.
+        """
         if self._tts is None:
             raise ValueError("TTS must be configured to regenerate audio.")
 
@@ -918,6 +931,8 @@ class ConversationOrchestrator:
             )
             if result is None:
                 raise RuntimeError("TTS regeneration failed.")
+            if on_turn:
+                on_turn(turn_id, result.audio_path)
             results.append(result)
         return results
 

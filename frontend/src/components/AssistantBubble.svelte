@@ -1,18 +1,35 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte'
+  import AudioPlayer from './AudioPlayer.svelte'
+
   export let text: string
   export let audioUrl: string | null = null
   export let hasAudio: boolean = false
+  export let regenPending: boolean = false
+
+  const dispatch = createEventDispatcher<{ regen: void }>()
 </script>
 
 <div class="bubble assistant-bubble">
   <p class="text">{text}</p>
 
   {#if audioUrl}
-    <!-- Native audio player; WaveSurfer waveform planned for a later phase. -->
-    <audio class="player" src={audioUrl} controls preload="none" />
+    <AudioPlayer src={audioUrl} />
   {:else if hasAudio}
-    <p class="audio-unavailable">Audio not available — regenerate to play.</p>
+    <p class="audio-unavailable">Audio not available.</p>
   {/if}
+
+  <div class="actions">
+    <button
+      class="regen-btn"
+      on:click={() => dispatch('regen')}
+      disabled={regenPending}
+      title="Regenerate audio"
+      aria-label="Regenerate audio"
+    >
+      {regenPending ? '…' : '↺'}
+    </button>
+  </div>
 </div>
 
 <style>
@@ -33,18 +50,37 @@
     word-break: break-word;
   }
 
-  .player {
-    display: block;
-    margin-top: 8px;
-    width: 100%;
-    height: 32px;
-    accent-color: var(--kc-primary, #333);
-  }
-
   .audio-unavailable {
     margin-top: 6px;
     font-size: 0.75rem;
     color: #aaa;
     font-style: italic;
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .regen-btn {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+    color: #bbb;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.15s;
+    line-height: 1;
+  }
+
+  .regen-btn:not(:disabled):hover {
+    color: var(--kc-primary, #555);
+  }
+
+  .regen-btn:disabled {
+    cursor: default;
+    opacity: 0.5;
   }
 </style>

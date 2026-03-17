@@ -1,9 +1,17 @@
 <script lang="ts">
+  import AudioPlayer from './AudioPlayer.svelte'
+
   export let text: string
+  export let audioUrl: string | null = null
 </script>
 
 <div class="bubble user-bubble">
-  <p class="text">{text}</p>
+  {#if text}
+    <p class="text">{text}</p>
+  {/if}
+  {#if audioUrl}
+    <AudioPlayer src={audioUrl} />
+  {/if}
 </div>
 
 <style>
