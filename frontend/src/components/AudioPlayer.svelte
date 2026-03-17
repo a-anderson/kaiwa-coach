@@ -3,19 +3,24 @@
   import WaveSurfer from 'wavesurfer.js'
 
   export let src: string
+  export let variant: 'user' | 'assistant' = 'user'
 
   let container: HTMLElement
   let ws: WaveSurfer | null = null
   let playing = false
   let ready = false
 
+  $: accentVar = variant === 'assistant' ? 'var(--kc-secondary, #555)' : 'var(--kc-primary, #333)'
+
   onMount(() => {
+    const cs = getComputedStyle(document.documentElement)
+    const activeVar  = variant === 'assistant' ? '--kc-waveform-bot-active'   : '--kc-waveform-active'
+    const inactiveVar = variant === 'assistant' ? '--kc-waveform-bot-inactive' : '--kc-waveform-inactive'
+
     ws = WaveSurfer.create({
       container,
-      waveColor: getComputedStyle(document.documentElement)
-        .getPropertyValue('--kc-waveform-inactive').trim() || '#ccc',
-      progressColor: getComputedStyle(document.documentElement)
-        .getPropertyValue('--kc-waveform-active').trim() || '#555',
+      waveColor: cs.getPropertyValue(inactiveVar).trim() || '#ccc',
+      progressColor: cs.getPropertyValue(activeVar).trim() || '#555',
       height: 36,
       barWidth: 2,
       barGap: 1,
@@ -40,7 +45,7 @@
   }
 </script>
 
-<div class="player">
+<div class="player" style="--player-accent: {accentVar}">
   <button
     class="play-btn"
     on:click={togglePlayback}
@@ -65,7 +70,7 @@
     height: 32px;
     border-radius: 50%;
     border: none;
-    background: var(--kc-primary, #333);
+    background: var(--player-accent, #333);
     color: #fff;
     font-size: 0.85rem;
     cursor: pointer;

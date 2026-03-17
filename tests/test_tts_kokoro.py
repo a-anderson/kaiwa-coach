@@ -73,6 +73,7 @@ def test_default_voice_from_language(tmp_path: Path) -> None:
     [
         ("es", "ef_dora"),
         ("it", "if_sara"),
+        ("pt", "pf_dora"),
         ("pt-br", "pf_dora"),
     ],
 )

@@ -39,3 +39,13 @@ export async function deleteConversation(id: string): Promise<void> {
 export async function deleteAllConversations(): Promise<void> {
   await checkOk(await fetch('/api/conversations', { method: 'DELETE' }))
 }
+
+export async function setSessionLanguage(language: string): Promise<void> {
+  await checkOk(
+    await fetch('/api/session/language', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language }),
+    }),
+  )
+}

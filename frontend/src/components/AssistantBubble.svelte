@@ -14,7 +14,7 @@
   <p class="text">{text}</p>
 
   {#if audioUrl}
-    <AudioPlayer src={audioUrl} />
+    <AudioPlayer src={audioUrl} variant="assistant" />
   {:else if hasAudio}
     <p class="audio-unavailable">Audio not available.</p>
   {/if}

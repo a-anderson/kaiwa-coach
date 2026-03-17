@@ -1,6 +1,6 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
-  import { createConversation, getConversation, deleteAllConversations } from '../lib/api/conversations'
+  import { createConversation, getConversation, deleteAllConversations, setSessionLanguage } from '../lib/api/conversations'
   import LanguageSelector from './LanguageSelector.svelte'
   import ConversationList from './ConversationList.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
@@ -14,6 +14,7 @@
     loadError = null
     try {
       const convo = await getConversation(id)
+      await setSessionLanguage(convo.language)
       sessionStore.update((s) => ({
         ...s,
         conversationId: id,

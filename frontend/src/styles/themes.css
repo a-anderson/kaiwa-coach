@@ -13,78 +13,90 @@
 
 /* 🇯🇵 Japanese — crimson red + neutral grey */
 :root[data-language="ja"] {
-  --kc-primary:             #b91c1c;  /* deep crimson (flag red: #bc002d) */
-  --kc-primary-light:       #dc2626;
-  --kc-secondary:           #888888;  /* dark grey (flag white → grey) */
-  --kc-user-bubble:         #fdf2f2;  /* soft red tint — kept warm, not grey */
-  --kc-bot-bubble:          #f3f3f3;  /* light grey (secondary = grey) */
-  --kc-accent:              #b91c1c;
-  --kc-waveform-active:     #b91c1c;
-  --kc-waveform-inactive:   #cca8a8;
-  --kc-correction-border:   #b91c1c;  /* red, matching user bubble outline */
+  --kc-primary:                 #b91c1c;  /* deep crimson (flag red: #bc002d) */
+  --kc-primary-light:           #dc2626;
+  --kc-secondary:               #888888;  /* dark grey (flag white → grey) */
+  --kc-user-bubble:             #fdf2f2;  /* soft red tint — kept warm, not grey */
+  --kc-bot-bubble:              #f3f3f3;  /* light grey (secondary = grey) */
+  --kc-accent:                  #b91c1c;
+  --kc-waveform-active:         #b91c1c;
+  --kc-waveform-inactive:       #cca8a8;
+  --kc-waveform-bot-active:     #888888;
+  --kc-waveform-bot-inactive:   #c8c8c8;
+  --kc-correction-border:       #b91c1c;  /* red, matching user bubble outline */
 }
 
 /* 🇫🇷 French — navy blue (primary) + red (secondary) */
 :root[data-language="fr"] {
-  --kc-primary:             #1e3a8a;  /* French navy (flag blue: #0055a4) */
-  --kc-primary-light:       #2952b3;
-  --kc-secondary:           #dc2626;  /* French flag red */
-  --kc-user-bubble:         #eef2fc;  /* light blue tint */
-  --kc-bot-bubble:          #fdf2f2;  /* light red tint (flag red secondary) */
-  --kc-accent:              #1e3a8a;
-  --kc-waveform-active:     #1e3a8a;
-  --kc-waveform-inactive:   #8aaad8;
-  --kc-correction-border:   #1e3a8a;  /* blue, matching user bubble outline */
+  --kc-primary:                 #1e3a8a;  /* French navy (flag blue: #0055a4) */
+  --kc-primary-light:           #2952b3;
+  --kc-secondary:               #dc2626;  /* French flag red */
+  --kc-user-bubble:             #eef2fc;  /* light blue tint */
+  --kc-bot-bubble:              #fdf2f2;  /* light red tint (flag red secondary) */
+  --kc-accent:                  #1e3a8a;
+  --kc-waveform-active:         #1e3a8a;
+  --kc-waveform-inactive:       #8aaad8;
+  --kc-waveform-bot-active:     #dc2626;
+  --kc-waveform-bot-inactive:   #f0a8a8;
+  --kc-correction-border:       #1e3a8a;  /* blue, matching user bubble outline */
 }
 
 /* 🇬🇧 English — red (primary) + navy blue (secondary); French colours swapped */
 :root[data-language="en"] {
-  --kc-primary:             #b91c1c;  /* Union Jack red */
-  --kc-primary-light:       #dc2626;
-  --kc-secondary:           #1e3a8a;  /* Union Jack navy */
-  --kc-user-bubble:         #fdf2f2;  /* light red tint */
-  --kc-bot-bubble:          #eef2fc;  /* light blue tint */
-  --kc-accent:              #b91c1c;
-  --kc-waveform-active:     #b91c1c;
-  --kc-waveform-inactive:   #8aaad8;
-  --kc-correction-border:   #b91c1c;  /* red, matching user bubble outline */
+  --kc-primary:                 #b91c1c;  /* Union Jack red */
+  --kc-primary-light:           #dc2626;
+  --kc-secondary:               #1e3a8a;  /* Union Jack navy */
+  --kc-user-bubble:             #fdf2f2;  /* light red tint */
+  --kc-bot-bubble:              #eef2fc;  /* light blue tint */
+  --kc-accent:                  #b91c1c;
+  --kc-waveform-active:         #b91c1c;
+  --kc-waveform-inactive:       #cca8a8;
+  --kc-waveform-bot-active:     #1e3a8a;
+  --kc-waveform-bot-inactive:   #8aaad8;
+  --kc-correction-border:       #b91c1c;  /* red, matching user bubble outline */
 }
 
 /* 🇪🇸 Spanish — red (primary) + golden yellow (secondary) */
 :root[data-language="es"] {
-  --kc-primary:             #b71c1c;  /* Spanish red (flag red: #c60b1e) */
-  --kc-primary-light:       #d32f2f;
-  --kc-secondary:           #ca8a04;  /* Spanish gold (flag gold: #f1bf00) */
-  --kc-user-bubble:         #fdf0f0;  /* light red tint */
-  --kc-bot-bubble:          #fef9e7;  /* light gold tint (flag gold secondary) */
-  --kc-accent:              #b71c1c;
-  --kc-waveform-active:     #b71c1c;
-  --kc-waveform-inactive:   #d4a830;  /* warm gold (flag gold: #f1bf00) */
-  --kc-correction-border:   #b71c1c;  /* red, matching user bubble outline */
+  --kc-primary:                 #b71c1c;  /* Spanish red (flag red: #c60b1e) */
+  --kc-primary-light:           #d32f2f;
+  --kc-secondary:               #ca8a04;  /* Spanish gold (flag gold: #f1bf00) */
+  --kc-user-bubble:             #fdf0f0;  /* light red tint */
+  --kc-bot-bubble:              #fef9e7;  /* light gold tint (flag gold secondary) */
+  --kc-accent:                  #b71c1c;
+  --kc-waveform-active:         #b71c1c;
+  --kc-waveform-inactive:       #cca8a8;
+  --kc-waveform-bot-active:     #ca8a04;
+  --kc-waveform-bot-inactive:   #e8c870;
+  --kc-correction-border:       #b71c1c;  /* red, matching user bubble outline */
 }
 
 /* 🇮🇹 Italian — green (primary) + red (secondary) */
 :root[data-language="it"] {
-  --kc-primary:             #1e6b3a;  /* Italian green (flag green: #009246) */
-  --kc-primary-light:       #268547;
-  --kc-secondary:           #ce2b37;  /* Italian red (flag red: #ce2b37) */
-  --kc-user-bubble:         #eef7f1;  /* light green tint */
-  --kc-bot-bubble:          #fdf2f2;  /* light red tint (flag red secondary) */
-  --kc-accent:              #1e6b3a;
-  --kc-waveform-active:     #1e6b3a;
-  --kc-waveform-inactive:   #8cc8a0;
-  --kc-correction-border:   #1e6b3a;  /* green, matching user bubble outline */
+  --kc-primary:                 #1e6b3a;  /* Italian green (flag green: #009246) */
+  --kc-primary-light:           #268547;
+  --kc-secondary:               #ce2b37;  /* Italian red (flag red: #ce2b37) */
+  --kc-user-bubble:             #eef7f1;  /* light green tint */
+  --kc-bot-bubble:              #fdf2f2;  /* light red tint (flag red secondary) */
+  --kc-accent:                  #1e6b3a;
+  --kc-waveform-active:         #1e6b3a;
+  --kc-waveform-inactive:       #8cc8a0;
+  --kc-waveform-bot-active:     #ce2b37;
+  --kc-waveform-bot-inactive:   #e8a0a4;
+  --kc-correction-border:       #1e6b3a;  /* green, matching user bubble outline */
 }
 
 /* 🇧🇷 Brazilian Portuguese — green (primary) + gold (secondary) */
 :root[data-language="pt"] {
-  --kc-primary:             #1a7040;  /* Brazilian green (flag green: #009c3b) */
-  --kc-primary-light:       #228a4e;
-  --kc-secondary:           #ca8a04;  /* Brazilian gold (flag gold: #fedf00) */
-  --kc-user-bubble:         #edf7f1;  /* light green tint */
-  --kc-bot-bubble:          #fef9e7;  /* light gold tint (flag gold secondary) */
-  --kc-accent:              #1a7040;
-  --kc-waveform-active:     #1a7040;
-  --kc-waveform-inactive:   #90c8a4;
-  --kc-correction-border:   #1a7040;  /* green, matching user bubble outline */
+  --kc-primary:                 #1a7040;  /* Brazilian green (flag green: #009c3b) */
+  --kc-primary-light:           #228a4e;
+  --kc-secondary:               #ca8a04;  /* Brazilian gold (flag gold: #fedf00) */
+  --kc-user-bubble:             #edf7f1;  /* light green tint */
+  --kc-bot-bubble:              #fef9e7;  /* light gold tint (flag gold secondary) */
+  --kc-accent:                  #1a7040;
+  --kc-waveform-active:         #1a7040;
+  --kc-waveform-inactive:       #90c8a4;
+  --kc-waveform-bot-active:     #ca8a04;
+  --kc-waveform-bot-inactive:   #e8c870;
+  --kc-correction-border:       #1a7040;  /* green, matching user bubble outline */
 }

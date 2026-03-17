@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
+  import { setSessionLanguage } from '../lib/api/conversations'
 
   // Mirrors SUPPORTED_LANGUAGES in src/kaiwacoach/constants.py
   const LANGUAGE_OPTIONS: { code: string; flag: string; label: string }[] = [
@@ -15,11 +16,7 @@
     const lang = (event.target as HTMLSelectElement).value
     sessionStore.update((s) => ({ ...s, language: lang }))
     try {
-      await fetch('/api/session/language', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: lang }),
-      })
+      await setSessionLanguage(lang)
     } catch {
       // Local app — network errors are unexpected; silently ignore for now.
     }
