@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
-  import { setSessionLanguage, createConversation, getConversation } from '../lib/api/conversations'
+  import { setSessionLanguage, createConversation, getConversation, deleteConversation } from '../lib/api/conversations'
 
   const dispatch = createEventDispatcher<{ newconversation: void }>()
 
@@ -17,7 +17,7 @@
 
   async function onLanguageChange(event: Event) {
     const lang = (event.target as HTMLSelectElement).value
-    const hadConversation = $sessionStore.conversationId !== null
+    const { conversationId: prevId, turns: prevTurns } = $sessionStore
 
     sessionStore.update((s) => ({ ...s, language: lang }))
     try {
@@ -26,9 +26,12 @@
       // Local app — network errors are unexpected; silently ignore for now.
     }
 
-    if (hadConversation) {
+    if (prevId) {
       try {
         const summary = await createConversation(lang)
+        if (prevTurns.length === 0) {
+          await deleteConversation(prevId)
+        }
         const convo = await getConversation(summary.id)
         sessionStore.update((s) => ({
           ...s,

@@ -13,7 +13,8 @@
     en: '🇺🇸',
     es: '🇪🇸',
     it: '🇮🇹',
-    pt: '🇵🇹',
+    pt: '🇧🇷',
+    'pt-br': '🇧🇷',
   }
 
   function formatDate(dateStr: string | null): string {

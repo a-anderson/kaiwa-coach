@@ -1,6 +1,6 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
-  import { createConversation, getConversation, deleteAllConversations, setSessionLanguage } from '../lib/api/conversations'
+  import { createConversation, getConversation, deleteConversation, deleteAllConversations, setSessionLanguage } from '../lib/api/conversations'
   import ConversationList from './ConversationList.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
 
@@ -45,7 +45,11 @@
     creating = true
     loadError = null
     try {
+      const { conversationId: prevId, turns: prevTurns } = $sessionStore
       const convo = await createConversation($sessionStore.language)
+      if (prevId && prevTurns.length === 0) {
+        await deleteConversation(prevId)
+      }
       await listRef.refresh()
       await handleSelect(convo.id)
     } catch (e) {
