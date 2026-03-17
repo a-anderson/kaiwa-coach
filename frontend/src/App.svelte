@@ -1,34 +1,28 @@
 <script lang="ts">
   // Import themeStore for its side-effect: keeps data-language on <html> in sync.
   import { themeStore } from './lib/stores/theme'
-  import LanguageSelector from './components/LanguageSelector.svelte'
+  import { sessionStore } from './lib/stores/session'
+  import Sidebar from './components/Sidebar.svelte'
 
   // Consume the store so the import is not tree-shaken.
   $: _theme = $themeStore
 </script>
 
 <div class="app">
-  <aside class="sidebar">
-    <header class="sidebar-header">
-      <span class="logo">KaiwaCoach</span>
-      <LanguageSelector />
-    </header>
-
-    <nav class="conversation-list">
-      <!-- Phase 4: conversation list with load/delete -->
-    </nav>
-
-    <footer class="sidebar-footer">
-      <button class="new-conversation-btn" disabled>
-        + New conversation
-      </button>
-    </footer>
-  </aside>
+  <Sidebar />
 
   <main class="main-panel">
     <div class="chat-thread">
-      <!-- Phase 4: ChatThread component -->
-      <p class="placeholder">Select or create a conversation to begin.</p>
+      {#if $sessionStore.conversationId === null}
+        <p class="placeholder">Select or create a conversation to begin.</p>
+      {:else if $sessionStore.turns.length === 0}
+        <p class="placeholder">No messages yet — start the conversation!</p>
+      {:else}
+        <!-- Phase 5: ChatThread component -->
+        <p class="placeholder">
+          {$sessionStore.turns.length} turn(s) loaded — chat UI coming in Phase 5.
+        </p>
+      {/if}
     </div>
 
     <div class="input-area">
@@ -43,67 +37,6 @@
     height: 100vh;
     overflow: hidden;
   }
-
-  /* ── Sidebar ── */
-
-  .sidebar {
-    width: 260px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid #e0e0e0;
-    background: #fafafa;
-  }
-
-  .sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid #e0e0e0;
-    gap: 8px;
-  }
-
-  .logo {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--kc-primary, #333);
-    white-space: nowrap;
-  }
-
-  .conversation-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 0;
-  }
-
-  .sidebar-footer {
-    padding: 12px 16px;
-    border-top: 1px solid #e0e0e0;
-  }
-
-  .new-conversation-btn {
-    width: 100%;
-    padding: 8px;
-    border: 1px dashed var(--kc-primary, #999);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--kc-primary, #666);
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-
-  .new-conversation-btn:not(:disabled):hover {
-    background: var(--kc-user-bubble, #f5f5f5);
-  }
-
-  .new-conversation-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  /* ── Main panel ── */
 
   .main-panel {
     flex: 1;
