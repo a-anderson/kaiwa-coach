@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from kaiwacoach.api.routes.audio import router as audio_router
 from kaiwacoach.api.routes.conversations import router as conversations_router
+from kaiwacoach.api.routes.turns import router as turns_router
 from kaiwacoach.api.schemas.conversation import SetLanguageRequest
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.storage.blobs import SessionAudioCache
@@ -57,6 +58,7 @@ def create_app(
     # ── API routers ──────────────────────────────────────────────────────
     app.include_router(conversations_router, prefix="/api")
     app.include_router(audio_router, prefix="/api")
+    app.include_router(turns_router, prefix="/api")
 
     # ── Session / settings endpoints ─────────────────────────────────────
 

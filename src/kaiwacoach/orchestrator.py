@@ -17,7 +17,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.models.asr_whisper import ASRResult
@@ -126,6 +126,8 @@ class ConversationOrchestrator:
         conversation_id: str,
         user_text: str,
         conversation_history: str = "",
+        corrections_enabled: bool = True,
+        on_stage: Callable[[str, str, dict], None] | None = None,
     ) -> TextTurnResult:
         timings: Dict[str, float] = {}
         user_turn_id = str(uuid.uuid4())
@@ -144,6 +146,8 @@ class ConversationOrchestrator:
         self._db.run_write(_insert_user)
         timings["user_insert_seconds"] = time.perf_counter() - start
 
+        if on_stage:
+            on_stage("llm", "running", {})
         assistant_turn_id, reply_text = self.generate_reply(
             conversation_id=conversation_id,
             user_turn_id=user_turn_id,
@@ -151,18 +155,29 @@ class ConversationOrchestrator:
             conversation_history=conversation_history,
             timings=timings,
         )
-        corrections = self.run_corrections(
-            user_turn_id,
-            user_text,
-            assistant_turn_id=assistant_turn_id,
-            timings=timings,
-        )
+        if on_stage:
+            on_stage("llm", "complete", {"reply": reply_text})
+        if corrections_enabled:
+            if on_stage:
+                on_stage("corrections", "running", {})
+            corrections = self.run_corrections(
+                user_turn_id,
+                user_text,
+                assistant_turn_id=assistant_turn_id,
+                timings=timings,
+            )
+            if on_stage:
+                on_stage("corrections", "complete", {"data": corrections})
+        if on_stage:
+            on_stage("tts", "running", {})
         tts_result = self.run_tts(
             conversation_id=conversation_id,
             assistant_turn_id=assistant_turn_id,
             reply_text=reply_text,
             timings=timings,
         )
+        if on_stage:
+            on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
         self._finalize_timings(timings)
         self._log_timings("text_turn", timings)
 
@@ -180,6 +195,8 @@ class ConversationOrchestrator:
         pcm_bytes: bytes,
         audio_meta: AudioMeta,
         conversation_history: str = "",
+        corrections_enabled: bool = True,
+        on_stage: Callable[[str, str, dict], None] | None = None,
     ) -> AudioTurnResult:
         if self._asr is None or self._audio_cache is None:
             raise ValueError("ASR and audio_cache must be configured for audio turns.")
@@ -197,6 +214,8 @@ class ConversationOrchestrator:
         )
         timings["audio_save_seconds"] = time.perf_counter() - start
         try:
+            if on_stage:
+                on_stage("asr", "running", {})
             model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
             language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
             cache_key = (audio_hash, str(model_id), str(language))
@@ -223,6 +242,8 @@ class ConversationOrchestrator:
                 cached_meta.pop("audio_path", None)
                 self._asr_cache[cache_key] = ASRResult(text=asr_result.text, meta=cached_meta)
                 asr_meta["audio_path"] = str(input_audio_path)
+            if on_stage:
+                on_stage("asr", "complete", {"transcript": asr_result.text})
             asr_meta_json = json.dumps(asr_meta, ensure_ascii=False)
 
             def _insert_user(conn) -> None:
@@ -239,6 +260,8 @@ class ConversationOrchestrator:
             self._db.run_write(_insert_user)
             timings["user_insert_seconds"] = time.perf_counter() - start
 
+            if on_stage:
+                on_stage("llm", "running", {})
             assistant_turn_id, reply_text = self.generate_reply(
                 conversation_id=conversation_id,
                 user_turn_id=user_turn_id,
@@ -246,18 +269,29 @@ class ConversationOrchestrator:
                 conversation_history=conversation_history,
                 timings=timings,
             )
-            corrections = self.run_corrections(
-                user_turn_id,
-                asr_result.text,
-                assistant_turn_id=assistant_turn_id,
-                timings=timings,
-            )
+            if on_stage:
+                on_stage("llm", "complete", {"reply": reply_text})
+            if corrections_enabled:
+                if on_stage:
+                    on_stage("corrections", "running", {})
+                corrections = self.run_corrections(
+                    user_turn_id,
+                    asr_result.text,
+                    assistant_turn_id=assistant_turn_id,
+                    timings=timings,
+                )
+                if on_stage:
+                    on_stage("corrections", "complete", {"data": corrections})
+            if on_stage:
+                on_stage("tts", "running", {})
             tts_result = self.run_tts(
                 conversation_id=conversation_id,
                 assistant_turn_id=assistant_turn_id,
                 reply_text=reply_text,
                 timings=timings,
             )
+            if on_stage:
+                on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
             self._finalize_timings(timings)
             self._log_timings("audio_turn", timings)
 
