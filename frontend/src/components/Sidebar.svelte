@@ -1,12 +1,14 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
-  import { createConversation, getConversation } from '../lib/api/conversations'
+  import { createConversation, getConversation, deleteAllConversations } from '../lib/api/conversations'
   import LanguageSelector from './LanguageSelector.svelte'
   import ConversationList from './ConversationList.svelte'
+  import ConfirmDialog from './ConfirmDialog.svelte'
 
   let listRef: ConversationList
   let creating = false
   let loadError: string | null = null
+  let confirmDeleteAll = false
 
   async function handleSelect(id: string): Promise<void> {
     loadError = null
@@ -20,6 +22,18 @@
       }))
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Failed to load conversation'
+    }
+  }
+
+  async function handleDeleteAll(): Promise<void> {
+    confirmDeleteAll = false
+    loadError = null
+    try {
+      await deleteAllConversations()
+      sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
+      await listRef.refresh()
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : 'Failed to delete all conversations'
     }
   }
 
@@ -45,6 +59,11 @@
   </header>
 
   <div class="list-container">
+    <div class="new-btn-row">
+      <button class="new-btn" on:click={handleNew} disabled={creating}>
+        {creating ? 'Creating…' : '+ New conversation'}
+      </button>
+    </div>
     <ConversationList bind:this={listRef} on:select={(e) => handleSelect(e.detail)} />
   </div>
 
@@ -52,11 +71,19 @@
     {#if loadError}
       <p class="load-error">{loadError}</p>
     {/if}
-    <button class="new-btn" on:click={handleNew} disabled={creating}>
-      {creating ? 'Creating…' : '+ New conversation'}
+    <button class="delete-all-btn" on:click={() => { confirmDeleteAll = true }}>
+      Delete all history
     </button>
   </footer>
 </aside>
+
+<ConfirmDialog
+  open={confirmDeleteAll}
+  message="Delete all conversations? This cannot be undone."
+  confirmLabel="Delete all"
+  on:confirm={handleDeleteAll}
+  on:cancel={() => { confirmDeleteAll = false }}
+/>
 
 <style>
   .sidebar {
@@ -89,21 +116,13 @@
   .list-container {
     flex: 1;
     overflow-y: auto;
-  }
-
-  .sidebar-footer {
-    flex-shrink: 0;
-    padding: 12px 16px;
-    border-top: 1px solid #e0e0e0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
 
-  .load-error {
-    font-size: 0.78rem;
-    color: #c0392b;
-    text-align: center;
+  .new-btn-row {
+    flex-shrink: 0;
+    padding: 10px 12px 4px;
   }
 
   .new-btn {
@@ -125,5 +144,36 @@
   .new-btn:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  .sidebar-footer {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .load-error {
+    font-size: 0.78rem;
+    color: #c0392b;
+    text-align: center;
+  }
+
+  .delete-all-btn {
+    width: 100%;
+    padding: 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #bbb;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .delete-all-btn:hover {
+    color: #c0392b;
   }
 </style>

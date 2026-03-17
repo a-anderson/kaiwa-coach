@@ -35,3 +35,7 @@ export async function createConversation(
 export async function deleteConversation(id: string): Promise<void> {
   await checkOk(await fetch(`/api/conversations/${id}`, { method: 'DELETE' }))
 }
+
+export async function deleteAllConversations(): Promise<void> {
+  await checkOk(await fetch('/api/conversations', { method: 'DELETE' }))
+}
