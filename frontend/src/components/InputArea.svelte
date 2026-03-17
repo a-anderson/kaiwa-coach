@@ -147,6 +147,7 @@
 
   {#if showRecorder}
     <AudioRecorder
+      autostart
       on:recorded={handleAudioRecorded}
       on:cancel={() => { showRecorder = false }}
     />

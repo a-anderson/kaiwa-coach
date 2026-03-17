@@ -12,13 +12,15 @@
 
   const dispatch = createEventDispatcher<{ recorded: { blob: Blob }; cancel: void }>()
 
+  export let autostart = false
+
   let container: HTMLElement
   let ws: WaveSurfer | null = null
   let record: InstanceType<typeof RecordPlugin> | null = null
   let recording = false
   let blob: Blob | null = null
 
-  onMount(() => {
+  onMount(async () => {
     ws = WaveSurfer.create({
       container,
       waveColor: getComputedStyle(document.documentElement)
@@ -36,6 +38,11 @@
       blob = b
       recording = false
     })
+
+    if (autostart) {
+      await record.startRecording()
+      recording = true
+    }
   })
 
   onDestroy(() => {
