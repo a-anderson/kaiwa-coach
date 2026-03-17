@@ -20,7 +20,6 @@ mlx-audio = "^0.3.1"
 numpy = "2.3.5"
 pydantic = "^2.12.5"
 soundfile = "^0.13.1"
-gradio = "^6.5.1"
 phonemizer-fork = "^3.3.2"
 misaki = {extras = ["ja"], version = "^0.9.4"}
 fugashi = "^1.5.2"
