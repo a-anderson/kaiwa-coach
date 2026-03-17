@@ -2,13 +2,13 @@
   import { sessionStore } from '../lib/stores/session'
 
   // Mirrors SUPPORTED_LANGUAGES in src/kaiwacoach/constants.py
-  const LANGUAGE_OPTIONS: { code: string; label: string }[] = [
-    { code: 'ja', label: '日本語 (Japanese)' },
-    { code: 'fr', label: 'Français (French)' },
-    { code: 'en', label: 'English' },
-    { code: 'es', label: 'Español (Spanish)' },
-    { code: 'it', label: 'Italiano (Italian)' },
-    { code: 'pt', label: 'Português (Portuguese)' },
+  const LANGUAGE_OPTIONS: { code: string; flag: string; label: string }[] = [
+    { code: 'ja', flag: '🇯🇵', label: '日本語 (Japanese)' },
+    { code: 'fr', flag: '🇫🇷', label: 'Français (French)' },
+    { code: 'en', flag: '🇬🇧', label: 'English' },
+    { code: 'es', flag: '🇪🇸', label: 'Español (Spanish)' },
+    { code: 'it', flag: '🇮🇹', label: 'Italiano (Italian)' },
+    { code: 'pt', flag: '🇧🇷', label: 'Português (Portuguese)' },
   ]
 
   async function onLanguageChange(event: Event) {
@@ -32,8 +32,8 @@
   on:change={onLanguageChange}
   aria-label="Select language"
 >
-  {#each LANGUAGE_OPTIONS as { code, label }}
-    <option value={code}>{label}</option>
+  {#each LANGUAGE_OPTIONS as { code, flag, label }}
+    <option value={code}>{flag} {label}</option>
   {/each}
 </select>
 
