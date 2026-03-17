@@ -8,8 +8,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python: 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
 
-KaiwaCoach is an offline-first language coaching app for Apple Silicon macOS.  
-It supports text and microphone turns, structured correction feedback, and TTS playback, with a clear separation between the UI, model pipeline, and persistent storage.
+KaiwaCoach is an offline-first language coaching app for Apple Silicon macOS.
+It supports text and microphone turns, structured correction feedback, TTS playback, audio regeneration, and a shadowing mode for pronunciation practice. The UI is a Svelte SPA backed by a FastAPI server, with a clear separation between the frontend, API layer, model pipeline, and persistent storage.
 
 ## Demos
 
@@ -32,16 +32,11 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - Runs a local conversational loop with:
     - user text/audio input
     - assistant reply generation
-    - optional correction pipeline:
-        - error detection
-        - corrected sentence
-        - native rewrite
-        - explanation
+    - optional correction pipeline (error detection → corrected sentence → native rewrite → explanation)
     - TTS synthesis of assistant reply
-- Persists conversations and supports:
-    - list, load, resume
-    - delete one conversation
-    - delete all history
+- Persists conversations and supports list, load, resume, and delete
+- Audio regeneration per-turn or per-conversation
+- Shadowing mode: side-by-side listen + record comparison for any assistant turn
 - Enforces JSON schema on LLM role outputs with bounded repair behaviour
 - Applies Japanese TTS normalisation with invariant checks and fallback behaviour
 
@@ -57,8 +52,10 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 
 ### Module boundaries
 
-- [src/kaiwacoach/ui/](src/kaiwacoach/ui/)
-    - Gradio layout and callback wiring
+- [frontend/](frontend/)
+    - Svelte + Vite SPA; communicates with the backend via REST + SSE
+- [src/kaiwacoach/api/](src/kaiwacoach/api/)
+    - FastAPI server, route handlers (conversations, turns, regen, audio), and request schemas
 - [src/kaiwacoach/orchestrator.py](src/kaiwacoach/orchestrator.py)
     - turn lifecycle, sequencing, and timing
 - [src/kaiwacoach/models/](src/kaiwacoach/models/)
@@ -93,8 +90,8 @@ More detailed notes:
 
 ## Tech Stack
 
-- Python 3.11
-- Gradio
+- Python 3.11, FastAPI, Uvicorn
+- Svelte 4, Vite, TypeScript, WaveSurfer.js
 - SQLite
 - Poetry
 - Local ASR/LLM/TTS model wrappers in [src/kaiwacoach/models/](src/kaiwacoach/models/)
@@ -118,12 +115,17 @@ More detailed notes:
 - macOS Apple Silicon
 - Python 3.11
 - Poetry
+- Node.js 18+
 
 ### Install
 
 ```bash
+# Python backend
 poetry install
 poetry run bash scripts/setup_macos.sh
+
+# Frontend
+cd frontend && npm install
 ```
 
 For test execution (installs the `dev` dependency group, including `pytest`):
@@ -134,8 +136,23 @@ poetry install --with dev
 
 ### Run
 
+**Option A — production build** (frontend served by FastAPI):
+
 ```bash
+cd frontend && npm run build   # writes to frontend/dist/
 poetry run python -m kaiwacoach.app
+# Open http://localhost:8000
+```
+
+**Option B — development** (hot-reload frontend, API on a separate port):
+
+```bash
+# Terminal 1
+poetry run python -m kaiwacoach.app
+
+# Terminal 2
+cd frontend && npm run dev
+# Open http://localhost:5173
 ```
 
 ## Configuration
@@ -185,9 +202,19 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 
 ### Conversation persistence
 
-- Refresh and load past conversations from the side panel.
-- Resume prior conversation context in UI.
-- Delete one conversation or all history.
+- Past conversations are listed in the sidebar; click to load and resume.
+- Delete a single conversation or clear all history from the sidebar.
+
+### Audio regeneration
+
+- Click **↺** on any assistant bubble to regenerate its TTS audio.
+- Click **↺ Regen all audio** in the conversation header to regenerate all turns.
+
+### Shadowing mode
+
+- Click **Shadow** on any assistant bubble to open the shadowing panel.
+- Listen to the reference audio on the left, record your attempt on the right.
+- Press **Try Again** to re-record; press **✕** or Esc to close.
 
 ## Testing
 
@@ -290,8 +317,8 @@ Instrumentation lives in:
 
 ## Limitations
 
-- Gradio audio recorder internals expose limited stable theming hooks; some recorder visuals remain framework-controlled.
 - Current scope is local Apple Silicon execution.
+- Browser microphone access requires a secure context (localhost or HTTPS).
 
 ## Roadmap
 
@@ -315,4 +342,4 @@ See [LICENSE](LICENSE).
 
 ## Acknowledgements
 
-KaiwaCoach is built on open-source tooling and local model ecosystems, including Gradio, SQLite, and local model runtimes used by this project.
+KaiwaCoach is built on open-source tooling and local model ecosystems, including FastAPI, Svelte, WaveSurfer.js, SQLite, and local model runtimes.

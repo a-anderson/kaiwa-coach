@@ -9,8 +9,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 poetry install
 poetry install --with dev   # include pytest
 
-# Run the app
+# Run the backend (FastAPI + Uvicorn)
 poetry run python -m kaiwacoach.app
+
+# Run the frontend dev server (Vite, proxies /api → localhost:8000)
+cd frontend && npm install && npm run dev
+
+# Build the frontend for production (output to frontend/dist/, served by FastAPI)
+cd frontend && npm run build
 
 # Run tests
 poetry run pytest -q                  # all tests
@@ -55,7 +61,9 @@ The Python environment is pre-created and owned by the maintainer.
 
 | Module | Responsibility |
 |---|---|
-| `src/kaiwacoach/ui/gradio_app.py` | Gradio layout and callback wiring only — no model logic |
+| `frontend/` | Svelte + Vite SPA — all UI logic; communicates with backend via REST + SSE only |
+| `src/kaiwacoach/api/server.py` | FastAPI app factory, router registration, static file serving, lifespan |
+| `src/kaiwacoach/api/routes/` | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py` |
 | `src/kaiwacoach/orchestrator.py` | Turn lifecycle: sequencing, timing, persistence; steps are pure functions |
 | `src/kaiwacoach/models/protocols.py` | Shared result types (`ASRResult`, `LLMResult`, `TTSResult`) and `@runtime_checkable` protocols (`ASRProtocol`, `LLMProtocol`, `TTSProtocol`) — concrete files import result types from here |
 | `src/kaiwacoach/models/factory.py` | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here |
@@ -138,15 +146,14 @@ When modifying `src/kaiwacoach/storage/schema.sql`, also update:
 
 Prefer nullable columns or columns with defaults for additive changes. The current behaviour on a column-set mismatch is a full local DB reset (acceptable for single-user MVP — note this in any schema PR).
 
-## Gradio / UI
+## Frontend (Svelte / Vite)
 
-- Gradio version is pinned at `6.5.1` — verify constructor args against that version before use.
-- Prefer `container=False` to remove outer component frames instead of CSS-heavy overrides.
-- Keep UI CSS in named module-level constants, not inline strings inside `build_ui()`.
-- Use stable `elem_id` values for CSS targeting and tests.
-- For dynamic UI updates (theme/logo/audio remounts), keep outputs centralised in shared lists to reduce ordering bugs.
-- Theme/logo updates must be deterministic and language-driven; loading a conversation must also sync language-dependent UI state.
-- Fallback behaviour for missing assets must be explicit and tested (e.g. language logo falls back to `ja` logo).
+- The frontend lives in `frontend/` and is a standalone Vite + Svelte 4 SPA.
+- All API calls go through `frontend/src/lib/api/`; components never call `fetch` directly.
+- UI state lives in `frontend/src/lib/stores/`; keep store updates co-located with the API call that triggers them.
+- Language themes are CSS custom properties on `:root[data-language="<code>"]` in `frontend/src/styles/themes.css`.
+- For development, run the Vite dev server (`npm run dev` in `frontend/`) alongside the FastAPI backend — Vite proxies `/api` to `localhost:8000`.
+- For production, `npm run build` writes to `frontend/dist/`, which FastAPI serves as static files.
 
 ## Testing
 
@@ -156,7 +163,7 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Every LLM role and repair prompt path must have schema tests.
 - Storage changes require round-trip tests covering DB and audio blobs.
 - End-to-end smoke tests are required for single text turn and single audio turn paths.
-- For UI callback changes: read the existing tests first — they encode required Gradio output ordering. Add targeted tests for callback output shape/order. Expect both manual UI validation and test updates to be required when touching `gradio_app.py`.
+- For frontend changes that affect user-visible flow (language switching, audio submit, history load, delete, shadowing), mention manual verification steps explicitly.
 - For startup/config wiring changes: add tests in `tests/test_app_startup.py`.
 - If a change affects user-visible flow (language switching, audio submit, history load, delete), mention manual verification steps explicitly.
 

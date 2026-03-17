@@ -27,7 +27,8 @@
   <main class="main-panel">
     {#if $sessionStore.conversationId === null}
       <div class="no-conversation">
-        <p>Select or create a conversation to begin.</p>
+        <p class="empty-title">No conversation selected</p>
+        <p class="empty-hint">Choose one from the sidebar, or click <strong>+ New</strong> to start.</p>
       </div>
     {:else}
       <ConversationHeader />
@@ -58,9 +59,22 @@
   .no-conversation {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #aaa;
-    font-size: 0.9rem;
+    gap: 8px;
+  }
+
+  .empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #888;
+    margin: 0;
+  }
+
+  .empty-hint {
+    font-size: 0.85rem;
+    color: #bbb;
+    margin: 0;
   }
 </style>
