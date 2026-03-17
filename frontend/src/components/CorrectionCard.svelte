@@ -101,7 +101,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    border-top: 1px solid #f0e0e0;
+    border-top: 1px solid color-mix(in srgb, var(--kc-correction-border, #e0a0a0) 30%, transparent);
   }
 
   .section h4 {

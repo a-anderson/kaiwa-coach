@@ -1,7 +1,6 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
   import { createConversation, getConversation, deleteAllConversations, setSessionLanguage } from '../lib/api/conversations'
-  import LanguageSelector from './LanguageSelector.svelte'
   import ConversationList from './ConversationList.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
 
@@ -54,11 +53,6 @@
 </script>
 
 <aside class="sidebar">
-  <header class="sidebar-header">
-    <span class="logo">KaiwaCoach</span>
-    <LanguageSelector />
-  </header>
-
   <div class="list-container">
     <div class="new-btn-row">
       <button class="new-btn" on:click={handleNew} disabled={creating}>
@@ -95,23 +89,6 @@
     border-right: 1px solid #e0e0e0;
     background: #fafafa;
     overflow: hidden;
-  }
-
-  .sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid #e0e0e0;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .logo {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--kc-primary, #333);
-    white-space: nowrap;
   }
 
   .list-container {

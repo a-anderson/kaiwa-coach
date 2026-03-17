@@ -8,6 +8,7 @@
   import ChatThread from './components/ChatThread.svelte'
   import ShadowingPanel from './components/ShadowingPanel.svelte'
   import InputArea from './components/InputArea.svelte'
+  import LanguageSelector from './components/LanguageSelector.svelte'
 
   // Consume the store so the import is not tree-shaken.
   $: _theme = $themeStore
@@ -22,30 +23,63 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <div class="app">
-  <Sidebar />
+  <header class="top-bar">
+    <span class="logo">KaiwaCoach</span>
+    <LanguageSelector />
+  </header>
 
-  <main class="main-panel">
-    {#if $sessionStore.conversationId === null}
-      <div class="no-conversation">
-        <p class="empty-title">No conversation selected</p>
-        <p class="empty-hint">Choose one from the sidebar, or click <strong>+ New</strong> to start.</p>
-      </div>
-    {:else}
-      <ConversationHeader />
-      <ChatThread />
-      {#if $uiStore.shadowingTurnId}
-        <ShadowingPanel />
+  <div class="content">
+    <Sidebar />
+
+    <main class="main-panel">
+      {#if $sessionStore.conversationId === null}
+        <div class="no-conversation">
+          <p class="empty-title">No conversation selected</p>
+          <p class="empty-hint">Choose one from the sidebar, or click <strong>+ New</strong> to start.</p>
+        </div>
+      {:else}
+        <ConversationHeader />
+        <ChatThread />
+        {#if $uiStore.shadowingTurnId}
+          <ShadowingPanel />
+        {/if}
+        <InputArea />
       {/if}
-      <InputArea />
-    {/if}
-  </main>
+    </main>
+  </div>
 </div>
 
 <style>
   .app {
     display: flex;
+    flex-direction: column;
     height: 100vh;
     overflow: hidden;
+  }
+
+  .top-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 49px;
+    border-bottom: 1px solid color-mix(in srgb, var(--kc-primary, #ccc) 20%, transparent);
+    background: var(--kc-user-bubble, #f5f5f5);
+  }
+
+  .logo {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--kc-primary, #333);
+    white-space: nowrap;
+  }
+
+  .content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
   }
 
   .main-panel {
