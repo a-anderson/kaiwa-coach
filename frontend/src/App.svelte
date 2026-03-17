@@ -4,6 +4,8 @@
   import { sessionStore } from './lib/stores/session'
   import { uiStore } from './lib/stores/ui'
   import Sidebar from './components/Sidebar.svelte'
+
+  let sidebarRef: Sidebar
   import ConversationHeader from './components/ConversationHeader.svelte'
   import ChatThread from './components/ChatThread.svelte'
   import ShadowingPanel from './components/ShadowingPanel.svelte'
@@ -25,11 +27,11 @@
 <div class="app">
   <header class="top-bar">
     <span class="logo">KaiwaCoach</span>
-    <LanguageSelector />
+    <LanguageSelector on:newconversation={() => sidebarRef.refresh()} />
   </header>
 
   <div class="content">
-    <Sidebar />
+    <Sidebar bind:this={sidebarRef} />
 
     <main class="main-panel">
       {#if $sessionStore.conversationId === null}

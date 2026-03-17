@@ -5,6 +5,10 @@
   import ConfirmDialog from './ConfirmDialog.svelte'
 
   let listRef: ConversationList
+
+  export async function refresh(): Promise<void> {
+    await listRef.refresh()
+  }
   let creating = false
   let loadError: string | null = null
   let confirmDeleteAll = false

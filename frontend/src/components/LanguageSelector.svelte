@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { createEventDispatcher } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
-  import { setSessionLanguage } from '../lib/api/conversations'
+  import { setSessionLanguage, createConversation, getConversation } from '../lib/api/conversations'
+
+  const dispatch = createEventDispatcher<{ newconversation: void }>()
 
   // Mirrors SUPPORTED_LANGUAGES in src/kaiwacoach/constants.py
   const LANGUAGE_OPTIONS: { code: string; flag: string; label: string }[] = [
@@ -14,11 +17,30 @@
 
   async function onLanguageChange(event: Event) {
     const lang = (event.target as HTMLSelectElement).value
+    const hadConversation = $sessionStore.conversationId !== null
+
     sessionStore.update((s) => ({ ...s, language: lang }))
     try {
       await setSessionLanguage(lang)
     } catch {
       // Local app — network errors are unexpected; silently ignore for now.
+    }
+
+    if (hadConversation) {
+      try {
+        const summary = await createConversation(lang)
+        const convo = await getConversation(summary.id)
+        sessionStore.update((s) => ({
+          ...s,
+          conversationId: convo.id,
+          language: convo.language,
+          turns: convo.turns,
+        }))
+        dispatch('newconversation')
+      } catch {
+        // If creation fails, just clear the active conversation.
+        sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
+      }
     }
   }
 </script>
