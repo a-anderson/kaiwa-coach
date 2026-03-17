@@ -84,7 +84,7 @@
   .actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin-top: 4px;
   }
 
@@ -95,6 +95,7 @@
 
   .download-btn {
     text-decoration: none;
+    margin-right: auto;
   }
 
   .action-btn {
