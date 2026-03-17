@@ -22,24 +22,37 @@
 
   <div class="actions">
     {#if audioUrl}
+      <a
+        class="action-btn download-btn"
+        href={audioUrl}
+        download
+        title="Download audio"
+        aria-label="Download audio"
+      >
+        ↓
+      </a>
+    {/if}
+    <span class="actions-right">
+      {#if audioUrl}
+        <button
+          class="action-btn"
+          on:click={() => dispatch('shadow')}
+          title="Shadow this turn"
+          aria-label="Shadow this turn"
+        >
+          Shadow
+        </button>
+      {/if}
       <button
         class="action-btn"
-        on:click={() => dispatch('shadow')}
-        title="Shadow this turn"
-        aria-label="Shadow this turn"
+        on:click={() => dispatch('regen')}
+        disabled={regenPending}
+        title="Regenerate audio"
+        aria-label="Regenerate audio"
       >
-        Shadow
+        {regenPending ? '…' : '↺'}
       </button>
-    {/if}
-    <button
-      class="action-btn"
-      on:click={() => dispatch('regen')}
-      disabled={regenPending}
-      title="Regenerate audio"
-      aria-label="Regenerate audio"
-    >
-      {regenPending ? '…' : '↺'}
-    </button>
+    </span>
   </div>
 </div>
 
@@ -70,8 +83,18 @@
 
   .actions {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
     margin-top: 4px;
+  }
+
+  .actions-right {
+    display: flex;
+    align-items: center;
+  }
+
+  .download-btn {
+    text-decoration: none;
   }
 
   .action-btn {
