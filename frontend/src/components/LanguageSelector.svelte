@@ -8,7 +8,7 @@
     { code: 'en', flag: '🇬🇧', label: 'English' },
     { code: 'es', flag: '🇪🇸', label: 'Español (Spanish)' },
     { code: 'it', flag: '🇮🇹', label: 'Italiano (Italian)' },
-    { code: 'pt', flag: '🇧🇷', label: 'Português (Portuguese)' },
+    { code: 'pt', flag: '🇧🇷', label: 'Português (Brazilian Portuguese)' },
   ]
 
   async function onLanguageChange(event: Event) {
