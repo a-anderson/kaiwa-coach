@@ -6,6 +6,7 @@
   export let audioUrl: string | null = null
   export let hasAudio: boolean = false
   export let regenPending: boolean = false
+  export let autoplay: boolean = false
 
   const dispatch = createEventDispatcher<{ regen: void; shadow: void }>()
 </script>
@@ -14,7 +15,7 @@
   <p class="text">{text}</p>
 
   {#if audioUrl}
-    <AudioPlayer src={audioUrl} variant="assistant" />
+    <AudioPlayer src={audioUrl} variant="assistant" {autoplay} />
   {:else if hasAudio}
     <p class="audio-unavailable">Audio not available.</p>
   {/if}

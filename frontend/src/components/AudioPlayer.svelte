@@ -4,6 +4,7 @@
 
   export let src: string
   export let variant: 'user' | 'assistant' = 'user'
+  export let autoplay: boolean = false
 
   let container: HTMLElement
   let ws: WaveSurfer | null = null
@@ -29,7 +30,7 @@
       url: src,
     })
 
-    ws.on('ready', () => { ready = true })
+    ws.on('ready', () => { ready = true; if (autoplay) ws.play() })
     ws.on('play', () => { playing = true })
     ws.on('pause', () => { playing = false })
     ws.on('finish', () => { playing = false })

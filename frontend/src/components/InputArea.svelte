@@ -71,6 +71,7 @@
             assistant_audio_url: result.audio_url,
           }
           sessionStore.update((s) => ({ ...s, turns: [...s.turns, newTurn] }))
+          uiStore.update((s) => ({ ...s, autoplayTurnId: result.assistant_turn_id }))
         } else if (frame.event === 'error') {
           submitError = (frame.data as SSEErrorEvent).message ?? 'Turn failed'
         }

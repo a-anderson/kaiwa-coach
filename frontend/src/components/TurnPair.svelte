@@ -50,6 +50,7 @@
       text={turn.reply_text}
       audioUrl={turn.assistant_audio_url}
       hasAudio={turn.has_assistant_audio}
+      autoplay={$uiStore.autoplayTurnId === turn.assistant_turn_id}
       {regenPending}
       on:regen={handleRegen}
       on:shadow={() => uiStore.update((s) => ({ ...s, shadowingTurnId: turn.assistant_turn_id }))}
