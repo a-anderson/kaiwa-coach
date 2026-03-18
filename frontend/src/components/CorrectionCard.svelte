@@ -6,7 +6,6 @@
   let open = false
 
   $: hasContent =
-    correction.errors.length > 0 ||
     correction.corrected ||
     correction.native ||
     correction.explanation
@@ -20,26 +19,11 @@
       aria-expanded={open}
     >
       <span class="icon">{open ? '▾' : '▸'}</span>
-      <span class="label">
-        {correction.errors.length > 0
-          ? `${correction.errors.length} correction${correction.errors.length === 1 ? '' : 's'}`
-          : 'Corrections'}
-      </span>
+      <span class="label">Corrections</span>
     </button>
 
     {#if open}
       <div class="body">
-        {#if correction.errors.length > 0}
-          <section class="section">
-            <h4>Errors</h4>
-            <ul>
-              {#each correction.errors as error}
-                <li>{error}</li>
-              {/each}
-            </ul>
-          </section>
-        {/if}
-
         {#if correction.corrected}
           <section class="section">
             <h4>Corrected</h4>
@@ -113,17 +97,8 @@
     margin-bottom: 3px;
   }
 
-  .section p,
-  .section li {
+  .section p {
     color: #333;
     line-height: 1.5;
-  }
-
-  .section ul {
-    padding-left: 16px;
-  }
-
-  .section li {
-    margin-bottom: 2px;
   }
 </style>
