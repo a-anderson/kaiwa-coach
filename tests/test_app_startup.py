@@ -76,9 +76,8 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setattr(app_module, "SQLiteWriter", _DB)
     monkeypatch.setattr(app_module, "PromptLoader", _PromptLoader)
     monkeypatch.setattr(app_module, "ConversationOrchestrator", _Orchestrator)
-    monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
 
-    app_module.main(launch_ui=False)
+    app_module.main(launch=False)
 
     assert calls.asr.models.asr_id == "asr"
     assert calls.asr.session.language == "ja"
@@ -90,74 +89,6 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert calls.orchestrator["tts_voice"] == "default"
     assert calls.orchestrator["tts_speed"] == 1.0
     assert calls.orchestrator["timing_logs_enabled"] is True
-
-
-def test_app_main_passes_logo_dir_to_build_ui(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """main should pass config.ui.logo_dir through to build_ui."""
-    calls = SimpleNamespace(build_ui_logo_dir=None, launched=False)
-
-    def _load_config():
-        return SimpleNamespace(
-            models=SimpleNamespace(asr_id="asr", llm_id="llm", tts_id="tts"),
-            session=SimpleNamespace(language="ja"),
-            llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
-            storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
-            tts=SimpleNamespace(voice="default", speed=1.0),
-            logging=SimpleNamespace(timing_logs=True),
-            ui=SimpleNamespace(logo_dir=str(tmp_path / "assets" / "logo")),
-        )
-
-    class _FakeModel:
-        pass
-
-    class _DB:
-        def __init__(self, db_path: str | Path, schema_path: str | Path) -> None:
-            return None
-
-        def start(self) -> None:
-            return None
-
-        def close(self) -> None:
-            return None
-
-    class _PromptLoader:
-        def __init__(self, root_dir: str | Path) -> None:
-            return None
-
-    class _Orchestrator:
-        def __init__(self, **kwargs) -> None:
-            return None
-
-    class _Cache:
-        def __init__(self, **_kwargs) -> None:
-            self.cleaned = False
-
-        def cleanup(self) -> None:
-            self.cleaned = True
-
-    class _Demo:
-        def launch(self) -> None:
-            calls.launched = True
-
-    def _build_ui(_orchestrator, logo_dir: Path):
-        calls.build_ui_logo_dir = logo_dir
-        return _Demo()
-
-    monkeypatch.setattr(app_module, "load_config", _load_config)
-    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _FakeModel())
-    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _FakeModel())
-    monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _FakeModel())
-    monkeypatch.setattr(app_module, "SessionAudioCache", _Cache)
-    monkeypatch.setattr(app_module, "SQLiteWriter", _DB)
-    monkeypatch.setattr(app_module, "PromptLoader", _PromptLoader)
-    monkeypatch.setattr(app_module, "ConversationOrchestrator", _Orchestrator)
-    monkeypatch.setattr(app_module, "build_ui", _build_ui)
-    monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
-
-    app_module.main(launch_ui=True)
-
-    assert calls.build_ui_logo_dir == Path(tmp_path / "assets" / "logo")
-    assert calls.launched is True
 
 
 # --- startup model logging ---
@@ -193,10 +124,9 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.setattr(app_module, "SQLiteWriter", _Noop)
     monkeypatch.setattr(app_module, "PromptLoader", _Noop)
     monkeypatch.setattr(app_module, "ConversationOrchestrator", _Noop)
-    monkeypatch.setattr(app_module.atexit, "register", lambda *_args, **_kwargs: None)
 
     with caplog.at_level(logging.INFO, logger="kaiwacoach.app"):
-        app_module.main(launch_ui=False, configure_logging=False)
+        app_module.main(launch=False, configure_logging=False)
 
     assert "mlx-community/whisper-large-v3-mlx" in caplog.text
     assert "mlx-community/Qwen3-14B-bf16" in caplog.text

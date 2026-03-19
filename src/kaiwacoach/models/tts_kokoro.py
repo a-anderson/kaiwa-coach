@@ -225,7 +225,7 @@ def _language_to_lang_code(language: str | None) -> str:
         return "i"
     if language in {"es", "spanish"}:
         return "e"
-    if language in {"pt-br", "portuguese", "portuguese-br", "brazilian portuguese"}:
+    if language in {"pt", "pt-br", "portuguese", "portuguese-br", "brazilian portuguese"}:
         return "p"
     if language in {"en", "english"}:
         return "b"

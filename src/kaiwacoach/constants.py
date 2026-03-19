@@ -9,5 +9,6 @@ DEFAULT_VOICES = {
     "ja": "jf_alpha",
     "es": "ef_dora",
     "it": "if_sara",
+    "pt": "pf_dora",
     "pt-br": "pf_dora",
 }
