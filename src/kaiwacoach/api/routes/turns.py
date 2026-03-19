@@ -18,6 +18,7 @@ from sse_starlette.sse import EventSourceResponse
 from kaiwacoach.api.audio_conversion import webm_to_pcm
 from kaiwacoach.api.deps import get_orchestrator
 from kaiwacoach.api.schemas.turn import TurnTextRequest
+from kaiwacoach.api.utils import audio_path_to_url
 from kaiwacoach.orchestrator import AudioTurnResult, ConversationOrchestrator, TextTurnResult
 
 _logger = logging.getLogger(__name__)
@@ -29,20 +30,6 @@ router = APIRouter()
 _executor = ThreadPoolExecutor(max_workers=1)
 
 
-def _audio_path_to_url(audio_path: str | None, cache_root: Path) -> str | None:
-    """Return a serveable /api/audio URL for *audio_path*, or None if missing."""
-    if not audio_path:
-        return None
-    p = Path(audio_path)
-    if not p.exists():
-        return None
-    try:
-        rel = p.relative_to(cache_root)
-        return f"/api/audio/{rel}"
-    except ValueError:
-        return None
-
-
 def _build_sse_generator(
     orc: ConversationOrchestrator,
     cache_root: Path,
@@ -52,14 +39,25 @@ def _build_sse_generator(
 
     *run_fn* must accept a single ``on_stage`` callback and return a
     ``TextTurnResult`` or ``AudioTurnResult``.
+
+    A ``request_id`` is generated per call and included in error log messages
+    and the SSE error event payload so failures can be correlated across server
+    logs and client-side error reports.
+
+    Note: if the client disconnects mid-stream the background thread continues
+    until the orchestrator completes. This is acceptable for a single-user local
+    deployment; for a multi-user server, add a cancellation mechanism.
     """
+    import uuid as _uuid
+    request_id = _uuid.uuid4().hex
+
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def on_stage(stage: str, status: str, data: dict) -> None:
         # Called from background thread — bridge to the async event loop.
         if stage == "tts" and status == "complete":
-            audio_url = _audio_path_to_url(data.get("audio_path"), cache_root)
+            audio_url = audio_path_to_url(data.get("audio_path"), cache_root)
             payload = {"stage": stage, "status": status, "audio_url": audio_url}
         else:
             payload = {"stage": stage, "status": status, **data}
@@ -70,8 +68,11 @@ def _build_sse_generator(
             result = run_fn(on_stage)
             loop.call_soon_threadsafe(queue.put_nowait, {"_done": True, "result": result})
         except Exception as exc:  # noqa: BLE001
-            _logger.exception("Turn processing failed")
-            loop.call_soon_threadsafe(queue.put_nowait, {"_done": True, "error": str(exc)})
+            _logger.exception("Turn processing failed request_id=%s", request_id)
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"_done": True, "error": str(exc), "request_id": request_id},
+            )
 
     loop.run_in_executor(_executor, run_sync)
 
@@ -80,10 +81,16 @@ def _build_sse_generator(
             msg = await queue.get()
             if msg.get("_done"):
                 if "error" in msg:
-                    yield {"event": "error", "data": json.dumps({"message": msg["error"]})}
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "message": msg["error"],
+                            "request_id": msg["request_id"],
+                        }),
+                    }
                 else:
                     result = msg["result"]
-                    tts_url = _audio_path_to_url(result.tts_audio_path, cache_root)
+                    tts_url = audio_path_to_url(result.tts_audio_path, cache_root)
                     complete_data: dict = {
                         "conversation_id": result.conversation_id,
                         "user_turn_id": result.user_turn_id,

@@ -6,7 +6,8 @@
   import PipelineProgress from './PipelineProgress.svelte'
   import AudioRecorder from './AudioRecorder.svelte'
   import type { TurnRecord, CorrectionData, SSEStageEvent, SSECompleteEvent, SSEErrorEvent } from '../lib/types/api'
-  import { createEventDispatcher } from 'svelte'
+  import { createEventDispatcher, onDestroy } from 'svelte'
+  import { isSupportedLanguage } from '../lib/constants'
 
   const dispatch = createEventDispatcher<{ turncomplete: void }>()
 
@@ -14,6 +15,7 @@
   let correctionsEnabled = true
   let submitError: string | null = null
   let showRecorder = false
+  let lastBlobUrl: string | null = null
 
   /** Build the conversation_history string from loaded turns (see Appendix A.9). */
   function buildHistory(turns: TurnRecord[]): string {
@@ -111,6 +113,11 @@
     const trimmed = text.trim()
     if (!trimmed || $uiStore.isSubmitting) return
 
+    if (!isSupportedLanguage($sessionStore.language)) {
+      submitError = `Unsupported language: "${$sessionStore.language}". Please select a language from the menu.`
+      return
+    }
+
     submitError = null
     text = ''
 
@@ -122,7 +129,7 @@
     sessionStore.update((s) => ({
       ...s,
       pendingTurn: {
-        user_turn_id: 'pending',
+        user_turn_id: '',
         assistant_turn_id: null,
         user_text: trimmed,
         asr_text: null,
@@ -132,6 +139,7 @@
         has_assistant_audio: false,
         user_audio_url: null,
         assistant_audio_url: null,
+        status: 'pending',
       },
     }))
     uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
@@ -150,17 +158,28 @@
     showRecorder = false
     if ($uiStore.isSubmitting) return
 
+    if (!isSupportedLanguage($sessionStore.language)) {
+      submitError = `Unsupported language: "${$sessionStore.language}". Please select a language from the menu.`
+      return
+    }
+
     submitError = null
     const convId = await ensureConversation()
     if (!convId) return
 
     const history = buildHistory($sessionStore.turns)
+    // Revoke any previous blob URL before creating a new one.
+    if (lastBlobUrl) {
+      URL.revokeObjectURL(lastBlobUrl)
+      lastBlobUrl = null
+    }
     const localUrl = URL.createObjectURL(e.detail.blob)
+    lastBlobUrl = localUrl
 
     sessionStore.update((s) => ({
       ...s,
       pendingTurn: {
-        user_turn_id: 'pending',
+        user_turn_id: '',
         assistant_turn_id: null,
         user_text: null,
         asr_text: null,
@@ -170,6 +189,7 @@
         has_assistant_audio: false,
         user_audio_url: localUrl,
         assistant_audio_url: null,
+        status: 'pending',
       },
     }))
     uiStore.update((s) => ({ ...s, isSubmitting: true, stageStatuses: {} }))
@@ -183,6 +203,10 @@
       uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
   }
+
+  onDestroy(() => {
+    if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl)
+  })
 
   function handleKeydown(e: KeyboardEvent): void {
     // Enter submits; Shift+Enter inserts newline.

@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
 from kaiwacoach.api.deps import get_orchestrator
+from kaiwacoach.api.utils import audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 _logger = logging.getLogger(__name__)
@@ -24,19 +25,6 @@ router = APIRouter()
 
 # Shared with turns router — serialises all ML work through one thread.
 _executor = ThreadPoolExecutor(max_workers=1)
-
-
-def _audio_path_to_url(audio_path: str | None, cache_root: Path) -> str | None:
-    if not audio_path:
-        return None
-    p = Path(audio_path)
-    if not p.exists():
-        return None
-    try:
-        rel = p.relative_to(cache_root)
-        return f"/api/audio/{rel}"
-    except ValueError:
-        return None
 
 
 @router.post("/turns/{assistant_turn_id}/regen-audio")
@@ -62,7 +50,7 @@ async def regen_turn_audio(assistant_turn_id: str, request: Request) -> dict:
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return {"audio_url": _audio_path_to_url(result.audio_path, cache_root)}
+    return {"audio_url": audio_path_to_url(result.audio_path, cache_root)}
 
 
 @router.post("/conversations/{conversation_id}/regen-audio")
@@ -88,7 +76,7 @@ async def regen_conversation_audio(conversation_id: str, request: Request) -> Ev
     def on_turn(turn_id: str, audio_path: str | None) -> None:
         payload = {
             "assistant_turn_id": turn_id,
-            "audio_url": _audio_path_to_url(audio_path, cache_root),
+            "audio_url": audio_path_to_url(audio_path, cache_root),
         }
         loop.call_soon_threadsafe(queue.put_nowait, {"_turn": payload})
 

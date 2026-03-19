@@ -260,6 +260,7 @@ def test_text_turn_orchestrator_exception_emits_error_event(client, mock_orchest
     error_events = [e for e in events if e.get("event") == "error"]
     assert len(error_events) == 1
     assert "model exploded" in error_events[0]["data"]["message"]
+    assert "request_id" in error_events[0]["data"]
 
 
 # ── Audio turn tests ──────────────────────────────────────────────────────────
@@ -345,3 +346,121 @@ def test_audio_turn_bad_audio_returns_422(client, mock_orchestrator, monkeypatch
         files={"audio": ("rec.webm", b"garbage", "audio/webm")},
     )
     assert resp.status_code == 422
+
+
+def test_audio_turn_orchestrator_exception_emits_error_event(client, mock_orchestrator, monkeypatch):
+    """If process_audio_turn raises (e.g. ASR failure), the SSE stream must emit an error event."""
+    from kaiwacoach.storage.blobs import AudioMeta
+
+    fake_pcm = b"\x00" * 320
+    fake_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2, num_frames=160)
+
+    import kaiwacoach.api.routes.turns as turns_module
+
+    monkeypatch.setattr(turns_module, "webm_to_pcm", lambda *_a, **_kw: (fake_pcm, fake_meta))
+    mock_orchestrator.process_audio_turn.side_effect = RuntimeError("ASR model crashed")
+
+    resp = client.post(
+        "/api/turns/audio",
+        files={"audio": ("rec.webm", b"fake-webm", "audio/webm")},
+        data={"language": "ja"},
+    )
+    assert resp.status_code == 200
+    events = parse_sse(resp.text)
+    error_events = [e for e in events if e.get("event") == "error"]
+    assert len(error_events) == 1
+    assert "ASR model crashed" in error_events[0]["data"]["message"]
+    assert "request_id" in error_events[0]["data"]
+
+
+# ── Mid-stream failure tests ───────────────────────────────────────────────────
+
+
+def _configure_text_turn_fails_after_llm(mock_orchestrator, reply_text: str) -> None:
+    """Emit LLM stage events then raise during TTS — simulates a mid-stream failure."""
+
+    def fake_process_text_turn(
+        conversation_id, user_text, conversation_history="", corrections_enabled=True, on_stage=None
+    ):
+        if on_stage:
+            on_stage("llm", "running", {})
+            on_stage("llm", "complete", {"reply": reply_text})
+        raise RuntimeError("TTS model crashed")
+
+    mock_orchestrator.process_text_turn.side_effect = fake_process_text_turn
+
+
+def _configure_audio_turn_fails_after_asr(mock_orchestrator, asr_text: str) -> None:
+    """Emit ASR stage events then raise during LLM — simulates a mid-stream failure."""
+
+    def fake_process_audio_turn(
+        conversation_id, pcm_bytes, audio_meta,
+        conversation_history="", corrections_enabled=True, on_stage=None,
+    ):
+        if on_stage:
+            on_stage("asr", "running", {})
+            on_stage("asr", "complete", {"transcript": asr_text})
+            on_stage("llm", "running", {})
+        raise RuntimeError("LLM crashed after ASR")
+
+    mock_orchestrator.process_audio_turn.side_effect = fake_process_audio_turn
+
+
+def test_text_turn_mid_stream_failure_emits_stage_events_then_error(client, mock_orchestrator):
+    """Stage events emitted before the failure must appear before the error event."""
+    _configure_text_turn_fails_after_llm(mock_orchestrator, reply_text="partial reply")
+    resp = client.post("/api/turns/text", json={"text": "test"})
+    events = parse_sse(resp.text)
+
+    stage_events = [e for e in events if e.get("event") == "stage"]
+    error_events = [e for e in events if e.get("event") == "error"]
+
+    # LLM stages were emitted before the failure.
+    stage_names = [(e["data"]["stage"], e["data"]["status"]) for e in stage_events]
+    assert ("llm", "running") in stage_names
+    assert ("llm", "complete") in stage_names
+
+    # Exactly one error event, after all stage events.
+    assert len(error_events) == 1
+    assert "TTS model crashed" in error_events[0]["data"]["message"]
+    assert events.index(error_events[0]) > events.index(stage_events[-1])
+
+
+def test_text_turn_mid_stream_failure_no_events_after_error(client, mock_orchestrator):
+    """No events must appear after the error event."""
+    _configure_text_turn_fails_after_llm(mock_orchestrator, reply_text="partial")
+    resp = client.post("/api/turns/text", json={"text": "test"})
+    events = parse_sse(resp.text)
+    assert events[-1]["event"] == "error"
+
+
+def test_audio_turn_mid_stream_failure_emits_asr_stages_then_error(
+    client, mock_orchestrator, monkeypatch
+):
+    """ASR stage events emitted before an LLM crash must appear before the error event."""
+    from kaiwacoach.storage.blobs import AudioMeta
+    import kaiwacoach.api.routes.turns as turns_module
+
+    fake_pcm = b"\x00" * 320
+    fake_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2, num_frames=160)
+    monkeypatch.setattr(turns_module, "webm_to_pcm", lambda *_a, **_kw: (fake_pcm, fake_meta))
+
+    _configure_audio_turn_fails_after_asr(mock_orchestrator, asr_text="こんにちは")
+
+    resp = client.post(
+        "/api/turns/audio",
+        files={"audio": ("rec.webm", b"fake-webm", "audio/webm")},
+        data={"language": "ja"},
+    )
+    events = parse_sse(resp.text)
+
+    stage_events = [e for e in events if e.get("event") == "stage"]
+    error_events = [e for e in events if e.get("event") == "error"]
+
+    stage_names = [(e["data"]["stage"], e["data"]["status"]) for e in stage_events]
+    assert ("asr", "running") in stage_names
+    assert ("asr", "complete") in stage_names
+
+    assert len(error_events) == 1
+    assert "LLM crashed after ASR" in error_events[0]["data"]["message"]
+    assert events.index(error_events[0]) > events.index(stage_events[-1])

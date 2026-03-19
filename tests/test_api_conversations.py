@@ -99,7 +99,7 @@ def test_get_conversation_returns_200(client, mock_orchestrator):
 
 
 def test_get_conversation_includes_corrections(client, mock_orchestrator):
-    """Corrections must be fetched and embedded per turn."""
+    """All four correction fields must be fetched and embedded per turn."""
     mock_orchestrator.get_conversation.return_value = {
         "id": "conv1",
         "title": "Test",
@@ -119,16 +119,19 @@ def test_get_conversation_includes_corrections(client, mock_orchestrator):
     mock_orchestrator.get_latest_corrections.return_value = {
         "errors": ["Missing particle"],
         "corrected": "ありがとうございます",
-        "native": "ありがとうございます",
-        "explanation": "More polite form",
+        "native": "どうもありがとうございます",
+        "explanation": "More polite form used by native speakers",
     }
 
     response = client.get("/api/conversations/conv1")
     assert response.status_code == 200
     turn = response.json()["turns"][0]
     assert turn["user_text"] == "ありがとう"
-    assert turn["correction"]["corrected"] == "ありがとうございます"
-    assert turn["correction"]["errors"] == ["Missing particle"]
+    correction = turn["correction"]
+    assert correction["errors"] == ["Missing particle"]
+    assert correction["corrected"] == "ありがとうございます"
+    assert correction["native"] == "どうもありがとうございます"
+    assert correction["explanation"] == "More polite form used by native speakers"
 
 
 def test_get_conversation_no_corrections_when_empty(client, mock_orchestrator):
@@ -159,6 +162,66 @@ def test_get_conversation_no_corrections_when_empty(client, mock_orchestrator):
     response = client.get("/api/conversations/conv1")
     turn = response.json()["turns"][0]
     assert turn["correction"] is None
+
+
+def test_get_conversation_turn_audio_url_resolved_from_path(
+    client, mock_orchestrator, mock_audio_cache, tmp_path
+):
+    """assistant_audio_url must be resolved to an /api/audio/ URL when the file exists."""
+    audio_file = mock_audio_cache.root_dir / "conv1" / "at1" / "tts.wav"
+    audio_file.parent.mkdir(parents=True)
+    audio_file.write_bytes(b"RIFF" + b"\x00" * 40)
+
+    mock_orchestrator.get_conversation.return_value = {
+        "id": "conv1",
+        "title": "Test",
+        "language": "ja",
+        "created_at": "2026-03-17T10:00:00",
+        "updated_at": "2026-03-17T10:05:00",
+        "turns": [
+            {
+                "user_turn_id": "ut1",
+                "assistant_turn_id": "at1",
+                "input_text": "hello",
+                "asr_text": None,
+                "reply_text": "hi",
+                "assistant_audio_path": str(audio_file),
+            }
+        ],
+    }
+
+    response = client.get("/api/conversations/conv1")
+    assert response.status_code == 200
+    turn = response.json()["turns"][0]
+    assert turn["has_assistant_audio"] is True
+    assert turn["assistant_audio_url"] is not None
+    assert turn["assistant_audio_url"].startswith("/api/audio/")
+
+
+def test_get_conversation_turn_audio_url_none_when_file_missing(client, mock_orchestrator):
+    """assistant_audio_url must be None when the audio file does not exist on disk."""
+    mock_orchestrator.get_conversation.return_value = {
+        "id": "conv1",
+        "title": "Test",
+        "language": "ja",
+        "created_at": "2026-03-17T10:00:00",
+        "updated_at": "2026-03-17T10:05:00",
+        "turns": [
+            {
+                "user_turn_id": "ut1",
+                "assistant_turn_id": "at1",
+                "input_text": "hello",
+                "asr_text": None,
+                "reply_text": "hi",
+                "assistant_audio_path": "/nonexistent/path/tts.wav",
+            }
+        ],
+    }
+
+    response = client.get("/api/conversations/conv1")
+    turn = response.json()["turns"][0]
+    assert turn["assistant_audio_url"] is None
+    assert turn["has_assistant_audio"] is False
 
 
 def test_get_conversation_not_found(client, mock_orchestrator):

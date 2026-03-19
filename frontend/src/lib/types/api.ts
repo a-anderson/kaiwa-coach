@@ -28,6 +28,8 @@ export interface TurnRecord {
   has_assistant_audio: boolean
   user_audio_url: string | null
   assistant_audio_url: string | null
+  /** Set to 'pending' for in-flight turns only; absent on committed turns. */
+  status?: 'pending'
 }
 
 export interface ConversationDetail {
@@ -72,6 +74,7 @@ export interface SSECompleteEvent {
 
 export interface SSEErrorEvent {
   message: string
+  request_id?: string
 }
 
 export type SSEEvent =

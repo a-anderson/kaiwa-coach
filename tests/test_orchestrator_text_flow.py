@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from kaiwacoach.models.asr_whisper import ASRResult, WhisperASR
 from kaiwacoach.models.llm_qwen import LLMResult, QwenLLM
 from kaiwacoach.models.tts_kokoro import TTSResult
@@ -892,7 +894,8 @@ def test_audio_turn_requires_asr_and_cache(tmp_path: Path) -> None:
         db.close()
 
 
-def test_audio_turn_fallback_persists_failure(tmp_path: Path) -> None:
+def test_audio_turn_asr_failure_raises_and_persists_record(tmp_path: Path) -> None:
+    """ASR failure re-raises the exception and persists the failed user turn."""
     db = _setup_db(tmp_path)
     cache = SessionAudioCache(root_dir=tmp_path / "audio")
     try:
@@ -916,21 +919,16 @@ def test_audio_turn_fallback_persists_failure(tmp_path: Path) -> None:
         audio_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2)
         pcm_bytes = b"\x00\x00" * 50
         conversation_id = orch.create_conversation("Test")
-        result = orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
 
-        assert result.asr_text == ""
-        assert result.reply_text == ""
-        assert result.assistant_turn_id == ""
-        assert "error" in result.asr_meta
+        with pytest.raises(RuntimeError, match="ASR failed"):
+            orch.process_audio_turn(conversation_id, pcm_bytes, audio_meta, conversation_history="")
 
+        # The failed user turn must be persisted with null asr_text and error metadata.
         with db.read_connection() as conn:
-            row = conn.execute(
-                "SELECT asr_text, asr_meta_json FROM user_turns WHERE id = ?",
-                (result.user_turn_id,),
-            ).fetchone()
-
-        assert row[0] is None
-        meta = json.loads(row[1])
+            rows = conn.execute("SELECT asr_text, asr_meta_json FROM user_turns").fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] is None
+        meta = json.loads(rows[0][1])
         assert meta["error"] == "ASR failed"
     finally:
         db.close()

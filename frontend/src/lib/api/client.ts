@@ -50,6 +50,9 @@ export async function* fetchSSE(
             yield { event, data: JSON.parse(data) }
           } catch {
             // Skip malformed frames rather than crashing the stream.
+            if (import.meta.env.DEV) {
+              console.warn('[SSE] Skipped malformed frame:', { event, data })
+            }
           }
         }
       }

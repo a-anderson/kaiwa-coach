@@ -107,6 +107,8 @@ The Python environment is pre-created and owned by the maintainer.
 - **Prompts only in `prompts/*.md`**: never inline prompt text in Python code.
 - **All LLM outputs schema-validated**: one repair retry max, then fail safe.
 - **Japanese invariant**: TTS normalisation must not alter Japanese substrings (byte-identical, with fallback to original on violation).
+- **Narrow exception handling**: never use bare `except Exception` to swallow errors silently. Wrap only the specific operation that can fail (e.g. the ASR transcription call, not the entire turn pipeline). If a failure path must persist state before returning, re-raise after cleanup so the error reaches the appropriate handler (e.g. the SSE error event emitter).
+- **Bounded in-memory caches**: all caches backed by a plain `dict` must be bounded. Use `_BoundedDict` (in `orchestrator.py`) or equivalent, with a named max-size constant. An unbounded cache is a memory leak in a long-running process.
 
 ## Performance
 
@@ -154,6 +156,10 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Language themes are CSS custom properties on `:root[data-language="<code>"]` in `frontend/src/styles/themes.css`.
 - For development, run the Vite dev server (`npm run dev` in `frontend/`) alongside the FastAPI backend — Vite proxies `/api` to `localhost:8000`.
 - For production, `npm run build` writes to `frontend/dist/`, which FastAPI serves as static files.
+- **Supported languages**: the canonical list lives in `frontend/src/lib/constants.ts` (`SUPPORTED_LANGUAGES`). Validate session language against it before making API calls — surface errors immediately in the UI rather than relying on the backend to reject the request.
+- **Blob URL cleanup**: always revoke `URL.createObjectURL()` URLs when they are no longer needed. Track the last-created URL in a component variable, revoke it before creating the next one, and revoke on `onDestroy`.
+- **No magic string sentinels**: do not repurpose ID fields as status indicators. Use a typed optional field (e.g. `status?: 'pending'`) for in-flight state so code can check the field explicitly rather than comparing against a hardcoded string.
+- **Dev-mode logging**: guard development-only diagnostics with `import.meta.env.DEV` so they are tree-shaken in production builds. Do not leave silent empty `catch {}` blocks where a `console.warn` would aid debugging.
 
 **Progressive rendering**: In-flight turns are tracked via `pendingTurn: TurnRecord | null` in `sessionStore`. `InputArea` populates it immediately on submit and patches it as each SSE stage completes (ASR transcript → LLM reply → corrections → TTS audio). On SSE `complete`, it is moved into `turns` with real IDs. `ChatThread` renders `pendingTurn` separately below committed turns. When a turn completes, `InputArea` dispatches a `turncomplete` event that `App.svelte` catches to trigger a sidebar refresh (picking up the auto-set conversation title).
 
@@ -167,8 +173,17 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - End-to-end smoke tests are required for single text turn and single audio turn paths.
 - For startup/config wiring changes: add tests in `tests/test_app_startup.py`.
 - For frontend changes that affect user-visible flow (language switching, audio submit, history load, delete, shadowing), mention manual verification steps explicitly.
+- **No `# pragma: no cover` on reachable error paths**: if a failure path exists in production code, it must be tested. A `# pragma: no cover` comment signals a missing test, not an acceptable gap.
+- **SSE route tests must include a mid-stream failure case**: test a scenario where stage events are emitted before the orchestrator raises, verify stage events appear before the error event, and that no events follow the error. Both text and audio turn routes need this.
+- **API-layer tests must assert all fields**: when a feature produces a multi-field result (e.g. corrections: `errors`, `corrected`, `native`, `explanation`), the API integration test must verify every field is correctly mapped through the full stack, not just a representative subset.
 
 **Frontend testing**: The frontend does not have an automated test suite. This is intentional — components are thin glue code binding stores to the DOM, and all application logic with meaningful test value lives in the Python backend. Do not add a JavaScript test framework unless the frontend acquires substantial standalone logic (e.g. non-trivial state machines or derived computations). For user-visible frontend changes, manual verification is the expected quality gate.
+
+## API conventions
+
+- **HTTP error messages**: use short noun phrases in sentence case, no trailing period — e.g. `"Conversation not found"`, `"Audio file not found"`, `"Empty audio upload"`. Do not use verb-first phrases like `"Failed to retrieve…"`. For 4xx errors where the detail helps the client recover, append the cause after a colon: `f"Audio conversion failed: {exc}"`.
+- **SSE error events**: must include a `request_id` field (generated per request in `_build_sse_generator`) so failures can be correlated between server logs and client-side error reports.
+- **Shared route utilities**: if a helper function would appear in more than one route file, add it to `src/kaiwacoach/api/utils.py` and import from there. Do not duplicate.
 
 ## Code quality
 
@@ -178,3 +193,5 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Add docstrings/comments only for non-obvious behaviour, tradeoffs, or framework quirks.
 - Start with the simplest solution that is likely to work. If choosing a more complex option, document why the simpler one was insufficient.
 - Keep changes focused and diffs small; avoid broad refactors unless explicitly requested.
+- **Python type hints**: use built-in types directly — `dict`, `list`, `tuple` — not `Dict`, `List` from `typing` (Python 3.9+ is required). Use `X | None` instead of `Optional[X]`.
+- **Timing variables**: when measuring multiple sub-steps in the same function, use a short-lived local (e.g. `t0`) that is reassigned for each step, and a separate `start_total` that is never reassigned, so the total and per-step durations are unambiguously distinct.

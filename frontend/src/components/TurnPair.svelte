@@ -45,7 +45,7 @@
     <CorrectionCard correction={turn.correction} />
   {/if}
 
-  {#if turn.user_turn_id === 'pending' && !turn.reply_text}
+  {#if turn.status === 'pending' && !turn.reply_text}
     <div class="typing-bubble" aria-label="Assistant is typing">
       <span class="dot" />
       <span class="dot" />

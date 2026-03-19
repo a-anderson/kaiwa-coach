@@ -14,23 +14,10 @@ from kaiwacoach.api.schemas.conversation import (
     CreateConversationRequest,
     TurnRecord,
 )
+from kaiwacoach.api.utils import audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
-
-
-def _audio_path_to_url(abs_path: str | None, cache_root: Path) -> str | None:
-    """Convert an absolute audio path to a serveable API URL, or None if missing."""
-    if not abs_path:
-        return None
-    p = Path(abs_path)
-    if not p.exists():
-        return None
-    try:
-        rel = p.relative_to(cache_root)
-        return f"/api/audio/{rel}"
-    except ValueError:
-        return None
 
 
 def _build_turn_record(
@@ -51,6 +38,10 @@ def _build_turn_record(
     # For text turns input_text is set; for audio turns asr_text is set.
     user_text = turn.get("input_text") or turn.get("asr_text")
 
+    # Resolve audio URLs first; derive has_* from whether the file exists on disk.
+    user_audio_url = audio_path_to_url(turn.get("user_audio_path"), cache_root)
+    assistant_audio_url = audio_path_to_url(turn.get("assistant_audio_path"), cache_root)
+
     return TurnRecord(
         user_turn_id=turn["user_turn_id"],
         assistant_turn_id=turn.get("assistant_turn_id"),
@@ -58,11 +49,10 @@ def _build_turn_record(
         asr_text=turn.get("asr_text"),
         reply_text=turn.get("reply_text"),
         correction=correction,
-        # Audio availability: Phase 2 sets real paths; for now resolve what exists.
-        has_user_audio=bool(turn.get("user_audio_path")),
-        has_assistant_audio=bool(turn.get("assistant_audio_path")),
-        user_audio_url=_audio_path_to_url(turn.get("user_audio_path"), cache_root),
-        assistant_audio_url=_audio_path_to_url(turn.get("assistant_audio_path"), cache_root),
+        has_user_audio=user_audio_url is not None,
+        has_assistant_audio=assistant_audio_url is not None,
+        user_audio_url=user_audio_url,
+        assistant_audio_url=assistant_audio_url,
     )
 
 
@@ -108,7 +98,7 @@ async def create_conversation(
     all_convos = orc.list_conversations()
     created = next((c for c in all_convos if c["id"] == conv_id), None)
     if created is None:
-        raise HTTPException(status_code=500, detail="Failed to retrieve created conversation")
+        raise HTTPException(status_code=500, detail="Created conversation not found")
     return ConversationSummary(**created)
 
 
