@@ -77,7 +77,7 @@ This project also served as a learning exercise for two areas:
 - using an LLM coding assistant effectively during a real software project
 - integrating local ASR, LLM, and TTS components into a reliable application
 
-I found both areas benefited from the same techniques: smaller scoped changes, clear constraints, regression tests, and review-style iteration rather than trying to solve everything in one step.
+Both areas benefited from the same habits: smaller scoped changes, clear constraints, regression tests, and review-style iteration. A few things stood out specifically for LLM-assisted work: choosing the interaction mode to match the task (planning mode for learning and high-risk changes, auto-accept for routine work), using successive fresh agents for PR reviews rather than relying on a single session, and treating the project instruction file as a living document updated whenever the same issue recurs. Calibrating trust to roughly junior-mid engineer level — good output, not infallible, and you are responsible for what you sign off on — was a useful grounding throughout.
 
 More detailed notes:
 

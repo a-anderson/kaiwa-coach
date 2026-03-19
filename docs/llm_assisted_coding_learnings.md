@@ -64,7 +64,47 @@ Small visual issues (borders, dropdown containers, image controls, alignment) we
 
 A solution that looks valid in documentation may not work in the pinned version. For example, constructor arguments available in some Gradio versions were not available in the version used here. Version-specific constraints need to be stated early.
 
+## Choosing a Mode
+
+Claude Code offers different interaction modes — from requiring approval on every change to accepting edits automatically. Choosing the right mode for the task made a meaningful difference.
+
+### Planning mode: use when the details matter
+
+Planning mode (where the assistant proposes changes and waits for approval before applying them) worked best for:
+
+- tasks where learning was the goal — reviewing proposed changes in real time, asking questions as they arose, and understanding the reasoning behind architectural decisions accelerated learning significantly compared to just reading the output
+- high-risk changes where a mistake would be costly or hard to reverse
+- unfamiliar domains where close attention to what is being done is important
+
+The back-and-forth is not friction — it is the point. For a learning project, planning mode provided an interactive, real-time conversation about why decisions were made, which is difficult to replicate by reading finished code.
+
+### Auto-accept mode: use when the output matters more than the details
+
+Auto-accept worked best for:
+
+- areas where the goal was the end result, not understanding the implementation
+- low-risk, routine, or boilerplate work
+- prototyping work that is expected to be thrown away
+
+The tradeoff is reduced visibility into what was produced. This is manageable with clear upfront standards (see the CLAUDE.md section below) and checkpoint reviews.
+
+### Switching modes mid-task
+
+If a task changes risk level or scope mid-session — something that started as routine becomes more consequential — switch modes explicitly and state the reason in the prompt. The mode should match the task, not the session.
+
 ## Collaboration Patterns That Improved Results
+
+### Use clarifying questions to scope a plan
+
+For planning and problem-solving, a better pattern than writing a comprehensive upfront prompt was to give a brief summary of intent and then ask the assistant to ask clarifying questions until the scope was clear.
+
+This worked better because:
+
+- it is easier to answer focused questions than to anticipate everything upfront
+- the questions often surfaced considerations or edge cases that had not been thought of, deepening understanding of both the problem and the solution space
+- arriving at a shared, well-scoped plan before implementation meant fewer course corrections mid-task
+
+The interaction itself — not just the output — was where much of the value came from.
 
 ### Ask for the simplest option first
 
@@ -99,6 +139,34 @@ Asking for a review mindset helped move from “it works” to “it is maintain
 If this branch were submitted as a PR for review by two senior Python engineers, would it pass? What would their comments be, and which points are blockers vs non-blocking comments?
 ```
 
+### Use successive agents for PR reviews
+
+A single agent reviewing its own recent work will miss things. Using a fresh agent or session at review checkpoints consistently surfaced issues the original session had not caught — including cases where a previous agent had declared something fixed when it was not, or where a fix had introduced a side effect or lacked test coverage.
+
+The pattern that worked:
+
+1. use one agent to implement and self-review
+2. bring in a fresh agent to do a PR-style review
+3. use the agent that identified a new issue to fix it
+4. repeat until no blocking issues are found
+
+Different agents will catch different things and miss different things. Playing their feedback against each other is more reliable than trusting any single review. Expect to go through more rounds than feels necessary — that is normal, not a sign something is wrong.
+
+### Treat agent output like work from a junior-mid level engineer
+
+Agents do not know everything, and they will make mistakes. A useful calibration: treat the output with roughly the same level of trust you would give a capable junior-mid level engineer. The work is often good, sometimes excellent, and occasionally wrong in ways that require experience to spot.
+
+This framing also serves as a useful reminder: you are ultimately responsible for any output you produce or sign off on. The assistant accelerates the work; the judgement is still yours.
+
+### Keep CLAUDE.md current
+
+The project instruction file (CLAUDE.md or equivalent) is most useful as a living document, not a one-time setup. Two patterns that worked well:
+
+- **Set standards upfront**: code quality bar, test requirements, architectural constraints, error handling rules. A good initial set of standards reduces the number of corrections needed later.
+- **Add to it reactively**: when the same class of issue keeps appearing across sessions, or when a cluster of fixes is needed at once, that is a signal to encode the standard explicitly in CLAUDE.md so it does not need to be re-stated each time.
+
+The file earns its value through iteration. Treat it like a project-specific style guide that evolves with the codebase.
+
 ## Quality Controls That Helped
 
 - targeted tests during iteration (`poetry run pytest -q <file>`)
@@ -112,15 +180,26 @@ If this branch were submitted as a PR for review by two senior Python engineers,
 - Start with smaller requests than you think you need.
 - Provide exact errors and traces whenever possible.
 - Ask for options and tradeoffs before implementation if there is more than one reasonable path.
-- Treat generated code as draft code that still needs review.
+- For non-trivial tasks, give a brief intent summary and ask the assistant to ask clarifying questions before planning — it surfaces blind spots and produces a better-scoped plan than trying to write a comprehensive prompt upfront.
+- Treat generated code as draft code that still needs review — calibrate trust to roughly junior-mid level engineer output.
 - Keep the assistant aligned with explicit constraints (version, style, architecture, quality bar).
+- Choose the mode to match the task: planning for learning or high-risk work, auto-accept for low-risk or routine work.
+- Use fresh agents for review checkpoints; do not rely on a single session to catch its own mistakes.
+- Update the project instruction file when the same issue recurs — encode the standard, not just the fix.
 
 ## How I Would Work Differently Next Time
 
 - State framework/version constraints earlier for UI work.
 - Ensure the proposed solution looks at the simplest method/s first, instead of complicated or workaround-heavy customisation.
 - Add a short “acceptance criteria” checklist before implementing medium-sized changes.
+- Be more deliberate about mode selection at the start of each task rather than leaving it at the session default.
+- Plan review checkpoints in advance rather than deciding ad hoc when to bring in a fresh agent.
+
+## Open Questions
+
+- **When is good enough actually good enough?** In familiar domains, weighing the cost of different architectural decisions is straightforward. In unfamiliar ones, it is harder to know whether a flagged issue is a genuine blocker or an over-cautious suggestion. How to develop that judgement in new domains is an open area for refinement.
+- **How much of multi-agent review overhead is real?** When successive agents identify many blocking issues, some may reflect genuine problems and others may reflect an agent trying to be thorough rather than accurate. Developing a reliable filter for this — especially in unfamiliar territory — is still a work in progress.
 
 ## Summary
 
-An LLM coding assistant is most useful when the interaction is structured. Clear scope, concrete evidence, tests, and review-style prompts consistently produced better results than broad “build this feature” requests.
+An LLM coding assistant is most useful when the interaction is structured. Clear scope, concrete evidence, tests, and review-style prompts consistently produced better results than broad “build this feature” requests. Choosing the right mode for each task, maintaining a current project instruction file, and using fresh agents for review checkpoints are the habits that had the most impact on output quality.
