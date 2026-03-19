@@ -2,12 +2,12 @@
 
 ## Demo Index
 
-| Feature                                  | Demo File                                   | Notes                                                                                                                        |
-| ---------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Text input turn flow                     | `assets/demos/text_input.gif`               | User submits text, receives assistant reply with TTS playback, and corrections card showing errors, corrected form, native reformulation, and explanation. |
-| Audio input turn flow                    | `assets/demos/audio_input.gif`              | User records audio, ASR transcribes the input, assistant responds with TTS playback, and corrections card is shown.          |
-| Load conversation, regen audio, shadowing | `assets/demos/load_conversation.gif`        | User loads a prior conversation, regenerates all assistant audio, then uses shadowing mode to listen and record alongside the assistant. |
-| Delete conversation(s)                   | `assets/demos/delete_conversations.gif`     | Removes a single selected conversation, then bulk-deletes the entire conversation history.                                   |
+| Feature                                   | Demo File                                    | Notes                                                                                                                           |
+| ----------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Text input turn flow                      | `assets/demos/text_input.gif`                | Submit a text message and receive an assistant reply with TTS playback. The corrections card shows errors, a corrected form, native reformulation, and an explanation. |
+| Audio input turn flow                     | `assets/demos/audio_input.gif`               | Record and submit audio, watch ASR transcribe the input, and get an assistant reply with TTS playback and a corrections card.   |
+| Load conversations, regen audio, shadowing | `assets/demos/load_conversations.gif`        | Load a saved conversation, regenerate all assistant audio, then use shadowing mode to listen and record alongside the assistant. |
+| Delete conversation(s)                    | `assets/demos/delete_conversations.gif`      | Delete a single conversation, then bulk-delete the entire conversation history.                                                 |
 
 ## Demo Gallery
 
@@ -23,10 +23,10 @@
   <img src="../assets/demos/audio_input.gif" alt="Audio input conversation flow with corrections" style="max-width: 800px; width: 100%; height: auto;" />
 </p>
 
-### Load Conversation, Regenerate Audio, and Shadowing
+### Load Conversations, Regenerate Audio, and Shadowing
 
 <p>
-  <img src="../assets/demos/load_conversation.gif" alt="Load saved conversation, regenerate audio, and shadowing mode" style="max-width: 800px; width: 100%; height: auto;" />
+  <img src="../assets/demos/load_conversations.gif" alt="Load saved conversations, regenerate audio, and shadowing mode" style="max-width: 800px; width: 100%; height: auto;" />
 </p>
 
 ### Delete Conversation(s)
