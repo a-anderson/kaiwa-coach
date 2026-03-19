@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
@@ -18,16 +17,12 @@ from sse_starlette.sse import EventSourceResponse
 from kaiwacoach.api.audio_conversion import webm_to_pcm
 from kaiwacoach.api.deps import get_orchestrator
 from kaiwacoach.api.schemas.turn import TurnTextRequest
-from kaiwacoach.api.utils import audio_path_to_url
+from kaiwacoach.api.utils import _ML_EXECUTOR, audio_path_to_url
 from kaiwacoach.orchestrator import AudioTurnResult, ConversationOrchestrator, TextTurnResult
 
 _logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# One turn at a time — the orchestrator holds ML models and is not safe for
-# concurrent processing. max_workers=1 serialises requests naturally.
-_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _build_sse_generator(
@@ -74,7 +69,7 @@ def _build_sse_generator(
                 {"_done": True, "error": str(exc), "request_id": request_id},
             )
 
-    loop.run_in_executor(_executor, run_sync)
+    loop.run_in_executor(_ML_EXECUTOR, run_sync)
 
     async def event_generator():
         while True:
