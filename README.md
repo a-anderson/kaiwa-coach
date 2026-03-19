@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/logo/kaiwacoach_logo_ja.png" alt="KaiwaCoach logo" width="800"/>
-</p>
-
 # KaiwaCoach
 
 [![CI](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml/badge.svg)](https://github.com/a-anderson/kaiwa-coach/actions/workflows/tests.yaml)
@@ -173,7 +169,7 @@ The default LLM is `mlx-community/Qwen3-14B-8bit` (8-bit quantised). To use the 
 
 ```yaml
 models:
-  llm_id: "mlx-community/Qwen3-14B-bf16"
+    llm_id: "mlx-community/Qwen3-14B-bf16"
 ```
 
 Or via environment variable:
