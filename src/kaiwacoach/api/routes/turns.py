@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
@@ -43,8 +44,7 @@ def _build_sse_generator(
     until the orchestrator completes. This is acceptable for a single-user local
     deployment; for a multi-user server, add a cancellation mechanism.
     """
-    import uuid as _uuid
-    request_id = _uuid.uuid4().hex
+    request_id = uuid.uuid4().hex
 
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
