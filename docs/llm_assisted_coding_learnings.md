@@ -2,13 +2,15 @@
 
 ## Purpose
 
-One goal I had for this project was to learn how to work with an LLM coding assistant as part of a real build, not just for isolated code snippets.
+One goal I had for this project was to learn how to work with LLM coding assistants as part of a real build, not just for isolated code snippets.
 
 I wanted to get better at:
 
 - scoping requests so the assistant could make useful changes without breaking surrounding behaviour
 - using the assistant for debugging and iteration
 - treating the assistant like a collaborator that still needs review, tests, and clear constraints
+
+For this project, I used both Codex and Claude Code, and found a strong preference for Claude Code.
 
 ## What Worked Well
 
@@ -25,18 +27,21 @@ This made it much easier to spot mistakes quickly and keep momentum.
 
 ### Supplying real tracebacks
 
-When something failed, pasting the full traceback usually led to faster fixes than describing the error in general terms. The assistant could work from concrete evidence and target the right part of the code.
+When I started the project with Codex, if something failed, I found that pasting the full traceback usually led to faster fixes than describing the error in general terms. The Codex assistant could work from concrete evidence and target the right part of the code.
+
+As I shifted to Claude Code, I gave the agent automatic permission and instructions to run non-slow tests after each code change, which allowed for even faster feedback and more targeted troubleshooting. This ended up being my preferred way of working, and the method I intend to use for future work.
 
 ### Asking for review-style feedback
 
-Asking whether a change would pass review by senior engineers was useful. It often surfaced:
+Asking whether a change would pass review by senior+ engineers was useful. It often surfaced:
 
 - missing tests
 - unclear helper names
 - brittle assumptions
 - framework-specific edge cases
+- issues that would cause long-term problems even though they had little short-term impact
 
-This was a good way to improve quality without waiting for a real PR review.
+This was a good way to improve quality without needing a PR review with (human) engineers.
 
 ### Asking for tradeoffs before implementation
 
@@ -52,7 +57,7 @@ That helped avoid overengineering, especially in UI work where several approache
 
 ### Broad requests produced messy solutions
 
-If I asked for a large feature without enough constraints, the first solution was sometimes technically functional but too complex or fragile. This happened most noticeably with Gradio theming and CSS overrides.
+If I asked for a large feature without enough constraints, the first solution was sometimes technically functional but too complex or fragile. This happened most noticeably with Gradio theming and CSS overrides (note: the UI has now been entirely replaced with a TypeScript + Svelte custom front-end).
 
 The fix was to narrow the request and ask for the simplest likely-working approach first.
 
@@ -60,9 +65,11 @@ The fix was to narrow the request and ask for the simplest likely-working approa
 
 Small visual issues (borders, dropdown containers, image controls, alignment) were easy to misunderstand. In those cases, tight feedback loops and concrete descriptions of what changed on screen mattered more than abstract styling requests.
 
+This became easier with Claude Code, where I could take a quick screenshot of a UI element that I wanted changed, and simply say something like "change the \[element\] border colour to match the background shade" and Claude would solve the issue without need for any further clarification.
+
 ### Framework version differences matter
 
-A solution that looks valid in documentation may not work in the pinned version. For example, constructor arguments available in some Gradio versions were not available in the version used here. Version-specific constraints need to be stated early.
+A solution that looks valid in documentation may not work in the pinned version. For example, constructor arguments available in some Gradio versions (now replaced with Svelte) were not available in the version initially used. Version-specific constraints need to be stated early.
 
 ## Choosing a Mode
 
@@ -202,7 +209,7 @@ The file earns its value through iteration. Treat it like a project-specific sty
 
 ## Working Patterns and Human Factors
 
-**Can deep work and LLM-assisted iteration coexist?**
+### Can deep work and LLM-assisted iteration coexist?
 
 The problem is not wait time or switching frequency — it is mindset disruption. Holding a hard problem in your head requires a particular mental state, and switching to another task breaks it regardless of how long the switch lasts. You cannot give proper attention to two things at once.
 
@@ -210,7 +217,7 @@ Running the assistant on longer uninterrupted tasks and using auto-accept for lo
 
 This feels structural rather than solvable through workflow adjustments. How to do genuine deep work while keeping LLM-assisted tasks progressing is an open question I do not have a good answer to yet.
 
-**The loss of ambient attention**
+### The loss of ambient attention
 
 A day of coding used to alternate cognitively demanding work with tasks that were necessary but easy — boilerplate, scaffolding, setup. The easy work was not just rest. It was a state where the foreground task was light enough that background processing could still run. That is where a lot of incidental discovery happened: noticing unexpected structure in the codebase, an error pointing to a deeper misunderstanding, duplicated logic, something that needed a conversation with someone from a different team. Many problem reframings came not from focused work but from that kind of peripheral attention while doing something easy.
 
@@ -218,7 +225,7 @@ LLM assistants remove most of that easy work and leave the cognitively demanding
 
 Deliberately recreating it — scheduled review passes, intentional reading time — sounds reasonable but adds cognitive load rather than reducing it. For a substitute to work it would need to arise naturally, not become another thing to actively manage. Whether that ambient discovery can be preserved or replaced in an LLM-assisted workflow, and what the long-term cost is if it cannot, is an open question.
 
-**Cognitive fatigue, blind acceptance, and the behavior change gap**
+### Cognitive fatigue, blind acceptance, and the behaviour change gap
 
 Intensive LLM-assisted work produces a recognisable degradation pattern: switching to TTS for long outputs rather than reading them → skipping large sections and reading only the opening → skimming headings → accepting changes without reviewing the output. Each step feels like a reasonable response to energy levels in the moment. By the end, the quality filter is gone.
 
@@ -228,4 +235,8 @@ The harder problem is that self-awareness is itself degraded when fatigued. The 
 
 ## Summary
 
-An LLM coding assistant is most useful when the interaction is structured. Clear scope, concrete evidence, tests, and review-style prompts consistently produced better results than broad “build this feature” requests. Choosing the right mode for each task, maintaining a current project instruction file, and using fresh agents for review checkpoints are the habits that had the most impact on output quality.
+An LLM coding assistant is most useful when the interaction is structured: small, bounded requests; concrete evidence and tracebacks over vague descriptions; review-style prompts; mode selection matched to the task rather than the session; successive fresh agents at review checkpoints; and a project instruction file that evolves with the codebase. Treating generated output with roughly the trust you would give a capable junior-mid engineer (good, not infallible, and ultimately your responsibility) is a useful calibration throughout.
+
+The human side of this work is less tractable. Deep work and LLM-assisted iteration are in tension by design rather than by poor workflow choices. The back-and-forth inherent in planning mode disrupts the mental state that hard problems require, and removing low-cognition work also removes the ambient attention where incidental discovery used to happen. Intensive assisted work produces a recognisable fatigue pattern where quality filtering degrades progressively and is difficult to catch from the inside.
+
+The workflow is learnable. What it costs in easy work, ambient attention, and conditions for genuine deep work is less often noticed, and harder to replace.
