@@ -77,7 +77,17 @@ This project also served as a learning exercise for two areas:
 - using an LLM coding assistant effectively during a real software project
 - integrating local ASR, LLM, and TTS components into a reliable application
 
-Both areas benefited from the same habits: smaller scoped changes, clear constraints, regression tests, and review-style iteration. A few things stood out specifically for LLM-assisted work: choosing the interaction mode to match the task (planning mode for learning and high-risk changes, auto-accept for routine work), using successive fresh agents for PR reviews rather than relying on a single session, and treating the project instruction file as a living document updated whenever the same issue recurs. Calibrating trust to roughly junior-mid engineer level — good output, not infallible, and you are responsible for what you sign off on — was a useful grounding throughout.
+### LLM-assisted coding
+
+Small, bounded requests with concrete evidence (real tracebacks, failing tests) consistently outperformed broad requests with vague descriptions. Asking for tradeoffs before implementation reduced overengineering; asking whether a change would pass senior+ review surfaced missing tests and brittle assumptions. Mode selection mattered — planning for learning and high-risk work, auto-accept for routine tasks — and switching modes mid-task when scope changed was more effective than leaving it at the session default. Successive fresh agents at review checkpoints caught things the implementing session missed; a single session reviewing its own work is not a reliable quality gate. Calibrating trust to roughly junior-mid engineer level and keeping the project instruction file (CLAUDE.md) as a living document were consistently useful throughout.
+
+The human side is less tractable. Deep work and LLM-assisted iteration are in tension by design: the back-and-forth inherent in planning mode disrupts the mental state that hard problems require, and removing low-cognition work also removes the ambient attention where incidental discovery used to happen. Intensive assisted work produces a recognisable fatigue pattern — progressively skipping output, skimming, then accepting without review — that is difficult to catch from the inside because self-awareness is itself degraded when fatigued.
+
+### Model integration
+
+Reliability came less from the models themselves and more from the engineering around them. The most important improvements were: schema validation on every LLM role output (with bounded repair — one retry, then fail safe), keeping sequencing logic in the orchestrator rather than scattering it across wrappers, and timing instrumentation that made performance work concrete rather than intuition-driven.
+
+A recurring lesson was that input-format problems are easy to mistake for model problems. Audio sample-rate mismatches, malformed JSON with reasoning-style preamble, and inconsistent parsing paths across similar roles all presented initially as model unreliability. Consistent handling across roles, explicit fallbacks, and tests targeting integration edges were more valuable than any single model improvement.
 
 More detailed notes:
 
