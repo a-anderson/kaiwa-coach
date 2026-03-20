@@ -200,6 +200,32 @@ The file earns its value through iteration. Treat it like a project-specific sty
 - **When is good enough actually good enough?** In familiar domains, weighing the cost of different architectural decisions is straightforward. In unfamiliar ones, it is harder to know whether a flagged issue is a genuine blocker or an over-cautious suggestion. How to develop that judgement in new domains is an open area for refinement.
 - **How much of multi-agent review overhead is real?** When successive agents identify many blocking issues, some may reflect genuine problems and others may reflect an agent trying to be thorough rather than accurate. Developing a reliable filter for this — especially in unfamiliar territory — is still a work in progress.
 
+## Working Patterns and Human Factors
+
+**Can deep work and LLM-assisted iteration coexist?**
+
+The problem is not wait time or switching frequency — it is mindset disruption. Holding a hard problem in your head requires a particular mental state, and switching to another task breaks it regardless of how long the switch lasts. You cannot give proper attention to two things at once.
+
+Running the assistant on longer uninterrupted tasks and using auto-accept for low-risk work reduces the cost significantly. But in planning mode, or on high-risk changes, the back-and-forth is inherent. The only alternative is to wait idle.
+
+This feels structural rather than solvable through workflow adjustments. How to do genuine deep work while keeping LLM-assisted tasks progressing is an open question I do not have a good answer to yet.
+
+**The loss of ambient attention**
+
+A day of coding used to alternate cognitively demanding work with tasks that were necessary but easy — boilerplate, scaffolding, setup. The easy work was not just rest. It was a state where the foreground task was light enough that background processing could still run. That is where a lot of incidental discovery happened: noticing unexpected structure in the codebase, an error pointing to a deeper misunderstanding, duplicated logic, something that needed a conversation with someone from a different team. Many problem reframings came not from focused work but from that kind of peripheral attention while doing something easy.
+
+LLM assistants remove most of that easy work and leave the cognitively demanding tasks. The burnout risk is obvious. The less obvious loss is the ambient attention.
+
+Deliberately recreating it — scheduled review passes, intentional reading time — sounds reasonable but adds cognitive load rather than reducing it. For a substitute to work it would need to arise naturally, not become another thing to actively manage. Whether that ambient discovery can be preserved or replaced in an LLM-assisted workflow, and what the long-term cost is if it cannot, is an open question.
+
+**Cognitive fatigue, blind acceptance, and the behavior change gap**
+
+Intensive LLM-assisted work produces a recognisable degradation pattern: switching to TTS for long outputs rather than reading them → skipping large sections and reading only the opening → skimming headings → accepting changes without reviewing the output. Each step feels like a reasonable response to energy levels in the moment. By the end, the quality filter is gone.
+
+Treating each stage as a signal rather than a preference is more useful than scheduled breaks, which override flow states and do not account for how much energy and engagement vary across a day or between people. Noticing the switch to TTS is an early indicator; skipping sections is a stronger one.
+
+The harder problem is that self-awareness is itself degraded when fatigued. The solutions are not mysterious — take breaks, review output, work intentionally, stop when you stop being engaged. The difficulty is doing them consistently. That gap is not unique to this context, and willpower is not a reliable mechanism for closing it. Meaningful change requires support, structure, and an environment where the right behaviour is also the easiest one. What that looks like in practice, for individual habits and for team settings, is something I am still working through.
+
 ## Summary
 
 An LLM coding assistant is most useful when the interaction is structured. Clear scope, concrete evidence, tests, and review-style prompts consistently produced better results than broad “build this feature” requests. Choosing the right mode for each task, maintaining a current project instruction file, and using fresh agents for review checkpoints are the habits that had the most impact on output quality.
