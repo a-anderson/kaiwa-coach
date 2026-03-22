@@ -32,7 +32,7 @@ def _load_model_defaults() -> dict[str, str]:
 
     return {
         "asr": getattr(model_module, "ASR_MODEL_ID"),
-        "llm": getattr(model_module, "LLM_MODEL_ID"),
+        "llm": getattr(model_module, "LLM_MODEL_ID_8BIT"),
         "tts": getattr(model_module, "TTS_MODEL_ID"),
     }
 

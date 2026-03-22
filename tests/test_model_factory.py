@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.models.factory as factory_module
-from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID, LLM_MODEL_ID_BF16, TTS_MODEL_ID
+from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.factory import build_asr, build_llm, build_tts
 from kaiwacoach.models.llm_qwen import QwenLLM
@@ -62,9 +62,16 @@ def test_llm_model_id_bf16_matches_expected_hub_path() -> None:
     assert LLM_MODEL_ID_BF16 == "mlx-community/Qwen3-14B-bf16"
 
 
+def test_llm_model_id_4bit_matches_expected_hub_path() -> None:
+    """LLM_MODEL_ID_4BIT should point to the 4-bit Qwen3-14B variant on the MLX hub."""
+    assert LLM_MODEL_ID_4BIT == "mlx-community/Qwen3-14B-4bit"
+
+
 def test_llm_model_id_constants_are_distinct() -> None:
-    """The 8-bit and bf16 constants must refer to different model IDs."""
-    assert LLM_MODEL_ID != LLM_MODEL_ID_BF16
+    """The 8-bit, bf16, and 4-bit constants must all refer to different model IDs."""
+    assert LLM_MODEL_ID_8BIT != LLM_MODEL_ID_BF16
+    assert LLM_MODEL_ID_8BIT != LLM_MODEL_ID_4BIT
+    assert LLM_MODEL_ID_BF16 != LLM_MODEL_ID_4BIT
 
 
 # --- build_llm (non-slow with stubbed backend) ---
@@ -111,10 +118,21 @@ def test_build_llm_wires_8bit_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path
     """build_llm should wire the 8-bit model ID through to QwenLLM when configured."""
     monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
 
-    llm = build_llm(_llm_config(LLM_MODEL_ID, tmp_path))
+    llm = build_llm(_llm_config(LLM_MODEL_ID_8BIT, tmp_path))
 
     assert isinstance(llm, QwenLLM)
-    assert llm.model_id == LLM_MODEL_ID
+    assert llm.model_id == LLM_MODEL_ID_8BIT
+
+
+def test_build_llm_wires_4bit_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm should wire the 4-bit model ID through to QwenLLM when configured."""
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    llm = build_llm(_llm_config(LLM_MODEL_ID_4BIT, tmp_path))
+
+    assert isinstance(llm, QwenLLM)
+    assert llm.model_id == LLM_MODEL_ID_4BIT
+    assert isinstance(llm, LLMProtocol)
 
 
 # --- build_llm (slow: MlxLmBackend loads the model on init) ---
