@@ -78,8 +78,8 @@ The Python environment is pre-created and owned by the maintainer.
 1. User input (text or audio) → ASR if audio
 2. Persist intermediates **before** side effects (e.g. save text before TTS)
 3. Conversation LLM role → `ConversationReply`
-4. Optional correction pipeline (if errors detected): `error_detection` → `correction` → `native_reformulation` → `explanation`
-5. TTS normalisation for Japanese → TTS synthesis
+4. TTS normalisation for Japanese → TTS synthesis (runs before corrections so audio is available sooner)
+5. Optional correction pipeline (if errors detected): `error_detection` → `correction` → `native_reformulation` → `explanation`
 6. Persist all artefacts to SQLite + blob storage
 
 **LLM role system**: Each LLM call uses a named role (`conversation`, `error_detection`, `correction`, `native_reformulation`, `explanation`, `jp_tts_normalisation`). Each role has:
@@ -161,12 +161,13 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - **No magic string sentinels**: do not repurpose ID fields as status indicators. Use a typed optional field (e.g. `status?: 'pending'`) for in-flight state so code can check the field explicitly rather than comparing against a hardcoded string.
 - **Dev-mode logging**: guard development-only diagnostics with `import.meta.env.DEV` so they are tree-shaken in production builds. Do not leave silent empty `catch {}` blocks where a `console.warn` would aid debugging.
 
-**Progressive rendering**: In-flight turns are tracked via `pendingTurn: TurnRecord | null` in `sessionStore`. `InputArea` populates it immediately on submit and patches it as each SSE stage completes (ASR transcript → LLM reply → corrections → TTS audio). On SSE `complete`, it is moved into `turns` with real IDs. `ChatThread` renders `pendingTurn` separately below committed turns. When a turn completes, `InputArea` dispatches a `turncomplete` event that `App.svelte` catches to trigger a sidebar refresh (picking up the auto-set conversation title).
+**Progressive rendering**: In-flight turns are tracked via `pendingTurn: TurnRecord | null` in `sessionStore`. `InputArea` populates it immediately on submit and patches it as each SSE stage completes (ASR transcript → LLM reply → TTS audio → corrections). On SSE `complete`, it is moved into `turns` with real IDs. `ChatThread` renders `pendingTurn` separately below committed turns. When a turn completes, `InputArea` dispatches a `turncomplete` event that `App.svelte` catches to trigger a sidebar refresh (picking up the auto-set conversation title).
 
 ## Testing
 
 - Slow tests (`@pytest.mark.slow`) require local models; CI runs only non-slow tests.
 - Prefer `poetry run pytest -q <targeted tests>` during iteration, then run broader suites before claiming completion.
+- After any test count change, update the passing test snapshot in `README.md` (search for "passed" under "Automated reliability checks").
 - When fixing a bug, add or adjust at least one regression test that would have caught it.
 - Every LLM role and repair prompt path must have schema tests.
 - Storage changes require round-trip tests covering DB and audio blobs.
