@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from kaiwacoach.models.tts_kokoro import KokoroTTS, TTSResult, TTSBackend, MlxAudioBackend
+from kaiwacoach.models.tts_kokoro import KokoroTTS, TTSResult, TTSBackend, MlxAudioBackend, _TTS_VOLUME_GAIN
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
 
 
@@ -163,3 +163,41 @@ def test_mlx_audio_backend_synthesizes(monkeypatch: pytest.MonkeyPatch) -> None:
     assert meta.channels == 1
     assert meta.sample_width == 2
     assert meta_extra["backend"] == "mlx_audio"
+
+
+def test_mlx_audio_backend_applies_volume_gain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MlxAudioBackend should amplify audio by _TTS_VOLUME_GAIN and clip to [-1, 1]."""
+    import numpy as np
+
+    class _FakeResult:
+        def __init__(self, audio, sample_rate):
+            self.audio = audio
+            self.sample_rate = sample_rate
+
+    class _FakeModel:
+        def generate(self, text, voice, speed, lang_code):
+            # 0.5 * 1.5 = 0.75 (stays within range); 0.8 * 1.5 = 1.2 (clips to 1.0)
+            return [_FakeResult(np.array([0.5, 0.8, -0.8]), 22050)]
+
+    class _FakeMx:
+        @staticmethod
+        def concatenate(chunks, axis=0):
+            return np.concatenate(chunks)
+
+    def _load_model(_model_id):
+        return _FakeModel()
+
+    monkeypatch.setitem(__import__("sys").modules, "mlx_audio.tts.utils", type("m", (), {"load_model": _load_model}))
+    monkeypatch.setitem(__import__("sys").modules, "mlx.core", _FakeMx)
+    monkeypatch.setitem(__import__("sys").modules, "numpy", np)
+
+    backend = MlxAudioBackend("model-x")
+    backend._mx = _FakeMx
+    backend._np = np
+
+    pcm_bytes, _, _ = backend.synthesize("hello", "voice", 1.0, "j")
+
+    audio_int16 = np.frombuffer(pcm_bytes, dtype=np.int16)
+    assert audio_int16[0] == pytest.approx(0.5 * _TTS_VOLUME_GAIN * 32767, abs=1)  # gain applied, no clip
+    assert audio_int16[1] == 32767   # clipped to +1.0
+    assert audio_int16[2] == -32767  # clipped to -1.0

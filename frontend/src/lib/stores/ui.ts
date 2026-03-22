@@ -7,9 +7,9 @@ export interface UIState {
   stageStatuses: Record<string, 'running' | 'complete'>
   // Non-null while the shadowing panel is open.
   shadowingTurnId: string | null
-  // Set to the assistant_turn_id of the most recently completed turn so its
-  // AudioPlayer autoplays. Null for turns loaded from history.
-  autoplayTurnId: string | null
+  // True while the pending turn's TTS audio is ready to play but the turn has
+  // not yet committed. Cleared on SSE complete or on any error/finally path.
+  autoplayPending: boolean
 }
 
 export const uiStore = writable<UIState>({
@@ -17,5 +17,5 @@ export const uiStore = writable<UIState>({
   isSubmitting: false,
   stageStatuses: {},
   shadowingTurnId: null,
-  autoplayTurnId: null,
+  autoplayPending: false,
 })

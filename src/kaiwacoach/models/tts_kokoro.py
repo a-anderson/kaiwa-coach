@@ -9,6 +9,10 @@ from kaiwacoach.constants import DEFAULT_VOICES
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
 from kaiwacoach.models.protocols import TTSResult
 
+# Volume gain applied to TTS output before int16 conversion. Values above 1.0
+# boost volume; the subsequent clip prevents overflow.
+_TTS_VOLUME_GAIN = 2.0
+
 
 class TTSBackend(Protocol):
     """Protocol for TTS backend implementations."""
@@ -175,7 +179,7 @@ class MlxAudioBackend:
             raise RuntimeError("mlx-audio returned no audio chunks.")
 
         full_audio = self._mx.concatenate(audio_chunks, axis=0)
-        audio_np = self._np.array(full_audio)
+        audio_np = self._np.array(full_audio) * _TTS_VOLUME_GAIN
         audio_np = self._np.clip(audio_np, -1.0, 1.0)
         audio_int16 = (audio_np * 32767).astype(self._np.int16)
 
