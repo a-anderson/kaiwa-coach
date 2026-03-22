@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.app as app_module
-from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID, LLM_MODEL_ID_BF16, TTS_MODEL_ID
+from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.settings import load_config
 
 
@@ -153,6 +153,24 @@ def test_load_config_bf16_llm_id_roundtrips_to_dict(monkeypatch: pytest.MonkeyPa
     assert config.to_dict()["models"]["llm_id"] == LLM_MODEL_ID_BF16
 
 
+def test_load_config_accepts_4bit_llm_id_via_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should accept the 4-bit model ID when set via KAIWACOACH_MODELS_LLM_ID."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", LLM_MODEL_ID_4BIT)
+
+    config = load_config()
+
+    assert config.models.llm_id == LLM_MODEL_ID_4BIT
+
+
+def test_load_config_4bit_llm_id_roundtrips_to_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The 4-bit model ID should survive the load_config → to_dict round-trip."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", LLM_MODEL_ID_4BIT)
+
+    config = load_config()
+
+    assert config.to_dict()["models"]["llm_id"] == LLM_MODEL_ID_4BIT
+
+
 # --- model ID validation ---
 
 def test_load_config_rejects_unknown_llm_id(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -183,5 +201,5 @@ def test_load_config_error_message_lists_valid_options(monkeypatch: pytest.Monke
     """The validation error for an unknown LLM ID should list the valid alternatives."""
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "typo-model")
 
-    with pytest.raises(ValueError, match=LLM_MODEL_ID):
+    with pytest.raises(ValueError, match=LLM_MODEL_ID_8BIT):
         load_config()

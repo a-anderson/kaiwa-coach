@@ -11,7 +11,7 @@ from mlx_audio.tts import load_model as load_tts
 
 from kaiwacoach.config.models import (
     ASR_MODEL_ID,
-    LLM_MODEL_ID,
+    LLM_MODEL_ID_8BIT,
     TTS_MODEL_ID,
 )
 
@@ -20,7 +20,7 @@ def main():
     load_asr(ASR_MODEL_ID)
 
     print("[prefetch] Loading LLM model...")
-    load_lm(LLM_MODEL_ID)
+    load_lm(LLM_MODEL_ID_8BIT)
 
     print("[prefetch] Loading TTS model...")
     load_tts(TTS_MODEL_ID)
