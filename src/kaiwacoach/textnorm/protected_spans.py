@@ -4,23 +4,19 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
-
-_URL_RE = re.compile(r"https?://[^\\s)]+")
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}")
-_CODE_BLOCK_RE = re.compile(r"```[\\s\\S]*?```", re.MULTILINE)
-_INLINE_CODE_RE = re.compile(r"`[^`]+`")
-_MARKDOWN_LINK_RE = re.compile(r"\\[[^\\]]+\\]\\([^\\)]+\\)")
-_FILE_PATH_RE = re.compile(
-    r"(?:/[^\\s]+)+|(?:[A-Za-z]:\\\\[^\\s]+)|(?:~/(?:[^\\s]+)*)"
-)
+_URL_RE           = re.compile(r"https?://[^\s)]+")
+_EMAIL_RE         = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_CODE_BLOCK_RE    = re.compile(r"```[\s\S]*?```", re.MULTILINE)
+_INLINE_CODE_RE   = re.compile(r"`[^`]+`")
+_MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\([^\)]+\)")
+_FILE_PATH_RE     = re.compile(r"(?:/[^\s]+)+|(?:[A-Za-z]:\\[^\s]+)|(?:~/(?:[^\s]+)*)")
 
 
 @dataclass(frozen=True)
 class MaskResult:
     text: str
-    spans: Dict[str, str]
+    spans: dict[str, str]
 
 
 def mask_protected_spans(text: str) -> MaskResult:
@@ -36,7 +32,7 @@ def mask_protected_spans(text: str) -> MaskResult:
     MaskResult
         Masked text and the mapping of placeholders to original spans.
     """
-    spans: Dict[str, str] = {}
+    spans: dict[str, str] = {}
     masked = text
     patterns = [
         ("code_block", _CODE_BLOCK_RE),
@@ -58,7 +54,7 @@ def mask_protected_spans(text: str) -> MaskResult:
     return MaskResult(text=masked, spans=spans)
 
 
-def restore_protected_spans(text: str, spans: Dict[str, str]) -> str:
+def restore_protected_spans(text: str, spans: dict[str, str]) -> str:
     """Restore masked spans in text.
 
     Parameters

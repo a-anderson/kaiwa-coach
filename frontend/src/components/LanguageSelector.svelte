@@ -22,8 +22,11 @@
     sessionStore.update((s) => ({ ...s, language: lang }))
     try {
       await setSessionLanguage(lang)
-    } catch {
+    } catch (e) {
       // Local app — network errors are unexpected; silently ignore for now.
+      if (import.meta.env.DEV) {
+        console.warn('[LanguageSelector] language change failed:', e)
+      }
     }
 
     if (prevId) {
@@ -40,8 +43,11 @@
           turns: convo.turns,
         }))
         dispatch('newconversation')
-      } catch {
+      } catch (e) {
         // If creation fails, just clear the active conversation.
+        if (import.meta.env.DEV) {
+          console.warn('[LanguageSelector] conversation creation failed:', e)
+        }
         sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
       }
     }

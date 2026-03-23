@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from kaiwacoach.models.json_enforcement import ParseResult
 
@@ -21,19 +21,19 @@ from kaiwacoach.models.json_enforcement import ParseResult
 @dataclass(frozen=True)
 class ASRResult:
     text: str
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class LLMResult:
     text: str
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class TTSResult:
     audio_path: str
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
 
 # @runtime_checkable is applied to all three protocols to enable isinstance
@@ -59,13 +59,13 @@ class LLMProtocol(Protocol):
     @property
     def max_context_tokens(self) -> int: ...
 
-    def generate(self, prompt: str, role: str, max_new_tokens: Optional[int] = None) -> LLMResult: ...
+    def generate(self, prompt: str, role: str, max_new_tokens: int | None = None) -> LLMResult: ...
 
     def generate_json(
         self,
         prompt: str,
         role: str,
-        max_new_tokens: Optional[int] = None,
+        max_new_tokens: int | None = None,
         repair_fn: Callable[[str], str] | None = None,
     ) -> ParseResult: ...
 

@@ -52,5 +52,5 @@ class PromptLoader:
 
 
 class _StrictDict(dict):
-    def __missing__(self, key: str) -> str:  # pragma: no cover - raised in format_map
+    def __missing__(self, key: str) -> str:
         raise KeyError(key)

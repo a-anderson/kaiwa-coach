@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 from kaiwacoach.constants import DEFAULT_VOICES
 from kaiwacoach.storage.blobs import AudioMeta, SessionAudioCache
@@ -19,7 +19,7 @@ class TTSBackend(Protocol):
 
     def synthesize(
         self, text: str, voice: str, speed: float, lang_code: str
-    ) -> Tuple[bytes, AudioMeta, Dict[str, Any]]: ...
+    ) -> tuple[bytes, AudioMeta, dict[str, Any]]: ...
 
 
 class KokoroTTS:
@@ -45,7 +45,7 @@ class KokoroTTS:
         self._model_id = model_id
         self._cache = cache
         self._backend = backend or MlxAudioBackend(model_id)
-        self._cache_index: Dict[str, str] = {}
+        self._cache_index: dict[str, str] = {}
 
     @property
     def model_id(self) -> str:
@@ -142,7 +142,7 @@ class KokoroTTS:
 class _DefaultBackend:
     """Stub backend that instructs callers to provide a real implementation."""
 
-    def synthesize(self, text: str, voice: str, speed: float, lang_code: str) -> Tuple[bytes, AudioMeta, Dict[str, Any]]:
+    def synthesize(self, text: str, voice: str, speed: float, lang_code: str) -> tuple[bytes, AudioMeta, dict[str, Any]]:
         raise RuntimeError(
             "TTS backend not configured. Provide a TTSBackend implementation "
             "or integrate Kokoro MLX inference."
@@ -167,7 +167,7 @@ class MlxAudioBackend:
         self._mx = mx
         self._np = np
 
-    def synthesize(self, text: str, voice: str, speed: float, lang_code: str) -> Tuple[bytes, AudioMeta, Dict[str, Any]]:
+    def synthesize(self, text: str, voice: str, speed: float, lang_code: str) -> tuple[bytes, AudioMeta, dict[str, Any]]:
         audio_chunks = []
         sample_rate = None
         for result in self._model.generate(text=text, voice=voice, speed=speed, lang_code=lang_code):

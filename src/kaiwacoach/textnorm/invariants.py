@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, List, Tuple
+from typing import Callable
 
 
 _JP_RE = re.compile(r"[\u3040-\u30FF\u4E00-\u9FFF]+")
@@ -13,10 +13,10 @@ _JP_RE = re.compile(r"[\u3040-\u30FF\u4E00-\u9FFF]+")
 @dataclass(frozen=True)
 class InvariantResult:
     ok: bool
-    mismatches: List[Tuple[str, int]]
+    mismatches: list[tuple[str, int]]
 
 
-def extract_japanese_spans(text: str) -> List[str]:
+def extract_japanese_spans(text: str) -> list[str]:
     """Extract contiguous Japanese substrings.
 
     Parameters
@@ -50,7 +50,7 @@ def check_japanese_invariant(original: str, candidate: str) -> InvariantResult:
     original_spans = extract_japanese_spans(original)
     candidate_spans = extract_japanese_spans(candidate)
 
-    mismatches: List[Tuple[str, int]] = []
+    mismatches: list[tuple[str, int]] = []
     for idx, span in enumerate(original_spans):
         if idx >= len(candidate_spans):
             mismatches.append((span, idx))
@@ -66,7 +66,7 @@ def enforce_japanese_invariant(
     original: str,
     candidate: str,
     logger: Callable[[str], None] | None = None,
-) -> Tuple[str, InvariantResult]:
+) -> tuple[str, InvariantResult]:
     """Enforce the Japanese invariant with fallback and logging.
 
     Parameters

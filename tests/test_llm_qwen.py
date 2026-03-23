@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
 import pytest
 
-from kaiwacoach.models.llm_qwen import LLMResult, MlxLmBackend, QwenLLM
+from kaiwacoach.models.llm_qwen import LLMResult, MlxLmBackend, QwenLLM, _LLM_CACHE_MAX
 from kaiwacoach.models.json_enforcement import ConversationReply
 
 
@@ -210,7 +208,7 @@ def test_no_think_suffix_reflected_in_prompt_hash() -> None:
 
 def test_mlx_backend_uses_generate_and_sampler() -> None:
     """MLX-LM backend should call generate with a sampler."""
-    captured: Dict[str, object] = {}
+    captured: dict[str, object] = {}
 
     class _FakeSampleUtils:
         @staticmethod
@@ -320,3 +318,19 @@ def test_generate_cache_separates_roles_and_caps() -> None:
     llm.generate("prompt", role="role_a", max_new_tokens=3)
 
     assert backend.calls == 3
+
+
+def test_cache_bounded_at_max_size() -> None:
+    """Cache must not grow beyond _LLM_CACHE_MAX entries."""
+    backend = _Backend()
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=10_000,
+        role_max_new_tokens={"role": 5},
+        backend=backend,
+    )
+
+    for i in range(_LLM_CACHE_MAX + 10):
+        llm.generate(f"unique prompt nonce={i}", role="role")
+
+    assert len(llm._cache) <= _LLM_CACHE_MAX

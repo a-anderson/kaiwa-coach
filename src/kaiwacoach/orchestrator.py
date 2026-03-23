@@ -15,7 +15,6 @@ import logging
 import re
 import time
 import uuid
-from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -31,27 +30,13 @@ from kaiwacoach.storage.db import SQLiteWriter
 from kaiwacoach.textnorm.invariants import enforce_japanese_invariant
 from kaiwacoach.textnorm.jp_katakana import normalise_katakana
 from kaiwacoach.textnorm.tts_punctuation import normalize_for_tts
+from kaiwacoach.utils import BoundedDict
 
 _logger = logging.getLogger(__name__)
 
 # Maximum number of unique (audio_hash, model_id, language) entries held in the
 # in-process ASR cache. Oldest entries are evicted when the limit is reached.
 _ASR_CACHE_MAX_SIZE = 128
-
-
-class _BoundedDict(OrderedDict):
-    """OrderedDict that evicts the oldest entry once *maxsize* is reached."""
-
-    def __init__(self, maxsize: int) -> None:
-        super().__init__()
-        self._maxsize = maxsize
-
-    def __setitem__(self, key, value) -> None:  # type: ignore[override]
-        if key in self:
-            self.move_to_end(key)
-        super().__setitem__(key, value)
-        if len(self) > self._maxsize:
-            self.popitem(last=False)
 
 
 @dataclass(frozen=True)
@@ -106,7 +91,7 @@ class ConversationOrchestrator:
         self._expected_sample_rate = (
             getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
         )
-        self._asr_cache: _BoundedDict = _BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
+        self._asr_cache: BoundedDict = BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
         self._logger = logging.getLogger(__name__)
         self._timing_logs_enabled = timing_logs_enabled
 
@@ -210,19 +195,22 @@ class ConversationOrchestrator:
             tts_audio_path=tts_result.audio_path if tts_result is not None else None,
         )
 
-    def process_audio_turn(
+    def _run_asr_with_caching(
         self,
-        conversation_id: str,
         pcm_bytes: bytes,
         audio_meta: AudioMeta,
-        conversation_history: str = "",
-        corrections_enabled: bool = True,
-        on_stage: Callable[[str, str, dict], None] | None = None,
-    ) -> AudioTurnResult:
-        if self._asr is None or self._audio_cache is None:
-            raise ValueError("ASR and audio_cache must be configured for audio turns.")
+        conversation_id: str,
+        timings: dict[str, float],
+    ) -> tuple[str, str, ASRResult, dict[str, Any]]:
+        """Save audio, run ASR with in-process caching, persist user turn, return results.
 
-        timings: dict[str, float] = {}
+        Returns
+        -------
+        tuple[str, str, ASRResult, dict[str, Any]]
+            (user_turn_id, input_audio_path, asr_result, asr_meta)
+        """
+        if self._audio_cache is None or self._asr is None:
+            raise ValueError("audio_cache and asr must be configured for audio turns")
         user_turn_id = str(uuid.uuid4())
         audio_hash = hashlib.sha256(pcm_bytes).hexdigest()
         start = time.perf_counter()
@@ -236,13 +224,9 @@ class ConversationOrchestrator:
         timings["audio_save_seconds"] = time.perf_counter() - start
 
         # ASR: persist a failure record if transcription throws, then re-raise.
-        # Errors from later stages (LLM, corrections, TTS) propagate directly.
         try:
-            if on_stage:
-                on_stage("asr", "running", {})
-            model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
-            language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
-            cache_key = (audio_hash, str(model_id), str(language))
+            model_id, language = self._asr_cache_key()
+            cache_key = (audio_hash, model_id, language)
             cached = self._asr_cache.get(cache_key)
             if cached is not None:
                 timings["asr_cache_seconds"] = 0.0
@@ -266,8 +250,6 @@ class ConversationOrchestrator:
                 cached_meta.pop("audio_path", None)
                 self._asr_cache[cache_key] = ASRResult(text=asr_result.text, meta=cached_meta)
                 asr_meta["audio_path"] = str(input_audio_path)
-            if on_stage:
-                on_stage("asr", "complete", {"transcript": asr_result.text})
         except Exception as exc:
             # Persist the failed user turn so the audio file is tracked in storage.
             failed_meta = {"audio_path": str(input_audio_path), "error": str(exc)}
@@ -301,6 +283,33 @@ class ConversationOrchestrator:
         start = time.perf_counter()
         self._db.run_write(_insert_user)
         timings["user_insert_seconds"] = time.perf_counter() - start
+        return user_turn_id, str(input_audio_path), asr_result, asr_meta
+
+    def process_audio_turn(
+        self,
+        conversation_id: str,
+        pcm_bytes: bytes,
+        audio_meta: AudioMeta,
+        conversation_history: str = "",
+        corrections_enabled: bool = True,
+        on_stage: Callable[[str, str, dict], None] | None = None,
+    ) -> AudioTurnResult:
+        if self._asr is None or self._audio_cache is None:
+            raise ValueError("ASR and audio_cache must be configured for audio turns.")
+
+        timings: dict[str, float] = {}
+
+        # ASR: errors from later stages (LLM, corrections, TTS) propagate directly.
+        if on_stage:
+            on_stage("asr", "running", {})
+        user_turn_id, input_audio_path, asr_result, asr_meta = self._run_asr_with_caching(
+            pcm_bytes=pcm_bytes,
+            audio_meta=audio_meta,
+            conversation_id=conversation_id,
+            timings=timings,
+        )
+        if on_stage:
+            on_stage("asr", "complete", {"transcript": asr_result.text})
         self._maybe_set_auto_title(conversation_id, asr_result.text)
 
         if on_stage:
@@ -419,79 +428,12 @@ class ConversationOrchestrator:
             raise ValueError("ASR and audio_cache must be configured for audio turns.")
         if timings is None:
             timings = {}
-        user_turn_id = str(uuid.uuid4())
-        audio_hash = hashlib.sha256(pcm_bytes).hexdigest()
-        start = time.perf_counter()
-        input_audio_path = self._audio_cache.save_audio(
-            conversation_id=conversation_id,
-            turn_id=user_turn_id,
-            kind="user",
+        user_turn_id, input_audio_path, asr_result, asr_meta = self._run_asr_with_caching(
             pcm_bytes=pcm_bytes,
-            meta=audio_meta,
+            audio_meta=audio_meta,
+            conversation_id=conversation_id,
+            timings=timings,
         )
-        timings["audio_save_seconds"] = time.perf_counter() - start
-
-        # ASR: persist a failure record if transcription throws, then re-raise.
-        try:
-            model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
-            language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
-            cache_key = (audio_hash, str(model_id), str(language))
-            cached = self._asr_cache.get(cache_key)
-            if cached is not None:
-                timings["asr_cache_seconds"] = 0.0
-                asr_meta = dict(cached.meta)
-                asr_meta.update(
-                    {
-                        "audio_path": str(input_audio_path),
-                        "audio_hash": audio_hash,
-                        "cache_hit": True,
-                    }
-                )
-                asr_result = ASRResult(text=cached.text, meta=asr_meta)
-            else:
-                start = time.perf_counter()
-                asr_result = self._asr.transcribe(input_audio_path)
-                timings["asr_transcribe_seconds"] = time.perf_counter() - start
-                asr_meta = dict(asr_result.meta)
-                asr_meta.setdefault("audio_hash", audio_hash)
-                asr_meta.setdefault("cache_hit", False)
-                cached_meta = dict(asr_meta)
-                cached_meta.pop("audio_path", None)
-                self._asr_cache[cache_key] = ASRResult(text=asr_result.text, meta=cached_meta)
-                asr_meta["audio_path"] = str(input_audio_path)
-        except Exception as exc:
-            # Persist the failed user turn so the audio file is tracked in storage.
-            failed_meta = {"audio_path": str(input_audio_path), "error": str(exc)}
-            failed_meta_json = json.dumps(failed_meta, ensure_ascii=False)
-
-            def _insert_user_failed(conn) -> None:
-                conn.execute(
-                    """
-                    INSERT INTO user_turns (id, conversation_id, input_text, asr_text, asr_meta_json)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (user_turn_id, conversation_id, None, None, failed_meta_json),
-                )
-                conn.commit()
-
-            self._db.run_write(_insert_user_failed)
-            raise
-
-        asr_meta_json = json.dumps(asr_meta, ensure_ascii=False)
-
-        def _insert_user(conn) -> None:
-            conn.execute(
-                """
-                INSERT INTO user_turns (id, conversation_id, input_text, asr_text, asr_meta_json)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (user_turn_id, conversation_id, None, asr_result.text, asr_meta_json),
-            )
-            conn.commit()
-
-        start = time.perf_counter()
-        self._db.run_write(_insert_user)
-        timings["user_insert_seconds"] = time.perf_counter() - start
         return AudioTurnResult(
             conversation_id=conversation_id,
             user_turn_id=user_turn_id,
@@ -844,6 +786,7 @@ class ConversationOrchestrator:
         if self._tts is None:
             return None
 
+        normalised_text = reply_text
         try:
             start_total = time.perf_counter()
             start = time.perf_counter()
@@ -867,7 +810,13 @@ class ConversationOrchestrator:
                 timings["tts_synthesize_seconds"] = time.perf_counter() - start
                 timings["tts_total_seconds"] = time.perf_counter() - start_total
             return result
-        except Exception:
+        except Exception:  # noqa: BLE001 — TTS backend raises are unspecified; log and degrade gracefully
+            _logger.exception(
+                "TTS synthesis failed for turn_id=%s text_len=%d language=%s",
+                assistant_turn_id,
+                len(normalised_text),
+                self._language,
+            )
             return None
 
     def regenerate_turn_audio(self, assistant_turn_id: str) -> TTSResult:
@@ -961,7 +910,11 @@ class ConversationOrchestrator:
             if errors_json:
                 try:
                     errors = json.loads(errors_json)
-                except Exception:
+                except json.JSONDecodeError:
+                    _logger.warning(
+                        "Failed to parse corrections JSON for turn_id=%s",
+                        user_turn_id,
+                    )
                     errors = []
             return {
                 "errors": errors,
@@ -1117,6 +1070,16 @@ class ConversationOrchestrator:
             conn.commit()
 
         self._db.run_write(_delete)
+
+    def _asr_cache_key(self) -> tuple[str, str]:
+        """Return (model_id, language) for ASR cache key construction.
+
+        Uses getattr to probe public then private attributes because ASRProtocol
+        does not currently expose these fields. Consolidates all access in one place.
+        """
+        model_id = getattr(self._asr, "model_id", None) or getattr(self._asr, "_model_id", "unknown")
+        language = getattr(self._asr, "language", None) or getattr(self._asr, "_language", self._language)
+        return str(model_id), str(language)
 
     @staticmethod
     def _resolve_model_id(model: Any | None) -> str:
