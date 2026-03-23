@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
-from kaiwacoach.utils import _BoundedDict
 from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
@@ -31,6 +30,7 @@ from kaiwacoach.storage.db import SQLiteWriter
 from kaiwacoach.textnorm.invariants import enforce_japanese_invariant
 from kaiwacoach.textnorm.jp_katakana import normalise_katakana
 from kaiwacoach.textnorm.tts_punctuation import normalize_for_tts
+from kaiwacoach.utils import BoundedDict
 
 _logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class ConversationOrchestrator:
         self._expected_sample_rate = (
             getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
         )
-        self._asr_cache: _BoundedDict = _BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
+        self._asr_cache: BoundedDict = BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
         self._logger = logging.getLogger(__name__)
         self._timing_logs_enabled = timing_logs_enabled
 

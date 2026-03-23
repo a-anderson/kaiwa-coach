@@ -3,7 +3,7 @@
 from collections import OrderedDict
 
 
-class _BoundedDict(OrderedDict):
+class BoundedDict(OrderedDict):
     """OrderedDict that evicts the oldest entry once *maxsize* is reached."""
 
     def __init__(self, maxsize: int) -> None:

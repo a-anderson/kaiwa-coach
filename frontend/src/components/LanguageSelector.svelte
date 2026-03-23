@@ -46,7 +46,7 @@
       } catch (e) {
         // If creation fails, just clear the active conversation.
         if (import.meta.env.DEV) {
-          console.warn('[LanguageSelector] language change failed:', e)
+          console.warn('[LanguageSelector] conversation creation failed:', e)
         }
         sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
       }
