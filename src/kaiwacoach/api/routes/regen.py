@@ -102,7 +102,7 @@ async def regen_conversation_audio(conversation_id: str, request: Request) -> Ev
                         "data": json.dumps({"message": msg["error"], "request_id": request_id}),
                     }
                 else:
-                    yield {"event": "complete", "data": "{}"}
+                    yield {"event": "complete", "data": json.dumps({})}
                 break
             elif "_turn" in msg:
                 yield {"event": "turn_done", "data": json.dumps(msg["_turn"])}

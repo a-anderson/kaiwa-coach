@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Type
 
 _THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
@@ -48,13 +48,13 @@ ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
 
 @dataclass(frozen=True)
 class ParseResult:
-    model: Optional[BaseModel]
-    raw_json: Optional[Dict[str, Any]]
-    error: Optional[str]
+    model: BaseModel | None
+    raw_json: dict[str, Any] | None
+    error: str | None
     repaired: bool
 
 
-def extract_first_json_object(text: str) -> Dict[str, Any]:
+def extract_first_json_object(text: str) -> dict[str, Any]:
     """Extract the first valid JSON object from a string.
 
     Parameters

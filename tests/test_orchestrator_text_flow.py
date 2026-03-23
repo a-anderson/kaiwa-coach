@@ -1183,3 +1183,44 @@ def test_regenerate_conversation_audio_handles_all_turns(tmp_path: Path) -> None
         assert results[0].audio_path == "/tmp/fake.wav"
     finally:
         db.close()
+
+
+def test_run_tts_logs_exception_and_returns_none(tmp_path: Path, caplog) -> None:
+    """run_tts() logs an ERROR and returns None when TTS synthesis raises."""
+    import logging
+
+    class _ErrorTTS:
+        def synthesize(self, **kwargs) -> TTSResult:
+            raise RuntimeError("synthesis error")
+
+    db = _setup_db(tmp_path)
+    try:
+        llm = QwenLLM(
+            model_id="model-x",
+            max_context_tokens=100,
+            role_max_new_tokens={"conversation": 5},
+            backend=_Backend('{"reply": "hello"}'),
+        )
+        prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
+        orch = ConversationOrchestrator(
+            db=db,
+            llm=llm,
+            prompt_loader=prompts,
+            language="ja",
+            tts=_ErrorTTS(),
+            tts_voice="default",
+            tts_speed=1.0,
+        )
+        conversation_id = orch.create_conversation("Test")
+
+        with caplog.at_level(logging.ERROR):
+            result = orch.run_tts(
+                conversation_id=conversation_id,
+                assistant_turn_id="turn-001",
+                reply_text="こんにちは",
+            )
+
+        assert result is None
+        assert any(r.levelno == logging.ERROR for r in caplog.records)
+    finally:
+        db.close()

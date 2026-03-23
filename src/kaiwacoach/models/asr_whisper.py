@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable
 
 from kaiwacoach.constants import SUPPORTED_LANGUAGES
 from kaiwacoach.models.protocols import ASRResult
@@ -21,7 +21,7 @@ class WhisperASR:
         model_id: str,
         language: str,
         cache_enabled: bool = True,
-        transcriber: Callable[[Path, str], Tuple[str, Dict[str, Any]]] | None = None,
+        transcriber: Callable[[Path, str], tuple[str, dict[str, Any]]] | None = None,
     ) -> None:
         """Initialize the ASR wrapper.
 
@@ -41,7 +41,7 @@ class WhisperASR:
         self._model_id = model_id
         self._language = language
         self._cache_enabled = cache_enabled
-        self._cache: Dict[str, ASRResult] = {}
+        self._cache: dict[str, ASRResult] = {}
         self._transcriber = transcriber or self._default_transcriber
 
     def transcribe(self, audio_path: str | Path) -> ASRResult:
@@ -112,7 +112,7 @@ class WhisperASR:
                 hasher.update(chunk)
         return hasher.hexdigest()
 
-    def _default_transcriber(self, audio_path: Path, language: str) -> Tuple[str, Dict[str, Any]]:
+    def _default_transcriber(self, audio_path: Path, language: str) -> tuple[str, dict[str, Any]]:
         """Default transcriber hook (requires MLX Whisper integration).
 
         Parameters
@@ -144,7 +144,7 @@ class WhisperASR:
         if not isinstance(result, dict) or "text" not in result:
             raise RuntimeError("mlx-whisper returned an unexpected result format.")
 
-        meta: Dict[str, Any] = {
+        meta: dict[str, Any] = {
             "segments": result.get("segments"),
         }
         return str(result["text"]), meta

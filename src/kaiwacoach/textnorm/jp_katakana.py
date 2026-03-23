@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Tuple
+from typing import Callable
 
 from kaiwacoach.textnorm.protected_spans import mask_protected_spans, restore_protected_spans
 
@@ -16,7 +16,7 @@ _LATIN_RE = re.compile(r"[A-Za-z]")
 @dataclass(frozen=True)
 class KatakanaResult:
     text: str
-    meta: Dict[str, object]
+    meta: dict[str, object]
 
 
 def normalise_katakana(

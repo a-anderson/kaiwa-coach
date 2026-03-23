@@ -5,10 +5,13 @@ from __future__ import annotations
 import time
 import inspect
 import hashlib
-from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple
+from typing import Any, Callable, Mapping, Protocol
 
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.protocols import LLMResult
+from kaiwacoach.utils import _BoundedDict
+
+_LLM_CACHE_MAX = 256
 
 
 class LLMBackend(Protocol):
@@ -41,7 +44,7 @@ class MlxLmBackend:
         self._supports_extra_eos = "extra_eos_token" in inspect.signature(self._generate_fn).parameters
 
     def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "prompt": prompt,
             "max_tokens": max_tokens,
             "sampler": self._sampler,
@@ -88,9 +91,9 @@ class QwenLLM:
         self._token_counter = token_counter
         self._backend = backend or MlxLmBackend(self._model_id)
         self._generator = self._default_generator
-        self._cache: Dict[Tuple[str, str, int], LLMResult] = {}
+        self._cache: _BoundedDict[tuple[str, str, int], LLMResult] = _BoundedDict(_LLM_CACHE_MAX)
 
-    def generate(self, prompt: str, role: str, max_new_tokens: Optional[int] = None) -> LLMResult:
+    def generate(self, prompt: str, role: str, max_new_tokens: int | None = None) -> LLMResult:
         """Generate a response for a given role with enforced token limits.
 
         Parameters
@@ -178,7 +181,7 @@ class QwenLLM:
         self,
         prompt: str,
         role: str,
-        max_new_tokens: Optional[int] = None,
+        max_new_tokens: int | None = None,
         repair_fn: Callable[[str], str] | None = None,
     ) -> ParseResult:
         """Generate and parse JSON output using the role schema.
@@ -209,7 +212,7 @@ class QwenLLM:
         {"error_detection", "correction", "native_reformulation", "explanation", "jp_tts_normalisation"}
     )
 
-    def _default_generator(self, **_: Any) -> tuple[str, Dict[str, Any]]:
+    def _default_generator(self, **_: Any) -> tuple[str, dict[str, Any]]:
         """Default generator hook (uses the configured backend).
 
         Returns
