@@ -201,18 +201,20 @@ class ConversationOrchestrator:
         audio_meta: AudioMeta,
         conversation_id: str,
         timings: dict[str, float],
-    ) -> tuple[str, str, ASRResult, dict]:
+    ) -> tuple[str, str, ASRResult, dict[str, Any]]:
         """Save audio, run ASR with in-process caching, persist user turn, return results.
 
         Returns
         -------
-        tuple[str, str, ASRResult, dict]
+        tuple[str, str, ASRResult, dict[str, Any]]
             (user_turn_id, input_audio_path, asr_result, asr_meta)
         """
+        if self._audio_cache is None or self._asr is None:
+            raise ValueError("audio_cache and asr must be configured for audio turns")
         user_turn_id = str(uuid.uuid4())
         audio_hash = hashlib.sha256(pcm_bytes).hexdigest()
         start = time.perf_counter()
-        input_audio_path = self._audio_cache.save_audio(  # type: ignore[union-attr]
+        input_audio_path = self._audio_cache.save_audio(
             conversation_id=conversation_id,
             turn_id=user_turn_id,
             kind="user",
@@ -239,7 +241,7 @@ class ConversationOrchestrator:
                 asr_result = ASRResult(text=cached.text, meta=asr_meta)
             else:
                 start = time.perf_counter()
-                asr_result = self._asr.transcribe(input_audio_path)  # type: ignore[union-attr]
+                asr_result = self._asr.transcribe(input_audio_path)
                 timings["asr_transcribe_seconds"] = time.perf_counter() - start
                 asr_meta = dict(asr_result.meta)
                 asr_meta.setdefault("audio_hash", audio_hash)
@@ -808,7 +810,7 @@ class ConversationOrchestrator:
                 timings["tts_synthesize_seconds"] = time.perf_counter() - start
                 timings["tts_total_seconds"] = time.perf_counter() - start_total
             return result
-        except Exception:
+        except Exception:  # noqa: BLE001 — TTS backend raises are unspecified; log and degrade gracefully
             _logger.exception(
                 "TTS synthesis failed for turn_id=%s text_len=%d language=%s",
                 assistant_turn_id,

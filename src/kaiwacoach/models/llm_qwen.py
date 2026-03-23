@@ -91,7 +91,7 @@ class QwenLLM:
         self._token_counter = token_counter
         self._backend = backend or MlxLmBackend(self._model_id)
         self._generator = self._default_generator
-        self._cache: _BoundedDict[tuple[str, str, int], LLMResult] = _BoundedDict(_LLM_CACHE_MAX)
+        self._cache: _BoundedDict[tuple[str, str, int], LLMResult] = _BoundedDict(maxsize=_LLM_CACHE_MAX)
 
     def generate(self, prompt: str, role: str, max_new_tokens: int | None = None) -> LLMResult:
         """Generate a response for a given role with enforced token limits.
