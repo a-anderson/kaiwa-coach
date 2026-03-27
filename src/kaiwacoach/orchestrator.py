@@ -653,76 +653,66 @@ class ConversationOrchestrator:
         if timings is None:
             timings = {}
         start_total = time.perf_counter()
-        detect_prompt = self._prompt_loader.render(
-            "detect_errors.md",
+
+        # Call 1: detect errors and produce corrected sentence in a single LLM call.
+        # No repair path: the errors field is a list, which makes a generic repair
+        # schema hard to specify safely. On failure both fields fall back to defaults
+        # (empty errors list, original user_text as corrected).
+        detect_correct_prompt = self._prompt_loader.render(
+            "detect_and_correct.md",
             {"language": self._language, "user_text": user_text},
         )
         t0 = time.perf_counter()
-        detect_result = self._safe_generate_json(prompt=detect_prompt.text, role="error_detection")
-        timings["corrections_detect_seconds"] = time.perf_counter() - t0
+        detect_correct_result = self._safe_generate_json(
+            prompt=detect_correct_prompt.text, role="detect_and_correct"
+        )
+        timings["corrections_detect_correct_seconds"] = time.perf_counter() - t0
         errors = []
-        if detect_result.model is not None:
-            errors = list(getattr(detect_result.model, "errors", []))
-
-        correction_prompt = self._prompt_loader.render(
-            "correct_sentence.md",
-            {"language": self._language, "user_text": user_text},
-        )
-        t0 = time.perf_counter()
-        correction_result = self._safe_generate_json(prompt=correction_prompt.text, role="correction")
-        timings["corrections_correct_seconds"] = time.perf_counter() - t0
         corrected_text = user_text
-        if correction_result.model is not None:
-            corrected_text = getattr(correction_result.model, "corrected", user_text)
+        if detect_correct_result.model is not None:
+            errors = list(getattr(detect_correct_result.model, "errors", []))
+            corrected_text = getattr(detect_correct_result.model, "corrected", user_text)
 
+        # Call 2: explanation (English) and native rewrite in a single LLM call.
+        # Tradeoff: combining these means a single JSON parse failure loses both
+        # fields. Previously a failed native rewrite still produced an explanation.
+        # Repair is available here to mitigate this; the repair schema covers both fields.
         # Escape braces so format_map doesn't treat LLM-generated error strings as placeholders.
         errors_text = "\n".join(f"- {e}" for e in errors) if errors else "(none)"
         errors_text = errors_text.replace("{", "{{").replace("}", "}}")
-        explain_prompt = self._prompt_loader.render(
-            "explain.md",
+        explain_native_prompt = self._prompt_loader.render(
+            "explain_and_native.md",
             {
+                "language": self._language,
                 "user_text": user_text,
                 "corrected_text": corrected_text,
                 "errors": errors_text,
             },
         )
         t0 = time.perf_counter()
-        explain_raw, explain_result, _ = self._generate_with_repair(
-            prompt=explain_prompt.text, role="explanation"
+        _, explain_native_result, explain_native_fallback_used = self._generate_with_repair(
+            prompt=explain_native_prompt.text,
+            role="explain_and_native",
+            repair_schema='{"explanation": "<English explanation>", "native": "<natural rewrite>"}',
         )
-        timings["corrections_explain_seconds"] = time.perf_counter() - t0
-        _ = explain_raw
+        timings["corrections_explain_native_seconds"] = time.perf_counter() - t0
         explanation_text = ""
-        if explain_result.model is not None:
-            explanation_text = getattr(explain_result.model, "explanation", "")
-
-        native_prompt = self._prompt_loader.render(
-            "native_rewrite.md",
-            {"language": self._language, "user_text": user_text},
-        )
-        t0 = time.perf_counter()
-        native_raw, native_result, native_fallback_used = self._generate_with_repair(
-            prompt=native_prompt.text,
-            role="native_reformulation",
-            repair_schema='{"native": "<natural rewrite>"}',
-        )
-        timings["corrections_native_seconds"] = time.perf_counter() - t0
         native_text = None
-        if native_result.model is not None:
-            native_text = getattr(native_result.model, "native", None)
-        if native_result.model is None and native_result.error:
+        if explain_native_result.model is not None:
+            explanation_text = getattr(explain_native_result.model, "explanation", "")
+            native_text = getattr(explain_native_result.model, "native", None)
+        if explain_native_result.model is None and explain_native_result.error:
             _logger.warning(
-                "corrections.native_invalid language=%s error=%s",
+                "corrections.explain_native_invalid language=%s error=%s",
                 self._language,
-                native_result.error,
+                explain_native_result.error,
             )
-        if native_fallback_used:
-            _logger.info("corrections.native_fallback_used language=%s", self._language)
-        _ = native_raw
+        if explain_native_fallback_used:
+            _logger.info("corrections.explain_native_fallback_used language=%s", self._language)
 
         correction_id = str(uuid.uuid4())
         errors_json = json.dumps(errors, ensure_ascii=False)
-        prompt_hash = correction_prompt.sha256
+        prompt_hash = detect_correct_prompt.sha256
 
         def _insert_correction(conn) -> None:
             conn.execute(

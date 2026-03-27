@@ -42,6 +42,7 @@ def build_llm(config: AppConfig) -> LLMProtocol:
         role_max_new_tokens=dataclasses.asdict(config.llm.role_max_new_tokens),
         backend=backend,
         token_counter=backend.count_tokens,
+        conversation_temperature=config.llm.conversation_temperature,
     )
 
 

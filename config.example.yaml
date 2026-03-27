@@ -10,13 +10,12 @@ models:
 
 llm:
   max_context_tokens: 4096
+  conversation_temperature: 0.7  # applied to conversation role only; corrections stay at 0.0
   role_max_new_tokens:
     conversation: 256
-    error_detection: 48
-    correction: 48
-    native_reformulation: 48
-    explanation: 72
     jp_tts_normalisation: 192
+    detect_and_correct: 96   # combined error detection + correction
+    explain_and_native: 144  # combined explanation + native rewrite
 
 storage:
   root_dir: "storage"

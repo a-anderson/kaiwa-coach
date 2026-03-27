@@ -28,7 +28,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - Runs a local conversational loop with:
     - user text/audio input
     - assistant reply generation
-    - optional correction pipeline (error detection → corrected sentence → native rewrite → explanation)
+    - optional correction pipeline (detect errors + corrected sentence → explanation + native rewrite)
     - TTS synthesis of assistant reply
 - Persists conversations and supports list, load, resume, and delete
 - Audio regeneration per-turn or per-conversation
@@ -69,6 +69,8 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - Role outputs are schema-validated with one repair attempt.
 - Turn processing uses deterministic defaults and explicit timing logs.
 - Before TTS, Japanese text is verified to ensure it was not accidentally altered.
+- The correction pipeline uses two combined LLM calls (`detect_and_correct`, `explain_and_native`) rather than four sequential single-purpose calls, halving correction latency.
+- The conversation role uses configurable sampling temperature (default `0.7`) for varied replies; all correction and normalisation roles use `0.0` for determinism.
 
 ## Build Learnings
 
@@ -332,9 +334,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-03-23):
+Latest full local snapshot (2026-03-28):
 
-- `222 passed`
+- `232 passed`
 
 ### Schema and repair robustness
 
@@ -350,7 +352,7 @@ Turn processing logs stage timings for:
 
 - ASR
 - LLM generation
-- corrections (detect/correct/native/explain)
+- corrections (detect_and_correct / explain_and_native)
 - TTS
 - total turn time
 

@@ -21,7 +21,13 @@ class LLMBackend(Protocol):
     max token count, returning a decoded string.
     """
 
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str: ...
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int,
+        extra_eos_tokens: list[str] | None = None,
+        temperature: float = 0.0,
+    ) -> str: ...
 
 
 class MlxLmBackend:
@@ -40,14 +46,22 @@ class MlxLmBackend:
         self._model = model
         self._tokenizer = tokenizer
         self._generate_fn = generate
-        self._sampler = make_sampler(temp=0.0)
+        self._make_sampler = make_sampler
+        self._sampler_greedy = make_sampler(temp=0.0)
         self._supports_extra_eos = "extra_eos_token" in inspect.signature(self._generate_fn).parameters
 
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int,
+        extra_eos_tokens: list[str] | None = None,
+        temperature: float = 0.0,
+    ) -> str:
+        sampler = self._make_sampler(temp=temperature) if temperature > 0.0 else self._sampler_greedy
         kwargs: dict[str, Any] = {
             "prompt": prompt,
             "max_tokens": max_tokens,
-            "sampler": self._sampler,
+            "sampler": sampler,
         }
         if self._supports_extra_eos and extra_eos_tokens:
             kwargs["extra_eos_token"] = list(extra_eos_tokens)
@@ -67,6 +81,7 @@ class QwenLLM:
         role_max_new_tokens: Mapping[str, int],
         backend: LLMBackend | None = None,
         token_counter: Callable[[str], int] | None = None,
+        conversation_temperature: float = 0.0,
     ) -> None:
         """Initialize the LLM wrapper.
 
@@ -82,6 +97,10 @@ class QwenLLM:
             Optional backend for generation (defaults to MLX-LM backend).
         token_counter : Callable[[str], int] | None
             Optional token counter for context length validation.
+        conversation_temperature : float
+            Sampling temperature for the conversation role. All other roles use 0.0.
+            The application default (0.7) lives in LLMConfig; this parameter
+            defaults to 0.0 so direct instantiation in tests stays deterministic.
         """
         if max_context_tokens <= 0:
             raise ValueError("max_context_tokens must be > 0")
@@ -90,6 +109,7 @@ class QwenLLM:
         self._role_max_new_tokens = dict(role_max_new_tokens)
         self._token_counter = token_counter
         self._backend = backend or MlxLmBackend(self._model_id)
+        self._conversation_temperature = conversation_temperature
         self._generator = self._default_generator
         self._cache: BoundedDict[tuple[str, str, int], LLMResult] = BoundedDict(maxsize=_LLM_CACHE_MAX)
 
@@ -133,6 +153,10 @@ class QwenLLM:
             effective_max_new_tokens = min(max_new_tokens, role_cap)
 
         prompt_hash = hashlib.sha256(effective_prompt.encode("utf-8")).hexdigest()
+        # Temperature is intentionally excluded from the cache key. It is fixed
+        # at startup and conversation prompts are effectively unique (history
+        # grows each turn), so cache collisions across different temperatures
+        # cannot occur in practice.
         cache_key = (prompt_hash, role, effective_max_new_tokens)
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -209,7 +233,7 @@ class QwenLLM:
     # think block signals to the model that the reasoning phase is complete
     # and it should output the answer directly, avoiding wasted token budget.
     _NO_THINK_ROLES: frozenset[str] = frozenset(
-        {"error_detection", "correction", "native_reformulation", "explanation", "jp_tts_normalisation"}
+        {"jp_tts_normalisation", "detect_and_correct", "explain_and_native"}
     )
 
     def _default_generator(self, **_: Any) -> tuple[str, dict[str, Any]]:
@@ -231,9 +255,17 @@ class QwenLLM:
         # Tradeoff: stopping on "}" reduces trailing garbage but can truncate
         # malformed outputs before a full JSON object is complete.
         extra_eos = ["}"] if role == "conversation" else None
+        # Only the conversation role uses non-zero temperature; all correction
+        # and normalisation roles stay deterministic at 0.0.
+        temperature = self._conversation_temperature if role == "conversation" else 0.0
         return (
-            self._backend.generate(prompt=prompt, max_tokens=max_tokens, extra_eos_tokens=extra_eos),
-            {"backend": "mlx_lm"},
+            self._backend.generate(
+                prompt=prompt,
+                max_tokens=max_tokens,
+                extra_eos_tokens=extra_eos,
+                temperature=temperature,
+            ),
+            {"backend": "mlx_lm", "temperature": temperature},
         )
 
     def clear_cache(self) -> None:

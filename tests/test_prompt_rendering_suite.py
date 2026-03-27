@@ -14,19 +14,11 @@ PROMPT_VARIABLES = {
         "conversation_history": "<history>",
         "user_text": "こんにちは",
     },
-    "detect_errors.md": {
+    "detect_and_correct.md": {
         "language": "ja",
         "user_text": "こんにちは",
     },
-    "correct_sentence.md": {
-        "language": "ja",
-        "user_text": "こんにちは",
-    },
-    "native_rewrite.md": {
-        "language": "ja",
-        "user_text": "こんにちは",
-    },
-    "explain.md": {
+    "explain_and_native.md": {
         "language": "ja",
         "user_text": "こんにちは",
         "corrected_text": "こんにちは。",

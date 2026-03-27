@@ -63,8 +63,8 @@ def test_extracts_json_after_think_tags_no_braces_in_think() -> None:
 
 
 def test_parse_with_schema_strips_think_tags() -> None:
-    text = "<think>reasoning here</think>{\"explanation\": \"Fixed capitalization.\"}"
-    result = parse_with_schema("explanation", text)
+    text = '<think>reasoning here</think>{"explanation": "Fixed capitalization.", "native": "Bonjour."}'
+    result = parse_with_schema("explain_and_native", text)
     assert result.error is None
     assert result.model is not None
     assert result.model.explanation == "Fixed capitalization."
@@ -74,3 +74,61 @@ def test_unknown_role_returns_error() -> None:
     result = parse_with_schema("unknown", '{"x": 1}')
     assert result.model is None
     assert result.error == "Unknown role: unknown"
+
+
+def test_detect_and_correct_valid() -> None:
+    result = parse_with_schema(
+        "detect_and_correct",
+        '{"errors": ["Missing period."], "corrected": "こんにちは。"}',
+    )
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.errors == ["Missing period."]
+    assert result.model.corrected == "こんにちは。"
+    assert result.repaired is False
+
+
+def test_detect_and_correct_empty_errors() -> None:
+    result = parse_with_schema(
+        "detect_and_correct",
+        '{"errors": [], "corrected": "Bonjour."}',
+    )
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.errors == []
+
+
+def test_detect_and_correct_missing_field_fails() -> None:
+    result = parse_with_schema("detect_and_correct", '{"errors": []}')
+    assert result.model is None
+    assert result.error is not None
+
+
+def test_explain_and_native_valid() -> None:
+    result = parse_with_schema(
+        "explain_and_native",
+        '{"explanation": "The period was missing.", "native": "こんにちは。"}',
+    )
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.explanation == "The period was missing."
+    assert result.model.native == "こんにちは。"
+    assert result.repaired is False
+
+
+def test_explain_and_native_missing_field_fails() -> None:
+    result = parse_with_schema("explain_and_native", '{"explanation": "ok"}')
+    assert result.model is None
+    assert result.error is not None
+
+
+def test_explain_and_native_repair_path() -> None:
+    def _repair(_: str) -> str:
+        return '{"explanation": "Fixed spelling.", "native": "Bonjour."}'
+
+    result = parse_with_schema("explain_and_native", "not json", repair_fn=_repair)
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.explanation == "Fixed spelling."
+    assert result.model.native == "Bonjour."
+    assert result.repaired is True

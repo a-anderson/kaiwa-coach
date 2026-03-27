@@ -83,7 +83,7 @@ class _StubBackend:
     def __init__(self, model_id: str) -> None:
         pass
 
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
         return ""
 
     def count_tokens(self, text: str) -> int:
@@ -133,6 +133,26 @@ def test_build_llm_wires_4bit_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert isinstance(llm, QwenLLM)
     assert llm.model_id == LLM_MODEL_ID_4BIT
     assert isinstance(llm, LLMProtocol)
+
+
+def test_build_llm_wires_conversation_temperature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm should pass conversation_temperature from AppConfig through to QwenLLM."""
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id=LLM_MODEL_ID_8BIT, tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(conversation_temperature=0.4),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    llm = build_llm(config)
+
+    assert isinstance(llm, QwenLLM)
+    assert llm._conversation_temperature == 0.4
 
 
 # --- build_llm (slow: MlxLmBackend loads the model on init) ---
