@@ -27,7 +27,7 @@ class _ASRTranscriber:
 
 
 class _LLMBackend:
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens=None) -> str:
+    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens=None, temperature: float = 0.0) -> str:
         return '{"reply": "ok"}'
 
 

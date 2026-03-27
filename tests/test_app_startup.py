@@ -197,6 +197,33 @@ def test_load_config_rejects_unknown_tts_id(monkeypatch: pytest.MonkeyPatch) -> 
         load_config()
 
 
+def test_load_config_rejects_conversation_temperature_above_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """conversation_temperature above 1.0 should be rejected."""
+    monkeypatch.setenv("KAIWACOACH_LLM_CONVERSATION_TEMPERATURE", "1.5")
+
+    with pytest.raises(ValueError, match="conversation_temperature"):
+        load_config()
+
+
+def test_load_config_rejects_negative_conversation_temperature(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Negative conversation_temperature should be rejected."""
+    monkeypatch.setenv("KAIWACOACH_LLM_CONVERSATION_TEMPERATURE", "-0.1")
+
+    with pytest.raises(ValueError, match="conversation_temperature"):
+        load_config()
+
+
+def test_load_config_accepts_conversation_temperature_boundary_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    """0.0 and 1.0 are valid boundary values for conversation_temperature."""
+    monkeypatch.setenv("KAIWACOACH_LLM_CONVERSATION_TEMPERATURE", "0.0")
+    config = load_config()
+    assert config.llm.conversation_temperature == 0.0
+
+    monkeypatch.setenv("KAIWACOACH_LLM_CONVERSATION_TEMPERATURE", "1.0")
+    config = load_config()
+    assert config.llm.conversation_temperature == 1.0
+
+
 def test_load_config_error_message_lists_valid_options(monkeypatch: pytest.MonkeyPatch) -> None:
     """The validation error for an unknown LLM ID should list the valid alternatives."""
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "typo-model")

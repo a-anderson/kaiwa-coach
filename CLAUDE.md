@@ -79,13 +79,14 @@ The Python environment is pre-created and owned by the maintainer.
 2. Persist intermediates **before** side effects (e.g. save text before TTS)
 3. Conversation LLM role → `ConversationReply`
 4. TTS normalisation for Japanese → TTS synthesis (runs before corrections so audio is available sooner)
-5. Optional correction pipeline (if errors detected): `error_detection` → `correction` → `native_reformulation` → `explanation`
+5. Optional correction pipeline (2 combined LLM calls): `detect_and_correct` → `explain_and_native`
 6. Persist all artefacts to SQLite + blob storage
 
-**LLM role system**: Each LLM call uses a named role (`conversation`, `error_detection`, `correction`, `native_reformulation`, `explanation`, `jp_tts_normalisation`). Each role has:
+**LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`). Each role has:
 - A Pydantic schema in `json_enforcement.py`
 - A markdown prompt in `src/kaiwacoach/prompts/`
 - An explicit per-role token cap
+- Temperature: `conversation` uses `llm.conversation_temperature` (default `0.7`); all other roles use `0.0` (deterministic)
 
 `parse_with_schema()` extracts the first valid JSON object (trailing content is ignored and logged), validates it, and makes **at most one** repair attempt via a repair prompt. On failure: fail safe with a minimal reply. Prompt hashes (SHA256 of the rendered prompt) are stored with each LLM call for reproducibility.
 
@@ -117,7 +118,7 @@ Caching is hash-based:
 - LLM: prompt hash + role
 - TTS: text + voice + speed
 
-Per-step timings are recorded (ASR, LLM converse/analyse, normalise, TTS). UX targets (best-effort, M1 Pro): text turn < 4s, audio turn < 7s.
+Per-step timings are recorded (ASR, LLM converse/analyse, corrections detect_correct/explain_native, TTS). UX targets (best-effort, M1 Pro): text turn < 4s, audio turn < 7s.
 
 ## Editing prompts
 
@@ -196,3 +197,4 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Keep changes focused and diffs small; avoid broad refactors unless explicitly requested.
 - **Python type hints**: use built-in types directly — `dict`, `list`, `tuple` — not `Dict`, `List` from `typing` (Python 3.9+ is required). Use `X | None` instead of `Optional[X]`.
 - **Timing variables**: when measuring multiple sub-steps in the same function, use a short-lived local (e.g. `t0`) that is reassigned for each step, and a separate `start_total` that is never reassigned, so the total and per-step durations are unambiguously distinct.
+- **Clean up after changes**: when a refactor or replacement makes code, variables, prompt files, schemas, config keys, env vars, or test fixtures obsolete, remove them in the same change. Do not leave dead code behind — unused items (schemas, role caps, prompt files, env var mappings, test role dicts) must be deleted when the feature that used them is replaced.

@@ -13,7 +13,13 @@ class _Backend:
         self.last_max_tokens: int | None = None
         self.calls = 0
 
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int,
+        extra_eos_tokens: list[str] | None = None,
+        temperature: float = 0.0,
+    ) -> str:
         self.last_max_tokens = max_tokens
         self.calls += 1
         return "ok"
@@ -79,7 +85,13 @@ def test_max_new_tokens_uses_role_default() -> None:
 def test_generate_returns_metadata() -> None:
     """Metadata should include timing, role, model_id, and token info."""
     class _MetaBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
             return "hello"
 
     llm = QwenLLM(
@@ -165,18 +177,24 @@ def test_no_think_suffix_added_for_json_roles() -> None:
     received_prompts: list[str] = []
 
     class _CapturingBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
             received_prompts.append(prompt)
             return '{"explanation": "ok"}'
 
     llm = QwenLLM(
         model_id="model-x",
         max_context_tokens=100,
-        role_max_new_tokens={"explanation": 96, "conversation": 256},
+        role_max_new_tokens={"detect_and_correct": 96, "conversation": 256},
         backend=_CapturingBackend(),
     )
 
-    llm.generate("my prompt", role="explanation")
+    llm.generate("my prompt", role="detect_and_correct")
     assert received_prompts[-1].endswith("<think>\n\n</think>")
 
     llm.generate("my prompt", role="conversation")
@@ -190,20 +208,81 @@ def test_no_think_suffix_reflected_in_prompt_hash() -> None:
     received: list[str] = []
 
     class _CapturingBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
             received.append(prompt)
             return '{"corrected": "ok"}'
 
     llm = QwenLLM(
         model_id="model-x",
         max_context_tokens=100,
-        role_max_new_tokens={"correction": 48},
+        role_max_new_tokens={"detect_and_correct": 48},
         backend=_CapturingBackend(),
     )
 
-    result = llm.generate("my prompt", role="correction")
+    result = llm.generate("my prompt", role="detect_and_correct")
     effective = received[-1]
     assert result.meta["prompt_hash"] == hashlib.sha256(effective.encode()).hexdigest()
+
+
+def test_conversation_role_uses_configured_temperature() -> None:
+    """conversation role should receive the configured temperature; other roles get 0.0."""
+    received: list[dict] = []
+
+    class _CapturingBackend:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            received.append({"temperature": temperature})
+            return '{"reply": "ok"}'
+
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"conversation": 5, "detect_and_correct": 5},
+        backend=_CapturingBackend(),
+        conversation_temperature=0.6,
+    )
+
+    llm.generate("prompt one", role="conversation")
+    assert received[-1]["temperature"] == 0.6
+
+    # Different prompt to avoid cache hit
+    llm.generate("prompt two", role="detect_and_correct")
+    assert received[-1]["temperature"] == 0.0
+
+
+def test_temperature_reflected_in_llm_meta() -> None:
+    """The temperature used for generation should appear in the result metadata."""
+    class _CapturingBackend:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            return '{"reply": "ok"}'
+
+    llm = QwenLLM(
+        model_id="model-x",
+        max_context_tokens=100,
+        role_max_new_tokens={"conversation": 5},
+        backend=_CapturingBackend(),
+        conversation_temperature=0.8,
+    )
+
+    result = llm.generate("a prompt", role="conversation")
+    assert result.meta["temperature"] == 0.8
 
 
 def test_mlx_backend_uses_generate_and_sampler() -> None:
@@ -270,7 +349,13 @@ def test_mlx_backend_uses_generate_and_sampler() -> None:
 def test_generate_json_parses_schema() -> None:
     """generate_json should parse role-specific schemas."""
     class _JsonBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
             return '{"reply": "ok"}'
 
     llm = QwenLLM(

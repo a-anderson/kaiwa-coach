@@ -20,15 +20,17 @@ class _Backend:
     def __init__(self, reply_text: str) -> None:
         self._reply_text = reply_text
 
-    def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-        if "Error Detection" in prompt:
-            return "{\"errors\": [\"err1\"]}"
-        if "Corrected Sentence" in prompt:
-            return "{\"corrected\": \"こんにちは。\"}"
-        if "Native Reformulation" in prompt:
-            return "{\"native\": \"こんにちは。\"}"
-        if "Explanation" in prompt:
-            return "{\"explanation\": \"Fixed punctuation.\"}"
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: int,
+        extra_eos_tokens: list[str] | None = None,
+        temperature: float = 0.0,
+    ) -> str:
+        if "Detect and Correct" in prompt:
+            return '{"errors": ["err1"], "corrected": "こんにちは。"}'
+        if "Explain and Native" in prompt:
+            return '{"explanation": "Fixed punctuation.", "native": "こんにちは。"}'
         return self._reply_text
 
 
@@ -173,11 +175,9 @@ def test_persists_turns_and_reply(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )
@@ -240,14 +240,18 @@ def test_create_conversation_persists_language(tmp_path: Path) -> None:
 
 def test_corrections_empty_errors(tmp_path: Path) -> None:
     class _NoErrorBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-            if "Error Detection" in prompt:
-                return "{\"errors\": []}"
-            if "Corrected Sentence" in prompt:
-                return "{\"corrected\": \"こんにちは\"}"
-            if "Explanation" in prompt:
-                return "{\"explanation\": \"\"}"
-            return "{\"reply\": \"ok\"}"
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            if "Detect and Correct" in prompt:
+                return '{"errors": [], "corrected": "こんにちは"}'
+            if "Explain and Native" in prompt:
+                return '{"explanation": "", "native": ""}'
+            return '{"reply": "ok"}'
 
     db = _setup_db(tmp_path)
     try:
@@ -256,10 +260,8 @@ def test_corrections_empty_errors(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_NoErrorBackend(),
         )
@@ -279,7 +281,7 @@ def test_corrections_empty_errors(tmp_path: Path) -> None:
 
 def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
     class _BadJsonBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             return "not json"
 
     db = _setup_db(tmp_path)
@@ -289,10 +291,8 @@ def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_BadJsonBackend(),
         )
@@ -318,7 +318,7 @@ def test_fallback_when_llm_returns_invalid_json(tmp_path: Path) -> None:
 
 def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
     class _RepairBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             if "JSON Repair" in prompt:
                 return "{\"reply\": \"fixed\"}"
             return "not json"
@@ -330,10 +330,8 @@ def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_RepairBackend(),
         )
@@ -360,7 +358,7 @@ def test_repair_path_marks_fallback_used(tmp_path: Path) -> None:
 
 def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
     class _SalvageBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             return 'thinking... "reply": "こんにちは" trailing'
 
     db = _setup_db(tmp_path)
@@ -370,10 +368,8 @@ def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_SalvageBackend(),
         )
@@ -397,18 +393,23 @@ def test_salvage_path_extracts_reply(tmp_path: Path) -> None:
         db.close()
 
 
-def test_native_reformulation_invalid_falls_back_to_none(tmp_path: Path) -> None:
+def test_explain_native_invalid_json_loses_both_fields(tmp_path: Path) -> None:
+    # Combined role: a single parse failure means explanation and native both fall
+    # back to defaults ("" and None). The old four-call pipeline could produce an
+    # explanation even when native failed; that isolation no longer exists.
     class _NativeInvalidBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-            if "Error Detection" in prompt:
-                return "{\"errors\": [\"err1\"]}"
-            if "Corrected Sentence" in prompt:
-                return "{\"corrected\": \"こんにちは。\"}"
-            if "Native Reformulation" in prompt:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            if "Detect and Correct" in prompt:
+                return '{"errors": ["err1"], "corrected": "こんにちは。"}'
+            if "Explain and Native" in prompt:
                 return "not json"
-            if "Explanation" in prompt:
-                return "{\"explanation\": \"Fixed punctuation.\"}"
-            return "{\"reply\": \"ok\"}"
+            return '{"reply": "ok"}'
 
     db = _setup_db(tmp_path)
     try:
@@ -417,10 +418,8 @@ def test_native_reformulation_invalid_falls_back_to_none(tmp_path: Path) -> None
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_NativeInvalidBackend(),
         )
@@ -435,23 +434,26 @@ def test_native_reformulation_invalid_falls_back_to_none(tmp_path: Path) -> None
                 "SELECT corrected_text, native_text, explanation_text FROM corrections"
             ).fetchone()
 
-        assert row == ("こんにちは。", None, "Fixed punctuation.")
+        # With the combined explain_and_native role, invalid JSON means both fields fail together
+        assert row == ("こんにちは。", None, "")
     finally:
         db.close()
 
 
-def test_native_reformulation_empty_string_persists(tmp_path: Path) -> None:
+def test_explain_native_empty_strings_persist(tmp_path: Path) -> None:
     class _NativeEmptyBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-            if "Error Detection" in prompt:
-                return "{\"errors\": []}"
-            if "Corrected Sentence" in prompt:
-                return "{\"corrected\": \"こんにちは\"}"
-            if "Native Reformulation" in prompt:
-                return "{\"native\": \"\"}"
-            if "Explanation" in prompt:
-                return "{\"explanation\": \"\"}"
-            return "{\"reply\": \"ok\"}"
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            if "Detect and Correct" in prompt:
+                return '{"errors": [], "corrected": "こんにちは"}'
+            if "Explain and Native" in prompt:
+                return '{"explanation": "", "native": ""}'
+            return '{"reply": "ok"}'
 
     db = _setup_db(tmp_path)
     try:
@@ -460,10 +462,8 @@ def test_native_reformulation_empty_string_persists(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_NativeEmptyBackend(),
         )
@@ -481,18 +481,21 @@ def test_native_reformulation_empty_string_persists(tmp_path: Path) -> None:
         db.close()
 
 
-def test_native_reformulation_salvages_prefixed_json(tmp_path: Path) -> None:
+def test_explain_native_salvages_prefixed_json(tmp_path: Path) -> None:
     class _NativePrefixedBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
-            if "Error Detection" in prompt:
-                return "{\"errors\": []}"
-            if "Corrected Sentence" in prompt:
-                return "{\"corrected\": \"こんにちは\"}"
-            if "Native Reformulation" in prompt:
-                return 'note: {"native": "こんにちは。"}'
-            if "Explanation" in prompt:
-                return "{\"explanation\": \"\"}"
-            return "{\"reply\": \"ok\"}"
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
+            if "Detect and Correct" in prompt:
+                return '{"errors": [], "corrected": "こんにちは"}'
+            if "Explain and Native" in prompt:
+                # Prefixed output — trim-to-first-{ salvage path extracts the JSON
+                return 'note: {"explanation": "", "native": "こんにちは。"}'
+            return '{"reply": "ok"}'
 
     db = _setup_db(tmp_path)
     try:
@@ -501,10 +504,8 @@ def test_native_reformulation_salvages_prefixed_json(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_NativePrefixedBackend(),
         )
@@ -530,11 +531,9 @@ def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )
@@ -545,7 +544,7 @@ def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
         orch.process_text_turn(conversation_id, "こんにちは", conversation_history="")
 
         expected_prompt = prompts.render(
-            "correct_sentence.md",
+            "detect_and_correct.md",
             {"language": "ja", "user_text": "こんにちは"},
         )
 
@@ -559,20 +558,22 @@ def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
 
 def test_normalises_and_synthesises_tts(tmp_path: Path) -> None:
     class _TtsBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(
+            self,
+            prompt: str,
+            max_tokens: int,
+            extra_eos_tokens: list[str] | None = None,
+            temperature: float = 0.0,
+        ) -> str:
             if "Conversation Reply" in prompt:
-                return "{\"reply\": \"すごい！！！本当？？\"}"
-            if "Error Detection" in prompt:
-                return "{\"errors\": []}"
-            if "Corrected Sentence" in prompt:
-                return "{\"corrected\": \"すごい！！！本当？？\"}"
-            if "Native Reformulation" in prompt:
-                return "{\"native\": \"すごい！！！本当？？\"}"
-            if "Explanation" in prompt:
-                return "{\"explanation\": \"\"}"
+                return '{"reply": "すごい！！！本当？？"}'
+            if "Detect and Correct" in prompt:
+                return '{"errors": [], "corrected": "すごい！！！本当？？"}'
+            if "Explain and Native" in prompt:
+                return '{"explanation": "", "native": "すごい！！！本当？？"}'
             if "Japanese TTS Normalisation" in prompt:
-                return "{\"text\": \"すごい！！！本当？？\"}"
-            return "{\"reply\": \"ok\"}"
+                return '{"text": "すごい！！！本当？？"}'
+            return '{"reply": "ok"}'
 
     db = _setup_db(tmp_path)
     try:
@@ -581,11 +582,9 @@ def test_normalises_and_synthesises_tts(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_TtsBackend(),
         )
@@ -615,7 +614,7 @@ def test_normalises_and_synthesises_tts(tmp_path: Path) -> None:
 
 def test_skips_tts_when_not_configured(tmp_path: Path) -> None:
     class _ReplyOnlyBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             return "{\"reply\": \"ok\"}"
 
     db = _setup_db(tmp_path)
@@ -625,10 +624,8 @@ def test_skips_tts_when_not_configured(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_ReplyOnlyBackend(),
         )
@@ -645,7 +642,7 @@ def test_skips_tts_when_not_configured(tmp_path: Path) -> None:
 
 def test_non_japanese_language_bypasses_normalisation(tmp_path: Path) -> None:
     class _FrenchBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"Bonjour...\"}"
             return "{\"reply\": \"ok\"}"
@@ -657,10 +654,8 @@ def test_non_japanese_language_bypasses_normalisation(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_FrenchBackend(),
         )
@@ -687,7 +682,7 @@ def test_non_japanese_language_bypasses_normalisation(tmp_path: Path) -> None:
 
 def test_invariant_violation_falls_back(tmp_path: Path) -> None:
     class _InvariantBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"こんにちは\"}"
             if "Japanese TTS Normalisation" in prompt:
@@ -701,11 +696,9 @@ def test_invariant_violation_falls_back(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_InvariantBackend(),
         )
@@ -732,7 +725,7 @@ def test_invariant_violation_falls_back(tmp_path: Path) -> None:
 
 def test_tts_uses_explicit_voice(tmp_path: Path) -> None:
     class _ReplyBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             if "Conversation Reply" in prompt:
                 return "{\"reply\": \"hello\"}"
             return "{\"reply\": \"ok\"}"
@@ -744,11 +737,9 @@ def test_tts_uses_explicit_voice(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_ReplyBackend(),
         )
@@ -775,7 +766,7 @@ def test_tts_uses_explicit_voice(tmp_path: Path) -> None:
 
 def test_llm_failure_falls_back_and_persists_error(tmp_path: Path) -> None:
     class _FailingBackend:
-        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None) -> str:
+        def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
             raise RuntimeError("LLM failure")
 
     db = _setup_db(tmp_path)
@@ -785,11 +776,9 @@ def test_llm_failure_falls_back_and_persists_error(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_FailingBackend(),
         )
@@ -825,11 +814,9 @@ def test_process_audio_turn_persists_asr_text_and_meta(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )
@@ -1015,11 +1002,9 @@ def test_text_turn_logs_timings(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )
@@ -1046,10 +1031,8 @@ def test_text_turn_logs_timings(tmp_path: Path) -> None:
             "prompt_render_seconds",
             "llm_generate_seconds",
             "assistant_insert_seconds",
-            "corrections_detect_seconds",
-            "corrections_correct_seconds",
-            "corrections_explain_seconds",
-            "corrections_native_seconds",
+            "corrections_detect_correct_seconds",
+            "corrections_explain_native_seconds",
             "corrections_insert_seconds",
             "corrections_total_seconds",
             "tts_normalise_seconds",
@@ -1112,11 +1095,9 @@ def test_regenerate_turn_audio_invokes_tts(tmp_path: Path) -> None:
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )
@@ -1152,11 +1133,9 @@ def test_regenerate_conversation_audio_handles_all_turns(tmp_path: Path) -> None
             max_context_tokens=100,
             role_max_new_tokens={
                 "conversation": 5,
-                "error_detection": 5,
-                "correction": 5,
-                "native_reformulation": 5,
-                "explanation": 5,
                 "jp_tts_normalisation": 5,
+                "detect_and_correct": 5,
+                "explain_and_native": 5,
             },
             backend=_Backend('{"reply": "hello"}'),
         )

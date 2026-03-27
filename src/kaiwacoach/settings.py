@@ -71,17 +71,17 @@ class ModelsConfig:
 @dataclass(frozen=True)
 class LLMRoleCaps:
     conversation: int = 256
-    error_detection: int = 48
-    correction: int = 48
-    native_reformulation: int = 48
-    explanation: int = 96
     jp_tts_normalisation: int = 192
+    detect_and_correct: int = 96
+    explain_and_native: int = 144
 
 
 @dataclass(frozen=True)
 class LLMConfig:
     max_context_tokens: int = 4096
     role_max_new_tokens: LLMRoleCaps = field(default_factory=LLMRoleCaps)
+    # Applied to the conversation role only; all correction roles stay at 0.0
+    conversation_temperature: float = 0.7
 
 
 @dataclass(frozen=True)
@@ -126,13 +126,12 @@ class AppConfig:
             },
             "llm": {
                 "max_context_tokens": self.llm.max_context_tokens,
+                "conversation_temperature": self.llm.conversation_temperature,
                 "role_max_new_tokens": {
                     "conversation": self.llm.role_max_new_tokens.conversation,
-                    "error_detection": self.llm.role_max_new_tokens.error_detection,
-                    "correction": self.llm.role_max_new_tokens.correction,
-                    "native_reformulation": self.llm.role_max_new_tokens.native_reformulation,
-                    "explanation": self.llm.role_max_new_tokens.explanation,
                     "jp_tts_normalisation": self.llm.role_max_new_tokens.jp_tts_normalisation,
+                    "detect_and_correct": self.llm.role_max_new_tokens.detect_and_correct,
+                    "explain_and_native": self.llm.role_max_new_tokens.explain_and_native,
                 },
             },
             "storage": {
@@ -256,28 +255,21 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
         "KAIWACOACH_MODELS_LLM_ID": (("models", "llm_id"), _to_str),
         "KAIWACOACH_MODELS_TTS_ID": (("models", "tts_id"), _to_str),
         "KAIWACOACH_LLM_MAX_CONTEXT_TOKENS": (("llm", "max_context_tokens"), _to_int),
+        "KAIWACOACH_LLM_CONVERSATION_TEMPERATURE": (("llm", "conversation_temperature"), _to_float),
         "KAIWACOACH_LLM_ROLE_CONVERSATION_MAX_NEW_TOKENS": (
             ("llm", "role_max_new_tokens", "conversation"),
             _to_int,
         ),
-        "KAIWACOACH_LLM_ROLE_ERROR_DETECTION_MAX_NEW_TOKENS": (
-            ("llm", "role_max_new_tokens", "error_detection"),
-            _to_int,
-        ),
-        "KAIWACOACH_LLM_ROLE_CORRECTION_MAX_NEW_TOKENS": (
-            ("llm", "role_max_new_tokens", "correction"),
-            _to_int,
-        ),
-        "KAIWACOACH_LLM_ROLE_NATIVE_REFORMULATION_MAX_NEW_TOKENS": (
-            ("llm", "role_max_new_tokens", "native_reformulation"),
-            _to_int,
-        ),
-        "KAIWACOACH_LLM_ROLE_EXPLANATION_MAX_NEW_TOKENS": (
-            ("llm", "role_max_new_tokens", "explanation"),
-            _to_int,
-        ),
         "KAIWACOACH_LLM_ROLE_JP_TTS_NORMALISATION_MAX_NEW_TOKENS": (
             ("llm", "role_max_new_tokens", "jp_tts_normalisation"),
+            _to_int,
+        ),
+        "KAIWACOACH_LLM_ROLE_DETECT_AND_CORRECT_MAX_NEW_TOKENS": (
+            ("llm", "role_max_new_tokens", "detect_and_correct"),
+            _to_int,
+        ),
+        "KAIWACOACH_LLM_ROLE_EXPLAIN_AND_NATIVE_MAX_NEW_TOKENS": (
+            ("llm", "role_max_new_tokens", "explain_and_native"),
             _to_int,
         ),
         "KAIWACOACH_STORAGE_ROOT_DIR": (("storage", "root_dir"), _to_str),
@@ -442,18 +434,19 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         ),
         llm=LLMConfig(
             max_context_tokens=_coerce_int(merged["llm"]["max_context_tokens"], "llm.max_context_tokens"),
+            conversation_temperature=_coerce_float(
+                merged["llm"].get("conversation_temperature", 0.7), "llm.conversation_temperature"
+            ),
             role_max_new_tokens=LLMRoleCaps(
                 conversation=_coerce_int(llm_caps["conversation"], "llm.role_max_new_tokens.conversation"),
-                error_detection=_coerce_int(
-                    llm_caps["error_detection"], "llm.role_max_new_tokens.error_detection"
-                ),
-                correction=_coerce_int(llm_caps["correction"], "llm.role_max_new_tokens.correction"),
-                native_reformulation=_coerce_int(
-                    llm_caps["native_reformulation"], "llm.role_max_new_tokens.native_reformulation"
-                ),
-                explanation=_coerce_int(llm_caps["explanation"], "llm.role_max_new_tokens.explanation"),
                 jp_tts_normalisation=_coerce_int(
                     llm_caps["jp_tts_normalisation"], "llm.role_max_new_tokens.jp_tts_normalisation"
+                ),
+                detect_and_correct=_coerce_int(
+                    llm_caps["detect_and_correct"], "llm.role_max_new_tokens.detect_and_correct"
+                ),
+                explain_and_native=_coerce_int(
+                    llm_caps["explain_and_native"], "llm.role_max_new_tokens.explain_and_native"
                 ),
             ),
         ),
@@ -512,6 +505,11 @@ def _validate_config(config: AppConfig) -> None:
         raise ValueError(
             f"Unsupported models.llm_id: {config.models.llm_id!r}. "
             f"Must be one of {sorted(SUPPORTED_MODELS['llm'])}."
+        )
+    if not 0.0 <= config.llm.conversation_temperature <= 1.0:
+        raise ValueError(
+            f"llm.conversation_temperature must be between 0.0 and 1.0, "
+            f"got {config.llm.conversation_temperature}"
         )
     if not config.models.tts_id:
         raise ValueError("models.tts_id must be set")

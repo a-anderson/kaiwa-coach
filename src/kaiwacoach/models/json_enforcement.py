@@ -16,33 +16,25 @@ class ConversationReply(BaseModel):
     reply: StrictStr
 
 
-class ErrorDetection(BaseModel):
-    errors: conlist(StrictStr, min_length=0)
-
-
-class CorrectedSentence(BaseModel):
-    corrected: StrictStr
-
-
-class NativeReformulation(BaseModel):
-    native: StrictStr
-
-
-class Explanation(BaseModel):
-    explanation: StrictStr
-
-
 class JpTtsNormalisation(BaseModel):
     text: StrictStr
 
 
+class DetectAndCorrect(BaseModel):
+    errors: conlist(StrictStr, min_length=0)
+    corrected: StrictStr
+
+
+class ExplainAndNative(BaseModel):
+    explanation: StrictStr
+    native: StrictStr
+
+
 ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
     "conversation": ConversationReply,
-    "error_detection": ErrorDetection,
-    "correction": CorrectedSentence,
-    "native_reformulation": NativeReformulation,
-    "explanation": Explanation,
     "jp_tts_normalisation": JpTtsNormalisation,
+    "detect_and_correct": DetectAndCorrect,
+    "explain_and_native": ExplainAndNative,
 }
 
 
