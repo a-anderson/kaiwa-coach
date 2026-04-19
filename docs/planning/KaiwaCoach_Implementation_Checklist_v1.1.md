@@ -384,11 +384,11 @@ It is intended for a **solo developer** working locally on Apple Silicon and is 
 ## 14. Post-MVP (Optional)
 
 ✅ Add support for other languages
-🔁 Correction text persists across restarts
+✅ Correction text persists across restarts
 🔁 Pronunciation scoring  
 ✅ Download option for message audio
-🔁 Audio regeneration (single turn + full conversation)
-🔁 Shadowing mode  
+✅ Audio regeneration (single turn + full conversation)
+✅ Shadowing mode  
 🔁 Anki export  
 ✅ Toggle to disable corrections (speed-focused mode)
-🔁 Evaluate smaller LLM variants (e.g., 4-bit) for latency
+✅ Evaluate smaller LLM variants (e.g., 4-bit) for latency
