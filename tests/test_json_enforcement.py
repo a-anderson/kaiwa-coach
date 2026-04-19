@@ -122,6 +122,27 @@ def test_explain_and_native_missing_field_fails() -> None:
     assert result.error is not None
 
 
+def test_extracts_json_after_gemma_channel_tags() -> None:
+    """Gemma 4 26B-A4B thought blocks should be stripped before JSON extraction."""
+    text = "<|channel>thought\nLet me analyse the sentence.\n<channel|>\n{\"reply\": \"Bonjour.\"}"
+    obj = extract_first_json_object(text)
+    assert obj == {"reply": "Bonjour."}
+
+
+def test_extracts_json_after_gemma_channel_tags_with_embedded_braces() -> None:
+    """Channel tag stripping should handle JSON-like content inside the thought block."""
+    text = '<|channel>thought\n{"internal": "reasoning"}\n<channel|>\n{"corrected": "ok"}'
+    obj = extract_first_json_object(text)
+    assert obj == {"corrected": "ok"}
+
+
+def test_gemma_channel_tag_stripping_is_harmless_when_absent() -> None:
+    """The Gemma channel tag regex should not affect output that contains no such tags."""
+    text = '{"reply": "こんにちは。"}'
+    obj = extract_first_json_object(text)
+    assert obj == {"reply": "こんにちは。"}
+
+
 def test_explain_and_native_repair_path() -> None:
     def _repair(_: str) -> str:
         return '{"explanation": "Fixed spelling.", "native": "Bonjour."}'

@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Type
 
 _THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+# Gemma 4 26B-A4B always generates thought blocks in this format before the answer.
+# The e4b model may not produce them, but the pattern is harmless when absent.
+_GEMMA_CHANNEL_RE = re.compile(r"<\|channel>thought.*?<channel\|>", re.DOTALL)
 
 from pydantic import BaseModel, Field, StrictStr, ValidationError, conlist
 
@@ -66,7 +69,8 @@ def extract_first_json_object(text: str) -> dict[str, Any]:
     ValueError
         If the parsed value is not a JSON object.
     """
-    cleaned = _THINK_TAG_RE.sub("", text).strip()
+    cleaned = _THINK_TAG_RE.sub("", text)
+    cleaned = _GEMMA_CHANNEL_RE.sub("", cleaned).strip()
     decoder = json.JSONDecoder()
     obj, _ = decoder.raw_decode(cleaned)
     if not isinstance(obj, dict):

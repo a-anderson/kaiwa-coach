@@ -78,10 +78,18 @@ def test_llm_model_id_constants_are_distinct() -> None:
 
 
 class _StubBackend:
-    """Stub MlxLmBackend — satisfies LLMBackend protocol without loading a model."""
+    """Stub backend — satisfies LLMBackend protocol without loading a model or daemon.
+
+    Also provides a no-op check_available classmethod so it can substitute for
+    OllamaBackend in factory tests without requiring a running Ollama daemon.
+    """
 
     def __init__(self, model_id: str) -> None:
         pass
+
+    @classmethod
+    def check_available(cls) -> None:
+        pass  # no-op in tests
 
     def generate(self, prompt: str, max_tokens: int, extra_eos_tokens: list[str] | None = None, temperature: float = 0.0) -> str:
         return ""
@@ -178,6 +186,20 @@ def test_build_llm_routes_to_qwen_llm() -> None:
 
 # --- _detect_family ---
 
+def test_detect_family_returns_gemma4_for_mlx_gemma4_prefix() -> None:
+    """MLX Gemma 4 model IDs should resolve to the gemma4 family."""
+    assert _detect_family("mlx-community/gemma-4-e4b-it-4bit") == "gemma4"
+    assert _detect_family("mlx-community/gemma-4-26b-a4b-it-8bit") == "gemma4"
+    assert _detect_family("mlx-community/gemma-4-e2b-it-8bit") == "gemma4"
+
+
+def test_detect_family_returns_gemma4_for_ollama_gemma4_prefix() -> None:
+    """Ollama Gemma 4 model IDs should resolve to the gemma4 family."""
+    assert _detect_family("gemma4:e4b") == "gemma4"
+    assert _detect_family("gemma4:26b") == "gemma4"
+    assert _detect_family("gemma4:31b") == "gemma4"
+
+
 def test_detect_family_returns_qwen3_for_mlx_qwen3_prefix() -> None:
     """MLX Qwen3 model IDs should resolve to the qwen3 family."""
     assert _detect_family("mlx-community/Qwen3-14B-8bit") == "qwen3"
@@ -204,6 +226,73 @@ def test_detect_family_error_message_lists_supported_prefixes() -> None:
 
 
 # --- build_llm: backend routing ---
+
+def test_build_llm_routes_to_gemma_llm_for_mlx_gemma4_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm with an MLX Gemma 4 model ID should return GemmaLLM."""
+    from kaiwacoach.models.llm_gemma import GemmaLLM
+
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="mlx-community/gemma-4-e4b-it-4bit", tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    llm = build_llm(config)
+
+    assert isinstance(llm, GemmaLLM)
+    assert llm.model_id == "mlx-community/gemma-4-e4b-it-4bit"
+    assert isinstance(llm, LLMProtocol)
+
+
+def test_build_llm_gemma_mlx_backend_label_is_mlx_lm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """GemmaLLM built with MLX backend should report backend_label='mlx_lm' in metadata."""
+    from kaiwacoach.models.llm_gemma import GemmaLLM
+
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="mlx-community/gemma-4-e4b-it-4bit", tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    llm = build_llm(config)
+
+    assert isinstance(llm, GemmaLLM)
+    assert llm._backend_label == "mlx_lm"
+
+
+def test_build_llm_gemma_ollama_backend_label_is_ollama(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """GemmaLLM built with Ollama backend should report backend_label='ollama' in metadata."""
+    from kaiwacoach.models.llm_gemma import GemmaLLM
+
+    monkeypatch.setattr(factory_module, "OllamaBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="gemma4:e4b", tts_id=TTS_MODEL_ID, llm_backend="ollama"),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    llm = build_llm(config)
+
+    assert isinstance(llm, GemmaLLM)
+    assert llm._backend_label == "ollama"
+
 
 def test_build_llm_ollama_backend_routes_to_qwen_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """build_llm with ollama backend and a qwen3: model ID should return QwenLLM."""

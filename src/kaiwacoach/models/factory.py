@@ -15,6 +15,7 @@ import dataclasses
 
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.llm_backends import MlxLmBackend, OllamaBackend
+from kaiwacoach.models.llm_gemma import GemmaLLM
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
@@ -26,9 +27,8 @@ from kaiwacoach.storage.blobs import SessionAudioCache
 _FAMILY_PREFIXES: list[tuple[str, str]] = [
     ("mlx-community/Qwen3-", "qwen3"),
     ("qwen3:", "qwen3"),
-    # Gemma 4 prefixes added in PR 2:
-    # ("mlx-community/gemma-4-", "gemma4"),
-    # ("gemma4:", "gemma4"),
+    ("mlx-community/gemma-4-", "gemma4"),
+    ("gemma4:", "gemma4"),
 ]
 
 
@@ -72,8 +72,9 @@ def build_llm(config: AppConfig) -> LLMProtocol:
         backend = MlxLmBackend(llm_id)
         token_counter = backend.count_tokens
     elif backend_name == "ollama":
+        OllamaBackend.check_available()
         backend = OllamaBackend(llm_id)
-        token_counter = None  # OllamaBackend does not yet provide a token counter
+        token_counter = None  # Ollama does not expose a token-counting endpoint
     else:
         raise ValueError(f"Unknown llm_backend: {backend_name!r}")
 
@@ -89,7 +90,18 @@ def build_llm(config: AppConfig) -> LLMProtocol:
             conversation_temperature=config.llm.conversation_temperature,
         )
 
-    # GemmaLLM routing added in PR 2
+    if family == "gemma4":
+        backend_label = "mlx_lm" if backend_name == "mlx" else "ollama"
+        return GemmaLLM(
+            model_id=llm_id,
+            max_context_tokens=config.llm.max_context_tokens,
+            role_max_new_tokens=dataclasses.asdict(config.llm.role_max_new_tokens),
+            backend=backend,
+            token_counter=token_counter,
+            conversation_temperature=config.llm.conversation_temperature,
+            backend_label=backend_label,
+        )
+
     raise ValueError(f"No LLM wrapper implemented for family {family!r}")
 
 

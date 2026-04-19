@@ -9,6 +9,9 @@ logic (think-tag suppression, EOS heuristics) lives in the wrapper layer
 from __future__ import annotations
 
 import inspect
+import json
+import urllib.error
+import urllib.request
 from typing import Any, Protocol
 
 
@@ -70,15 +73,35 @@ class MlxLmBackend:
 
 
 class OllamaBackend:
-    """Ollama HTTP backend stub — not yet implemented.
+    """Ollama HTTP backend — calls the local Ollama daemon at localhost:11434.
 
-    Will call the Ollama local API at http://localhost:11434 once implemented
-    in the Gemma 4 integration PR. Satisfies LLMBackend protocol so factory
-    routing can be wired now without blocking on the full implementation.
+    Offline-first: all calls go to localhost; no external network traffic.
+    Requires the Ollama daemon to be running before the application starts.
+    Call check_available() at startup to surface a clear error if it is not.
     """
+
+    _BASE_URL = "http://localhost:11434"
+    _GENERATE_TIMEOUT = 120  # seconds; LLM generation can take time
 
     def __init__(self, model_id: str) -> None:
         self._model_id = model_id
+
+    @classmethod
+    def check_available(cls) -> None:
+        """Verify the Ollama daemon is reachable. Raises RuntimeError if not.
+
+        Call this at startup (from factory.build_llm) so a missing daemon
+        produces a clear error before any model loading is attempted.
+        """
+        try:
+            with urllib.request.urlopen(cls._BASE_URL, timeout=3):
+                pass
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                f"Ollama daemon is not available at {cls._BASE_URL}. "
+                "Start Ollama before launching kaiwa-coach with llm_backend=ollama. "
+                f"Detail: {exc}"
+            ) from exc
 
     def generate(
         self,
@@ -87,13 +110,37 @@ class OllamaBackend:
         extra_eos_tokens: list[str] | None = None,
         temperature: float = 0.0,
     ) -> str:
-        raise NotImplementedError(
-            "OllamaBackend is not yet implemented. "
-            "Ollama support is planned for the Gemma 4 integration PR."
-        )
+        options: dict[str, Any] = {
+            "num_predict": max_tokens,
+            "temperature": temperature,
+        }
+        if extra_eos_tokens:
+            options["stop"] = extra_eos_tokens
 
-    def count_tokens(self, text: str) -> int:
-        raise NotImplementedError(
-            "OllamaBackend is not yet implemented. "
-            "Ollama support is planned for the Gemma 4 integration PR."
+        payload = {
+            "model": self._model_id,
+            "prompt": prompt,
+            "stream": False,
+            "options": options,
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self._BASE_URL}/api/generate",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
+        try:
+            with urllib.request.urlopen(req, timeout=self._GENERATE_TIMEOUT) as resp:
+                response_data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(
+                f"Ollama API returned HTTP {exc.code} for model {self._model_id!r}. "
+                f"Detail: {exc.read().decode('utf-8', errors='replace')}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                f"Ollama request failed for model {self._model_id!r}: {exc}"
+            ) from exc
+
+        return str(response_data.get("response", ""))

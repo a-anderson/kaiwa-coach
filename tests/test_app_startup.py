@@ -292,3 +292,36 @@ def test_load_config_mlx_backend_rejects_ollama_style_model_id(monkeypatch: pyte
 
     with pytest.raises(ValueError, match="Unsupported models.llm_id"):
         load_config()
+
+
+# --- Gemma 4 config wiring ---
+
+def test_load_config_accepts_gemma4_mlx_model_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should accept a known Gemma 4 MLX model ID."""
+    from kaiwacoach.config.models import GEMMA4_E4B_4BIT
+
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", GEMMA4_E4B_4BIT)
+
+    config = load_config()
+
+    assert config.models.llm_id == GEMMA4_E4B_4BIT
+    assert config.models.llm_backend == "mlx"
+
+
+def test_load_config_accepts_gemma4_26b_mlx_model_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """load_config should accept the 26B MoE Gemma 4 MLX model ID."""
+    from kaiwacoach.config.models import GEMMA4_26B_8BIT
+
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", GEMMA4_26B_8BIT)
+
+    config = load_config()
+
+    assert config.models.llm_id == GEMMA4_26B_8BIT
+
+
+def test_load_config_rejects_nonexistent_gemma4_mlx_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Gemma 4 MLX model ID that isn't in the allowlist should be rejected."""
+    monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "mlx-community/gemma-4-e4b-it-8bit")
+
+    with pytest.raises(ValueError, match="Unsupported models.llm_id"):
+        load_config()
