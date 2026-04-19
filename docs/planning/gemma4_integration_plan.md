@@ -91,14 +91,6 @@ MLX model IDs are validated against an explicit allowlist at startup. Ollama mod
 
 ---
 
-## Open Unknowns
-
-None — all unknowns resolved.
-
----
-
-## Resolved Unknowns (all)
-
 5. ✅ **Recommended temperature** (resolved 2026-04-19): Google recommends `temperature=1.0` for Gemma 4. Default `0.7` produces natural responses with no observed quality issues for either `gemma4:e4b` or `gemma4:26b`. No change to the default — if users want to experiment, `config.example.yaml` documents the `conversation_temperature` option.
 
 ---

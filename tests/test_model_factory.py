@@ -389,6 +389,29 @@ def test_build_llm_unknown_model_id_prefix_raises(monkeypatch: pytest.MonkeyPatc
         build_llm(config)
 
 
+def test_build_llm_ollama_unknown_prefix_raises_at_build_time(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """An unknown Ollama model ID prefix passes config validation but raises at build_llm.
+
+    Ollama IDs are pass-through in _validate_config (no allowlist). Family detection
+    happens in build_llm, so the ValueError surfaces at startup during app.main() with
+    a descriptive message listing the supported prefixes.
+    """
+    monkeypatch.setattr(factory_module, "OllamaBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="custom-model:v1", tts_id=TTS_MODEL_ID, llm_backend="ollama"),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    with pytest.raises(ValueError, match="Cannot determine LLM model family"):
+        build_llm(config)
+
+
 # --- build_tts (slow: MlxAudioBackend loads the model on init) ---
 
 @pytest.mark.slow

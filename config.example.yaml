@@ -22,7 +22,7 @@ models:
   # Qwen3 via Ollama (set llm_backend: "ollama"):
   #   qwen3:14b
   # Gemma 4 via Ollama (set llm_backend: "ollama"):
-  #   gemma4:e4b  /  gemma4:26b  /  gemma4:31b
+  #   gemma4:e4b  /  gemma4:26b
   tts_id: "mlx-community/Kokoro-82M-bf16"
 
 llm:

@@ -92,19 +92,16 @@ def build_llm(config: AppConfig) -> LLMProtocol:
             conversation_temperature=config.llm.conversation_temperature,
         )
 
-    if family == "gemma4":
-        backend_label = "mlx_lm" if backend_name == "mlx" else "ollama"
-        return GemmaLLM(
-            model_id=llm_id,
-            max_context_tokens=config.llm.max_context_tokens,
-            role_max_new_tokens=dataclasses.asdict(config.llm.role_max_new_tokens),
-            backend=backend,
-            token_counter=token_counter,
-            conversation_temperature=config.llm.conversation_temperature,
-            backend_label=backend_label,
-        )
-
-    raise ValueError(f"No LLM wrapper implemented for family {family!r}")
+    backend_label = "mlx_lm" if backend_name == "mlx" else "ollama"
+    return GemmaLLM(
+        model_id=llm_id,
+        max_context_tokens=config.llm.max_context_tokens,
+        role_max_new_tokens=dataclasses.asdict(config.llm.role_max_new_tokens),
+        backend=backend,
+        token_counter=token_counter,
+        conversation_temperature=config.llm.conversation_temperature,
+        backend_label=backend_label,
+    )
 
 
 def build_tts(config: AppConfig, cache: SessionAudioCache) -> TTSProtocol:
