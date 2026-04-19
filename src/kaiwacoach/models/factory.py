@@ -67,18 +67,20 @@ def build_llm(config: AppConfig) -> LLMProtocol:
     """
     llm_id = config.models.llm_id
     backend_name = config.models.llm_backend
+    family = _detect_family(llm_id)
 
     if backend_name == "mlx":
         backend = MlxLmBackend(llm_id)
         token_counter = backend.count_tokens
     elif backend_name == "ollama":
         OllamaBackend.check_available()
-        backend = OllamaBackend(llm_id)
+        # Gemma 4 26B-A4B generates mandatory thought blocks that consume the
+        # token budget before the actual answer. Suppressing thinking ensures
+        # the full cap is available for the JSON answer across all roles.
+        backend = OllamaBackend(llm_id, suppress_thinking=(family == "gemma4"))
         token_counter = None  # Ollama does not expose a token-counting endpoint
     else:
         raise ValueError(f"Unknown llm_backend: {backend_name!r}")
-
-    family = _detect_family(llm_id)
 
     if family == "qwen3":
         return QwenLLM(

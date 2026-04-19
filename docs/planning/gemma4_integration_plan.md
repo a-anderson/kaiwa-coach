@@ -152,17 +152,17 @@ Env vars:
 
 These cannot be answered without empirical testing against a live Gemma 4 model. They are **not** blockers for PR 1.
 
-1. **JSON output reliability (highest risk)**: Does Gemma 4 IT reliably produce bare JSON with no preamble or markdown fences when prompted in completion style? If not, prompts in `prompts/*.md` may need stronger JSON-only directives. Test every role: `conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`.
+1. **JSON output reliability** ✅ **Resolved (2026-04-19, `gemma4:e4b` via Ollama)**: All four roles (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`) produce clean JSON with no preamble or markdown fences. Prompts require no changes.
 
-2. **Token cap calibration**: `LLMRoleCaps` defaults (`conversation=256`, `jp_tts_normalisation=192`, `detect_and_correct=96`, `explain_and_native=144`) were tuned for Qwen3's tokenizer. Gemma 4 tokenises differently — verify these are not too tight or too loose.
+2. **Token cap calibration**: Defaults (`conversation=256`, `jp_tts_normalisation=192`, `detect_and_correct=96`, `explain_and_native=144`) not yet verified for Gemma 4 tokenizer. Not yet tested.
 
-3. **e4b thought-tag behaviour**: The 26B-A4B model always generates `<|channel>thought...<channel|>` tags. Verify whether `e4b-it` does the same. If it does not, the `json_enforcement.py` change in PR 2 is still harmless (the pattern simply never matches).
+3. **e4b thought-tag behaviour** ✅ **Resolved (2026-04-19, `gemma4:e4b` via Ollama)**: No `<|channel>thought...<channel|>` tags produced — output is clean. `_GEMMA_CHANNEL_RE` is harmless. **`gemma4:26b` thought-tag behaviour not yet tested** — Ollama may strip them internally before returning the response.
 
-4. **`}` EOS token**: Whether `extra_eos_tokens=["}"]` helps or hurts Gemma 4 conversation output is unknown. Test with and without.
+4. **`}` EOS token**: Not yet tested for Gemma 4. Currently not enabled in `GemmaLLM` (unlike `QwenLLM`). Test empirically if output truncation issues arise.
 
-5. **Recommended temperature**: Google recommends `temperature=1.0, top_p=0.95, top_k=64` for Gemma 4. The app default is `0.7` (Qwen3-tuned). Not a breaking issue but worth noting in `config.example.yaml`.
+5. **Recommended temperature**: Google recommends `temperature=1.0` for Gemma 4. Default `0.7` works correctly for `gemma4:e4b` (2026-04-19 test). Not a breaking issue.
 
-6. **Ollama startup health check**: If Ollama backend is configured but the Ollama daemon is not running, the failure should surface as a clear error at startup rather than a cryptic HTTP connection error mid-turn. PR 2 should add a startup health-check ping to `http://localhost:11434` when `llm_backend = "ollama"`.
+6. **Ollama startup health check** ✅ **Resolved**: `OllamaBackend.check_available()` implemented; raises `RuntimeError` with a clear message if the Ollama daemon is not running.
 
 ---
 

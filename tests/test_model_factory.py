@@ -84,7 +84,7 @@ class _StubBackend:
     OllamaBackend in factory tests without requiring a running Ollama daemon.
     """
 
-    def __init__(self, model_id: str) -> None:
+    def __init__(self, model_id: str, suppress_thinking: bool = False) -> None:
         pass
 
     @classmethod
@@ -270,6 +270,62 @@ def test_build_llm_gemma_mlx_backend_label_is_mlx_lm(monkeypatch: pytest.MonkeyP
 
     assert isinstance(llm, GemmaLLM)
     assert llm._backend_label == "mlx_lm"
+
+
+def test_build_llm_gemma_ollama_suppresses_thinking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """GemmaLLM via Ollama should have suppress_thinking=True to avoid token starvation."""
+    created_backends: list = []
+
+    class _CapturingStubBackend(_StubBackend):
+        def __init__(self, model_id: str, suppress_thinking: bool = False) -> None:
+            super().__init__(model_id)
+            self.suppress_thinking = suppress_thinking
+            created_backends.append(self)
+
+    monkeypatch.setattr(factory_module, "OllamaBackend", _CapturingStubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="gemma4:26b", tts_id=TTS_MODEL_ID, llm_backend="ollama"),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    build_llm(config)
+
+    assert len(created_backends) == 1
+    assert created_backends[0].suppress_thinking is True
+
+
+def test_build_llm_qwen3_ollama_does_not_suppress_thinking(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """QwenLLM via Ollama should not suppress thinking (Qwen3 uses a different mechanism)."""
+    created_backends: list = []
+
+    class _CapturingStubBackend(_StubBackend):
+        def __init__(self, model_id: str, suppress_thinking: bool = False) -> None:
+            super().__init__(model_id)
+            self.suppress_thinking = suppress_thinking
+            created_backends.append(self)
+
+    monkeypatch.setattr(factory_module, "OllamaBackend", _CapturingStubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="qwen3:14b", tts_id=TTS_MODEL_ID, llm_backend="ollama"),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    build_llm(config)
+
+    assert len(created_backends) == 1
+    assert created_backends[0].suppress_thinking is False
 
 
 def test_build_llm_gemma_ollama_backend_label_is_ollama(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

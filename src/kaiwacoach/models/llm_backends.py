@@ -83,8 +83,12 @@ class OllamaBackend:
     _BASE_URL = "http://localhost:11434"
     _GENERATE_TIMEOUT = 120  # seconds; LLM generation can take time
 
-    def __init__(self, model_id: str) -> None:
+    def __init__(self, model_id: str, suppress_thinking: bool = False) -> None:
         self._model_id = model_id
+        # When True, adds "think": false to API requests. Required for thinking
+        # models (e.g. gemma4:26b) where the thought phase consumes token budget
+        # before the actual answer is generated.
+        self._suppress_thinking = suppress_thinking
 
     @classmethod
     def check_available(cls) -> None:
@@ -117,12 +121,14 @@ class OllamaBackend:
         if extra_eos_tokens:
             options["stop"] = extra_eos_tokens
 
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._model_id,
             "prompt": prompt,
             "stream": False,
             "options": options,
         }
+        if self._suppress_thinking:
+            payload["think"] = False
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(
             f"{self._BASE_URL}/api/generate",

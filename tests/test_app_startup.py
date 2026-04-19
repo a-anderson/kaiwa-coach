@@ -173,12 +173,12 @@ def test_load_config_4bit_llm_id_roundtrips_to_dict(monkeypatch: pytest.MonkeyPa
 
 # --- model ID validation ---
 
-def test_load_config_rejects_unknown_llm_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_rejects_unknown_llm_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """load_config should raise ValueError for an unrecognised LLM model ID."""
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "mlx-community/unknown-model")
 
     with pytest.raises(ValueError, match="Unsupported models.llm_id"):
-        load_config()
+        load_config(config_path=tmp_path / "nonexistent.yaml")
 
 
 def test_load_config_rejects_unknown_asr_id(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -224,26 +224,26 @@ def test_load_config_accepts_conversation_temperature_boundary_values(monkeypatc
     assert config.llm.conversation_temperature == 1.0
 
 
-def test_load_config_error_message_lists_valid_options(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_error_message_lists_valid_options(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The validation error for an unknown LLM ID should list the valid alternatives."""
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "typo-model")
 
     with pytest.raises(ValueError, match=LLM_MODEL_ID_8BIT):
-        load_config()
+        load_config(config_path=tmp_path / "nonexistent.yaml")
 
 
 # --- llm_backend config ---
 
-def test_load_config_default_llm_backend_is_mlx() -> None:
+def test_load_config_default_llm_backend_is_mlx(tmp_path: Path) -> None:
     """Default config should use the mlx backend."""
-    config = load_config()
+    config = load_config(config_path=tmp_path / "nonexistent.yaml")
 
     assert config.models.llm_backend == "mlx"
 
 
-def test_load_config_llm_backend_roundtrips_to_dict() -> None:
+def test_load_config_llm_backend_roundtrips_to_dict(tmp_path: Path) -> None:
     """llm_backend should survive the load_config → to_dict round-trip."""
-    config = load_config()
+    config = load_config(config_path=tmp_path / "nonexistent.yaml")
 
     assert config.to_dict()["models"]["llm_backend"] == "mlx"
 
@@ -296,13 +296,13 @@ def test_load_config_mlx_backend_rejects_ollama_style_model_id(monkeypatch: pyte
 
 # --- Gemma 4 config wiring ---
 
-def test_load_config_accepts_gemma4_mlx_model_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_accepts_gemma4_mlx_model_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """load_config should accept a known Gemma 4 MLX model ID."""
     from kaiwacoach.config.models import GEMMA4_E4B_4BIT
 
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", GEMMA4_E4B_4BIT)
 
-    config = load_config()
+    config = load_config(config_path=tmp_path / "nonexistent.yaml")
 
     assert config.models.llm_id == GEMMA4_E4B_4BIT
     assert config.models.llm_backend == "mlx"
@@ -319,9 +319,9 @@ def test_load_config_accepts_gemma4_26b_mlx_model_id(monkeypatch: pytest.MonkeyP
     assert config.models.llm_id == GEMMA4_26B_8BIT
 
 
-def test_load_config_rejects_nonexistent_gemma4_mlx_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_rejects_nonexistent_gemma4_mlx_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A Gemma 4 MLX model ID that isn't in the allowlist should be rejected."""
     monkeypatch.setenv("KAIWACOACH_MODELS_LLM_ID", "mlx-community/gemma-4-e4b-it-8bit")
 
     with pytest.raises(ValueError, match="Unsupported models.llm_id"):
-        load_config()
+        load_config(config_path=tmp_path / "nonexistent.yaml")

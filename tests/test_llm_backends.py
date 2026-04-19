@@ -123,6 +123,38 @@ def test_ollama_backend_generate_omits_stop_when_none() -> None:
     assert "stop" not in captured["payload"]["options"]
 
 
+def test_ollama_backend_suppress_thinking_adds_think_false_to_payload() -> None:
+    """suppress_thinking=True should add 'think': false to the Ollama request payload."""
+    captured: dict = {}
+    mock_resp = _make_urlopen_response({"response": "ok"})
+
+    def _fake_urlopen(req, timeout=None):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return mock_resp
+
+    with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        backend = OllamaBackend("gemma4:26b", suppress_thinking=True)
+        backend.generate("prompt", max_tokens=256)
+
+    assert captured["payload"].get("think") is False
+
+
+def test_ollama_backend_no_think_field_when_suppress_thinking_false() -> None:
+    """suppress_thinking=False (default) should not add 'think' to the payload."""
+    captured: dict = {}
+    mock_resp = _make_urlopen_response({"response": "ok"})
+
+    def _fake_urlopen(req, timeout=None):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return mock_resp
+
+    with patch("urllib.request.urlopen", side_effect=_fake_urlopen):
+        backend = OllamaBackend("qwen3:14b")
+        backend.generate("prompt", max_tokens=256)
+
+    assert "think" not in captured["payload"]
+
+
 def test_ollama_backend_generate_raises_on_url_error() -> None:
     """Network errors should be wrapped in RuntimeError with a clear message."""
     with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
