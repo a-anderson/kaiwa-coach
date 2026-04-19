@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from kaiwacoach.models.json_enforcement import (
     ConversationReply,
     extract_first_json_object,
@@ -141,6 +145,18 @@ def test_gemma_channel_tag_stripping_is_harmless_when_absent() -> None:
     text = '{"reply": "こんにちは。"}'
     obj = extract_first_json_object(text)
     assert obj == {"reply": "こんにちは。"}
+
+
+def test_gemma_truncated_channel_tag_raises_decode_error() -> None:
+    """Truncated thought-block output (no closing tag) is not stripped and raises JSONDecodeError.
+
+    This documents the known limitation: _GEMMA_CHANNEL_RE requires the closing <channel|>
+    tag. For Ollama, suppress_thinking=True prevents this situation entirely.
+    For MLX, truncated output will surface as a parse failure and trigger the repair path.
+    """
+    truncated = "<|channel>thought\nThis is reasoning that was cut off mid-stream"
+    with pytest.raises(json.JSONDecodeError):
+        extract_first_json_object(truncated)
 
 
 def test_explain_and_native_repair_path() -> None:

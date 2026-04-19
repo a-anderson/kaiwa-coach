@@ -8,8 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Callable, Type
 
 _THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
-# Gemma 4 26B-A4B always generates thought blocks in this format before the answer.
-# The e4b model may not produce them, but the pattern is harmless when absent.
+# Gemma 4 26B-A4B (MLX) generates thought blocks in this format before the answer.
+# Requires the closing <channel|> tag — truncated output (no closing tag) will not be
+# stripped and will cause raw_decode to fail. For Ollama, use suppress_thinking=True
+# on OllamaBackend instead; this regex handles the MLX path only.
 _GEMMA_CHANNEL_RE = re.compile(r"<\|channel>thought.*?<channel\|>", re.DOTALL)
 
 from pydantic import BaseModel, Field, StrictStr, ValidationError, conlist

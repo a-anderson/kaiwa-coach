@@ -177,10 +177,8 @@ class GemmaLLM:
         result = self.generate(prompt=prompt, role=role, max_new_tokens=max_new_tokens)
         return parse_with_schema(role=role, text=result.text, repair_fn=repair_fn)
 
-    def _default_generator(self, **_: Any) -> tuple[str, dict[str, Any]]:
-        prompt = _["prompt"]
-        max_tokens = _["max_new_tokens"]
-        role = _["role"]
+    def _default_generator(self, *, prompt: str, max_new_tokens: int, role: str) -> tuple[str, dict[str, Any]]:
+        max_tokens = max_new_tokens
         # No extra_eos heuristic for Gemma — test empirically before enabling.
         temperature = self._conversation_temperature if role == "conversation" else 0.0
         return (

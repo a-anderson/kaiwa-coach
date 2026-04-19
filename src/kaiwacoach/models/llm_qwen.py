@@ -179,22 +179,9 @@ class QwenLLM:
         {"jp_tts_normalisation", "detect_and_correct", "explain_and_native"}
     )
 
-    def _default_generator(self, **_: Any) -> tuple[str, dict[str, Any]]:
-        """Default generator hook (uses the configured backend).
-
-        Returns
-        -------
-        tuple[str, dict]
-            Generated text and metadata.
-
-        Raises
-        ------
-        RuntimeError
-            If no LLM backend is configured.
-        """
-        prompt = _["prompt"]
-        max_tokens = _["max_new_tokens"]
-        role = _["role"]
+    def _default_generator(self, *, prompt: str, max_new_tokens: int, role: str) -> tuple[str, dict[str, Any]]:
+        """Default generator hook (uses the configured backend)."""
+        max_tokens = max_new_tokens
         # Tradeoff: stopping on "}" reduces trailing garbage but can truncate
         # malformed outputs before a full JSON object is complete.
         extra_eos = ["}"] if role == "conversation" else None

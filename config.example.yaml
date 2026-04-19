@@ -16,8 +16,8 @@ models:
   #   mlx-community/gemma-4-e2b-it-8bit     — 2B, low VRAM
   #   mlx-community/gemma-4-e4b-it-4bit     — 4B, low VRAM
   #   mlx-community/gemma-4-e4b-it-bf16     — 4B, full precision
-  #   mlx-community/gemma-4-26b-a4b-it-8bit — 26B MoE (~4B active), best quality
-  #   mlx-community/gemma-4-26b-a4b-it-4bit — 26B MoE, minimum VRAM
+  #   mlx-community/gemma-4-26b-a4b-it-8bit — 26B MoE (~4B active), best quality; generates thought blocks stripped automatically
+  #   mlx-community/gemma-4-26b-a4b-it-4bit — 26B MoE, minimum VRAM; same thought-block behaviour
   #   Google recommends temperature=1.0 for Gemma 4; default 0.7 is conservative.
   # Qwen3 via Ollama (set llm_backend: "ollama"):
   #   qwen3:14b
