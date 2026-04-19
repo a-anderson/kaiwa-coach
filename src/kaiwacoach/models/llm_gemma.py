@@ -1,9 +1,17 @@
-"""Qwen LLM wrapper with token limits and metadata capture."""
+"""Gemma LLM wrapper with token limits and metadata capture.
+
+Mirrors QwenLLM but omits Qwen3-specific behaviour:
+- No _NO_THINK_ROLES: does not append <think>\\n\\n</think> to any prompt.
+- No extra_eos=["}"] heuristic (test empirically before enabling).
+
+The backend label in result metadata is set at construction time so MLX and
+Ollama calls are distinguishable in logs.
+"""
 
 from __future__ import annotations
 
-import time
 import hashlib
+import time
 from typing import Any, Callable, Mapping
 
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
@@ -14,8 +22,8 @@ from kaiwacoach.utils import BoundedDict
 _LLM_CACHE_MAX = 256
 
 
-class QwenLLM:
-    """LLM wrapper enforcing context limits and per-role max tokens."""
+class GemmaLLM:
+    """LLM wrapper for Gemma 4 models, enforcing context limits and per-role token caps."""
 
     def __init__(
         self,
@@ -25,25 +33,26 @@ class QwenLLM:
         backend: LLMBackend | None = None,
         token_counter: Callable[[str], int] | None = None,
         conversation_temperature: float = 0.0,
+        backend_label: str = "mlx_lm",
     ) -> None:
-        """Initialize the LLM wrapper.
+        """Initialise the Gemma LLM wrapper.
 
         Parameters
         ----------
         model_id : str
-            Model identifier to load.
+            Model identifier passed to the backend.
         max_context_tokens : int
-            Maximum context tokens allowed for prompts.
+            Maximum context tokens; prompts exceeding this raise ValueError.
         role_max_new_tokens : Mapping[str, int]
-            Per-role max token limits for generation.
+            Per-role generation token caps.
         backend : LLMBackend | None
-            Optional backend for generation (defaults to MLX-LM backend).
+            Backend for generation; defaults to MlxLmBackend.
         token_counter : Callable[[str], int] | None
-            Optional token counter for context length validation.
+            Token counting function; None skips context-limit enforcement.
         conversation_temperature : float
             Sampling temperature for the conversation role. All other roles use 0.0.
-            The application default (0.7) lives in LLMConfig; this parameter
-            defaults to 0.0 so direct instantiation in tests stays deterministic.
+        backend_label : str
+            Label recorded in result metadata to identify the backend in use.
         """
         if max_context_tokens <= 0:
             raise ValueError("max_context_tokens must be > 0")
@@ -53,6 +62,7 @@ class QwenLLM:
         self._token_counter = token_counter
         self._backend = backend or MlxLmBackend(self._model_id)
         self._conversation_temperature = conversation_temperature
+        self._backend_label = backend_label
         self._generator = self._default_generator
         self._cache: BoundedDict[tuple[str, str, int], LLMResult] = BoundedDict(maxsize=_LLM_CACHE_MAX)
 
@@ -76,9 +86,8 @@ class QwenLLM:
         if role not in self._role_max_new_tokens:
             raise ValueError(f"Unknown role: {role}")
 
-        # Apply no-think prefix before token counting, hashing, and generation
-        # so all metadata reflects the prompt actually sent to the model.
-        effective_prompt = prompt + "<think>\n\n</think>" if role in self._NO_THINK_ROLES else prompt
+        # No think-suppression suffix for Gemma — Qwen3-specific behaviour.
+        effective_prompt = prompt
 
         if self._token_counter is not None:
             prompt_tokens = self._token_counter(effective_prompt)
@@ -96,10 +105,6 @@ class QwenLLM:
             effective_max_new_tokens = min(max_new_tokens, role_cap)
 
         prompt_hash = hashlib.sha256(effective_prompt.encode("utf-8")).hexdigest()
-        # Temperature is intentionally excluded from the cache key. It is fixed
-        # at startup and conversation prompts are effectively unique (history
-        # grows each turn), so cache collisions across different temperatures
-        # cannot occur in practice.
         cache_key = (prompt_hash, role, effective_max_new_tokens)
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -156,13 +161,13 @@ class QwenLLM:
         Parameters
         ----------
         prompt : str
-            Prompt text to send to the model.
+            Prompt text.
         role : str
-            Logical role name for schema selection.
+            Role name for schema selection.
         max_new_tokens : int | None
             Optional override for max new tokens.
         repair_fn : Callable[[str], str] | None
-            Optional repair function to attempt once on invalid JSON.
+            Optional repair function for a single retry on invalid JSON.
 
         Returns
         -------
@@ -172,30 +177,18 @@ class QwenLLM:
         result = self.generate(prompt=prompt, role=role, max_new_tokens=max_new_tokens)
         return parse_with_schema(role=role, text=result.text, repair_fn=repair_fn)
 
-    # Roles that should suppress Qwen3 thinking mode. Appending the empty
-    # think block signals to the model that the reasoning phase is complete
-    # and it should output the answer directly, avoiding wasted token budget.
-    _NO_THINK_ROLES: frozenset[str] = frozenset(
-        {"jp_tts_normalisation", "detect_and_correct", "explain_and_native"}
-    )
-
     def _default_generator(self, *, prompt: str, max_new_tokens: int, role: str) -> tuple[str, dict[str, Any]]:
-        """Default generator hook (uses the configured backend)."""
         max_tokens = max_new_tokens
-        # Tradeoff: stopping on "}" reduces trailing garbage but can truncate
-        # malformed outputs before a full JSON object is complete.
-        extra_eos = ["}"] if role == "conversation" else None
-        # Only the conversation role uses non-zero temperature; all correction
-        # and normalisation roles stay deterministic at 0.0.
+        # No extra_eos heuristic for Gemma — test empirically before enabling.
         temperature = self._conversation_temperature if role == "conversation" else 0.0
         return (
             self._backend.generate(
                 prompt=prompt,
                 max_tokens=max_tokens,
-                extra_eos_tokens=extra_eos,
+                extra_eos_tokens=None,
                 temperature=temperature,
             ),
-            {"backend": "mlx_lm", "temperature": temperature},
+            {"backend": self._backend_label, "temperature": temperature},
         )
 
     def clear_cache(self) -> None:

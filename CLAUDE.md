@@ -192,7 +192,7 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Write to a standard suitable for senior+ review: clear, testable, easy to reason about.
 - Prefer small explicit helpers over large callback bodies when output ordering or state transitions are non-trivial.
 - When refactoring: move code first, then change behaviour in a separate step.
-- Add docstrings/comments only for non-obvious behaviour, tradeoffs, or framework quirks.
+- Add docstrings/comments only for non-obvious behaviour, tradeoffs, or framework quirks. When a docstring is warranted, the description must be one concise sentence; Parameters and Returns sections are permitted where they add clarity.
 - Start with the simplest solution that is likely to work. If choosing a more complex option, document why the simpler one was insufficient.
 - Keep changes focused and diffs small; avoid broad refactors unless explicitly requested.
 - **Python type hints**: use built-in types directly — `dict`, `list`, `tuple` — not `Dict`, `List` from `typing` (Python 3.9+ is required). Use `X | None` instead of `Optional[X]`.

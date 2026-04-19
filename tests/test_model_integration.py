@@ -50,8 +50,10 @@ def test_asr_integration_real_model(tmp_path: Path) -> None:
 
 @pytest.mark.slow
 def test_llm_integration_real_model() -> None:
-    """LLM integration: model loads and returns a JSON response."""
+    """LLM integration: MLX backend loads and returns a JSON response."""
     config = load_config()
+    if config.models.llm_backend != "mlx":
+        pytest.skip(f"Test requires mlx backend; configured backend is {config.models.llm_backend!r}")
     prompt_loader = PromptLoader(_prompt_dir())
     prompt = prompt_loader.render(
         "conversation.md",

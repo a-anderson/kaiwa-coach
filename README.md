@@ -177,7 +177,9 @@ Use [config.example.yaml](config.example.yaml) as the file-based template.
 
 ### LLM model variant
 
-The default LLM is `mlx-community/Qwen3-14B-8bit` (8-bit quantised). Three variants are supported — all use the same MLX-LM backend and `QwenLLM` wrapper:
+The default LLM is `mlx-community/Qwen3-14B-8bit`. Two model families are supported: **Qwen3** and **Gemma 4**, each available via MLX (Apple Silicon) or Ollama.
+
+**Qwen3 via MLX** (`llm_backend: "mlx"`):
 
 | Variant         | Model ID                       | Trade-off                   |
 | --------------- | ------------------------------ | --------------------------- |
@@ -185,17 +187,36 @@ The default LLM is `mlx-community/Qwen3-14B-8bit` (8-bit quantised). Three varia
 | 8-bit (default) | `mlx-community/Qwen3-14B-8bit` | Balanced quality and VRAM   |
 | bf16            | `mlx-community/Qwen3-14B-bf16` | Full precision, ~2× VRAM    |
 
+**Gemma 4 via MLX** (`llm_backend: "mlx"`):
+
+| Variant              | Model ID                                    | Notes                          |
+| -------------------- | ------------------------------------------- | ------------------------------ |
+| e2b-it 8-bit         | `mlx-community/gemma-4-e2b-it-8bit`        | 2B dense, lowest VRAM          |
+| e4b-it 4-bit         | `mlx-community/gemma-4-e4b-it-4bit`        | 4B dense, low VRAM             |
+| e4b-it bf16          | `mlx-community/gemma-4-e4b-it-bf16`        | 4B dense, full precision       |
+| 26b-a4b-it 8-bit     | `mlx-community/gemma-4-26b-a4b-it-8bit`    | 26B MoE (~4B active), balanced |
+| 26b-a4b-it 4-bit     | `mlx-community/gemma-4-26b-a4b-it-4bit`    | 26B MoE, minimum VRAM          |
+
+**Via Ollama** (`llm_backend: "ollama"`, requires [Ollama](https://ollama.com) running locally):
+
+| Model       | `llm_id`      |
+| ----------- | ------------- |
+| Qwen3 14B   | `qwen3:14b`   |
+| Gemma 4 e4b | `gemma4:e4b`  |
+| Gemma 4 26b | `gemma4:26b`  |
+
 Set in `config.yaml`:
 
 ```yaml
 models:
-    llm_id: "mlx-community/Qwen3-14B-4bit"
+    llm_backend: "mlx"
+    llm_id: "mlx-community/gemma-4-e4b-it-4bit"
 ```
 
-Or via environment variable:
+Or via environment variables:
 
 ```bash
-KAIWACOACH_MODELS_LLM_ID=mlx-community/Qwen3-14B-4bit poetry run python -m kaiwacoach.app
+KAIWACOACH_MODELS_LLM_BACKEND=mlx KAIWACOACH_MODELS_LLM_ID=mlx-community/gemma-4-e4b-it-4bit poetry run python -m kaiwacoach.app
 ```
 
 The active ASR, LLM, and TTS model IDs are logged at startup so the configured variant is always visible.
@@ -334,9 +355,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-03-28):
+Latest full local snapshot (2026-04-19):
 
-- `232 passed`
+- `277 passed`
 
 ### Schema and repair robustness
 

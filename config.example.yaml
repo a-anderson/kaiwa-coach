@@ -4,8 +4,25 @@ session:
   language: "ja"  # or "fr" or "en"
 
 models:
+  llm_backend: "mlx"  # "mlx" (default, Apple Silicon only) or "ollama" (requires Ollama daemon)
   asr_id: "mlx-community/whisper-large-v3-mlx"
-  llm_id: "mlx-community/Qwen3-14B-8bit"  # or "mlx-community/Qwen3-14B-bf16" for full precision
+  llm_id: "mlx-community/Qwen3-14B-8bit"
+  # --- LLM model options ---
+  # Qwen3 via MLX (default):
+  #   mlx-community/Qwen3-14B-4bit   — minimum VRAM, lower quality
+  #   mlx-community/Qwen3-14B-8bit   — balanced (default)
+  #   mlx-community/Qwen3-14B-bf16   — full precision, ~2x VRAM
+  # Gemma 4 via MLX (e4b has no 8bit checkpoint; note: no e4b-8bit):
+  #   mlx-community/gemma-4-e2b-it-8bit     — 2B, low VRAM
+  #   mlx-community/gemma-4-e4b-it-4bit     — 4B, low VRAM
+  #   mlx-community/gemma-4-e4b-it-bf16     — 4B, full precision
+  #   mlx-community/gemma-4-26b-a4b-it-8bit — 26B MoE (~4B active), best quality; generates thought blocks stripped automatically
+  #   mlx-community/gemma-4-26b-a4b-it-4bit — 26B MoE, minimum VRAM; same thought-block behaviour
+  #   Google recommends temperature=1.0 for Gemma 4; default 0.7 is conservative.
+  # Qwen3 via Ollama (set llm_backend: "ollama"):
+  #   qwen3:14b
+  # Gemma 4 via Ollama (set llm_backend: "ollama"):
+  #   gemma4:e4b  /  gemma4:26b
   tts_id: "mlx-community/Kokoro-82M-bf16"
 
 llm:
