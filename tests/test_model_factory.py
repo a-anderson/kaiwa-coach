@@ -11,7 +11,7 @@ import pytest
 import kaiwacoach.models.factory as factory_module
 from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16, TTS_MODEL_ID
 from kaiwacoach.models.asr_whisper import WhisperASR
-from kaiwacoach.models.factory import build_asr, build_llm, build_tts
+from kaiwacoach.models.factory import _detect_family, build_asr, build_llm, build_tts
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
@@ -174,6 +174,74 @@ def test_build_llm_routes_to_qwen_llm() -> None:
     finally:
         del llm
         gc.collect()
+
+
+# --- _detect_family ---
+
+def test_detect_family_returns_qwen3_for_mlx_qwen3_prefix() -> None:
+    """MLX Qwen3 model IDs should resolve to the qwen3 family."""
+    assert _detect_family("mlx-community/Qwen3-14B-8bit") == "qwen3"
+    assert _detect_family("mlx-community/Qwen3-14B-4bit") == "qwen3"
+    assert _detect_family("mlx-community/Qwen3-14B-bf16") == "qwen3"
+
+
+def test_detect_family_returns_qwen3_for_ollama_qwen3_prefix() -> None:
+    """Ollama Qwen3 model IDs should resolve to the qwen3 family."""
+    assert _detect_family("qwen3:14b") == "qwen3"
+    assert _detect_family("qwen3:7b") == "qwen3"
+
+
+def test_detect_family_raises_for_unknown_prefix() -> None:
+    """An unrecognised model ID prefix should raise ValueError at startup."""
+    with pytest.raises(ValueError, match="Cannot determine LLM model family"):
+        _detect_family("unknown-org/some-model")
+
+
+def test_detect_family_error_message_lists_supported_prefixes() -> None:
+    """The ValueError for an unknown prefix should list the known prefixes."""
+    with pytest.raises(ValueError, match="mlx-community/Qwen3-"):
+        _detect_family("totally-unknown")
+
+
+# --- build_llm: backend routing ---
+
+def test_build_llm_ollama_backend_routes_to_qwen_llm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm with ollama backend and a qwen3: model ID should return QwenLLM."""
+    monkeypatch.setattr(factory_module, "OllamaBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="qwen3:14b", tts_id=TTS_MODEL_ID, llm_backend="ollama"),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    llm = build_llm(config)
+
+    assert isinstance(llm, QwenLLM)
+    assert llm.model_id == "qwen3:14b"
+    assert isinstance(llm, LLMProtocol)
+
+
+def test_build_llm_unknown_model_id_prefix_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """build_llm should raise ValueError when the model ID prefix is not recognised."""
+    monkeypatch.setattr(factory_module, "MlxLmBackend", _StubBackend)
+
+    config = AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id="unknown-org/mystery-model", tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+    with pytest.raises(ValueError, match="Cannot determine LLM model family"):
+        build_llm(config)
 
 
 # --- build_tts (slow: MlxAudioBackend loads the model on init) ---

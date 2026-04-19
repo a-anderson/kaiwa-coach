@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from kaiwacoach.models.llm_qwen import LLMResult, MlxLmBackend, QwenLLM, _LLM_CACHE_MAX
 from kaiwacoach.models.json_enforcement import ConversationReply
+from kaiwacoach.models.llm_backends import MlxLmBackend
+from kaiwacoach.models.llm_qwen import QwenLLM, _LLM_CACHE_MAX
+from kaiwacoach.models.protocols import LLMResult
 
 
 class _Backend:
@@ -115,28 +117,6 @@ def test_generate_returns_metadata() -> None:
     assert result.meta["cache_hit"] is False
     assert "prompt_hash" in result.meta
 
-
-def test_default_backend_requires_mlx_lm() -> None:
-    """MlxLmBackend should raise if mlx-lm is unavailable."""
-    import builtins
-
-    original_import = builtins.__import__
-
-    def _import_hook(
-        name: str,
-        globals: object | None = None,
-        locals: object | None = None,
-        fromlist: tuple[str, ...] | list[str] = (),
-        level: int = 0,
-    ):
-        if name.startswith("mlx_lm"):
-            raise ImportError("no module named mlx_lm")
-        return original_import(name, globals, locals, fromlist, level)
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(builtins, "__import__", _import_hook)
-        with pytest.raises(RuntimeError, match="mlx-lm is not available"):
-            MlxLmBackend("model-x")
 
 
 def test_generate_without_token_counter_allows_prompt() -> None:

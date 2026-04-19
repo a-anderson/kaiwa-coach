@@ -3,72 +3,15 @@
 from __future__ import annotations
 
 import time
-import inspect
 import hashlib
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping
 
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
+from kaiwacoach.models.llm_backends import LLMBackend, MlxLmBackend
 from kaiwacoach.models.protocols import LLMResult
 from kaiwacoach.utils import BoundedDict
 
 _LLM_CACHE_MAX = 256
-
-
-class LLMBackend(Protocol):
-    """Protocol for LLM backend implementations.
-
-    Implementations must provide a `generate` method that accepts a prompt and
-    max token count, returning a decoded string.
-    """
-
-    def generate(
-        self,
-        prompt: str,
-        max_tokens: int,
-        extra_eos_tokens: list[str] | None = None,
-        temperature: float = 0.0,
-    ) -> str: ...
-
-
-class MlxLmBackend:
-    """MLX-LM backend loader and generator implementing the LLMBackend protocol."""
-
-    def __init__(self, model_id: str) -> None:
-        try:
-            from mlx_lm import generate, load  # type: ignore
-            from mlx_lm.sample_utils import make_sampler  # type: ignore
-        except Exception as exc:  # pragma: no cover
-            raise RuntimeError(
-                "mlx-lm is not available. Install the LLM dependency to enable generation."
-            ) from exc
-
-        model, tokenizer = load(model_id)
-        self._model = model
-        self._tokenizer = tokenizer
-        self._generate_fn = generate
-        self._make_sampler = make_sampler
-        self._sampler_greedy = make_sampler(temp=0.0)
-        self._supports_extra_eos = "extra_eos_token" in inspect.signature(self._generate_fn).parameters
-
-    def generate(
-        self,
-        prompt: str,
-        max_tokens: int,
-        extra_eos_tokens: list[str] | None = None,
-        temperature: float = 0.0,
-    ) -> str:
-        sampler = self._make_sampler(temp=temperature) if temperature > 0.0 else self._sampler_greedy
-        kwargs: dict[str, Any] = {
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "sampler": sampler,
-        }
-        if self._supports_extra_eos and extra_eos_tokens:
-            kwargs["extra_eos_token"] = list(extra_eos_tokens)
-        return str(self._generate_fn(self._model, self._tokenizer, **kwargs))
-
-    def count_tokens(self, text: str) -> int:
-        return len(self._tokenizer.encode(text))
 
 
 class QwenLLM:

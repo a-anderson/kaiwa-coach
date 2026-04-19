@@ -11,9 +11,19 @@ LLM_MODEL_ID_BF16 = "mlx-community/Qwen3-14B-bf16"
 
 TTS_MODEL_ID = "mlx-community/Kokoro-82M-bf16"
 
-# All validated model IDs per type. Adding a new model requires updating this dict.
+# Supported execution backends for the LLM.
+SUPPORTED_BACKENDS: frozenset[str] = frozenset({"mlx", "ollama"})
+
+# Per-backend LLM model ID allowlists.
+# MLX IDs are validated strictly against this curated set.
+# Ollama IDs are pass-through (None) — Ollama validates availability at model-load time.
+SUPPORTED_LLM_MODELS: dict[str, frozenset[str] | None] = {
+    "mlx": frozenset({LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16}),
+    "ollama": None,
+}
+
+# ASR and TTS use a flat allowlist (single backend each, no per-backend split needed).
 SUPPORTED_MODELS: dict[str, frozenset[str]] = {
     "asr": frozenset({ASR_MODEL_ID}),
-    "llm": frozenset({LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16}),
     "tts": frozenset({TTS_MODEL_ID}),
 }

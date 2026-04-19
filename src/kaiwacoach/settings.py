@@ -66,6 +66,7 @@ class ModelsConfig:
     asr_id: str
     llm_id: str
     tts_id: str
+    llm_backend: str = "mlx"
 
 
 @dataclass(frozen=True)
@@ -122,6 +123,7 @@ class AppConfig:
             "models": {
                 "asr_id": self.models.asr_id,
                 "llm_id": self.models.llm_id,
+                "llm_backend": self.models.llm_backend,
                 "tts_id": self.models.tts_id,
             },
             "llm": {
@@ -253,6 +255,7 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
         "KAIWACOACH_SESSION_LANGUAGE": (("session", "language"), _to_lower_str),
         "KAIWACOACH_MODELS_ASR_ID": (("models", "asr_id"), _to_str),
         "KAIWACOACH_MODELS_LLM_ID": (("models", "llm_id"), _to_str),
+        "KAIWACOACH_MODELS_LLM_BACKEND": (("models", "llm_backend"), _to_lower_str),
         "KAIWACOACH_MODELS_TTS_ID": (("models", "tts_id"), _to_str),
         "KAIWACOACH_LLM_MAX_CONTEXT_TOKENS": (("llm", "max_context_tokens"), _to_int),
         "KAIWACOACH_LLM_CONVERSATION_TEMPERATURE": (("llm", "conversation_temperature"), _to_float),
@@ -404,6 +407,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
         "models": {
             "asr_id": model_defaults["asr"],
             "llm_id": model_defaults["llm"],
+            "llm_backend": "mlx",
             "tts_id": model_defaults["tts"],
         },
         "llm": {
@@ -431,6 +435,7 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
             asr_id=str(merged["models"]["asr_id"]),
             llm_id=str(merged["models"]["llm_id"]),
             tts_id=str(merged["models"]["tts_id"]),
+            llm_backend=str(merged["models"]["llm_backend"]),
         ),
         llm=LLMConfig(
             max_context_tokens=_coerce_int(merged["llm"]["max_context_tokens"], "llm.max_context_tokens"),
@@ -490,7 +495,7 @@ def _validate_config(config: AppConfig) -> None:
     ValueError
         If any configuration values are invalid.
     """
-    from kaiwacoach.config.models import SUPPORTED_MODELS
+    from kaiwacoach.config.models import SUPPORTED_BACKENDS, SUPPORTED_LLM_MODELS, SUPPORTED_MODELS
 
     if not config.models.asr_id:
         raise ValueError("models.asr_id must be set")
@@ -499,12 +504,20 @@ def _validate_config(config: AppConfig) -> None:
             f"Unsupported models.asr_id: {config.models.asr_id!r}. "
             f"Must be one of {sorted(SUPPORTED_MODELS['asr'])}."
         )
+    if not config.models.llm_backend:
+        raise ValueError("models.llm_backend must be set")
+    if config.models.llm_backend not in SUPPORTED_BACKENDS:
+        raise ValueError(
+            f"Unsupported models.llm_backend: {config.models.llm_backend!r}. "
+            f"Must be one of {sorted(SUPPORTED_BACKENDS)}."
+        )
     if not config.models.llm_id:
         raise ValueError("models.llm_id must be set")
-    if config.models.llm_id not in SUPPORTED_MODELS["llm"]:
+    allowed_ids = SUPPORTED_LLM_MODELS.get(config.models.llm_backend)
+    if allowed_ids is not None and config.models.llm_id not in allowed_ids:
         raise ValueError(
             f"Unsupported models.llm_id: {config.models.llm_id!r}. "
-            f"Must be one of {sorted(SUPPORTED_MODELS['llm'])}."
+            f"Must be one of {sorted(allowed_ids)}."
         )
     if not 0.0 <= config.llm.conversation_temperature <= 1.0:
         raise ValueError(
