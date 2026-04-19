@@ -166,10 +166,10 @@ def test_build_llm_wires_conversation_temperature(monkeypatch: pytest.MonkeyPatc
 # --- build_llm (slow: MlxLmBackend loads the model on init) ---
 
 @pytest.mark.slow
-def test_build_llm_routes_to_qwen_llm() -> None:
-    """build_llm should route to QwenLLM for the current default config."""
+def test_build_llm_routes_to_qwen_llm(tmp_path: Path) -> None:
+    """build_llm should route to QwenLLM for the default config (Qwen3+MLX)."""
     from kaiwacoach.settings import load_config
-    config = load_config()
+    config = load_config(config_path=tmp_path / "nonexistent.yaml")
     try:
         llm = build_llm(config)
     except RuntimeError as exc:
