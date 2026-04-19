@@ -154,9 +154,9 @@ These cannot be answered without empirical testing against a live Gemma 4 model.
 
 1. **JSON output reliability** ✅ **Resolved (2026-04-19, `gemma4:e4b` via Ollama)**: All four roles (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`) produce clean JSON with no preamble or markdown fences. Prompts require no changes.
 
-2. **Token cap calibration**: Defaults (`conversation=256`, `jp_tts_normalisation=192`, `detect_and_correct=96`, `explain_and_native=144`) not yet verified for Gemma 4 tokenizer. Not yet tested.
+2. **Token cap calibration**: Defaults (`conversation=256`, `jp_tts_normalisation=192`, `detect_and_correct=96`, `explain_and_native=144`) not formally verified against the Gemma 4 tokenizer. Empirically confirmed working for both `gemma4:e4b` and `gemma4:26b` via Ollama (2026-04-19) — all roles produce complete, valid responses at these caps.
 
-3. **e4b thought-tag behaviour** ✅ **Resolved (2026-04-19, `gemma4:e4b` via Ollama)**: No `<|channel>thought...<channel|>` tags produced — output is clean. `_GEMMA_CHANNEL_RE` is harmless. **`gemma4:26b` thought-tag behaviour not yet tested** — Ollama may strip them internally before returning the response.
+3. **e4b thought-tag behaviour** ✅ **Resolved (2026-04-19, `gemma4:e4b` via Ollama)**: No `<|channel>thought...<channel|>` tags produced — output is clean. `_GEMMA_CHANNEL_RE` is harmless. **`gemma4:26b` thought-tag behaviour** ✅ **Resolved (2026-04-19)**: Ollama does NOT strip thought blocks — they consume the full token budget before the JSON answer, causing blank responses. Fixed by passing `"think": false` in the Ollama API payload (`OllamaBackend(suppress_thinking=True)`). `_GEMMA_CHANNEL_RE` is not the fix for this case. All roles confirmed working after fix.
 
 4. **`}` EOS token**: Not yet tested for Gemma 4. Currently not enabled in `GemmaLLM` (unlike `QwenLLM`). Test empirically if output truncation issues arise.
 
@@ -451,13 +451,15 @@ if family == "gemma4":
     )
 ```
 
-Add the Ollama health check call:
+Add the Ollama health check call and suppress_thinking for Gemma 4:
 
 ```python
 if backend_name == "ollama":
     OllamaBackend.check_available()   # raises RuntimeError if daemon not running
-    backend = OllamaBackend(llm_id)
+    backend = OllamaBackend(llm_id, suppress_thinking=(family == "gemma4"))
 ```
+
+`suppress_thinking=True` adds `"think": false` to the Ollama payload, preventing the 26B-A4B model's mandatory thought phase from exhausting the token budget before the JSON answer. Safe to set for all Gemma 4 variants — e4b does not produce thought blocks, so it is a no-op there.
 
 ### Step 5 — Update `config/models.py`
 
