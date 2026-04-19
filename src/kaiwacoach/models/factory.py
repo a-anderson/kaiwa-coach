@@ -92,6 +92,7 @@ def build_llm(config: AppConfig) -> LLMProtocol:
             conversation_temperature=config.llm.conversation_temperature,
         )
 
+    # family == "gemma4" — update build_llm when adding a new family to _FAMILY_PREFIXES
     backend_label = "mlx_lm" if backend_name == "mlx" else "ollama"
     return GemmaLLM(
         model_id=llm_id,
