@@ -87,13 +87,11 @@ MLX model IDs are validated against an explicit allowlist at startup. Ollama mod
 
 4. ✅ **Ollama startup health check** (resolved): `OllamaBackend.check_available()` implemented; raises `RuntimeError` with a clear message if the Ollama daemon is not running. Called from `build_llm()` before any model is instantiated.
 
+5. ✅ **`}` EOS token for Gemma 4** (resolved 2026-04-19, `gemma4:e4b` and `gemma4:26b` via Ollama): No trailing content or non-Japanese punctuation observed. `GemmaLLM` correctly omits `extra_eos=["}"]` — the stop token is Qwen3-specific and not needed for Gemma 4.
+
 ---
 
 ## Open Unknowns
-
-These require further empirical testing.
-
-4. **`}` EOS token for Gemma 4**: `QwenLLM` adds `}` as a stop token for the `conversation` role to reduce Qwen3's trailing-content tendency. `GemmaLLM` does not. Untested — enable in `GemmaLLM` if output truncation or trailing garbage is observed in practice.
 
 5. **Recommended temperature**: Google recommends `temperature=1.0` for Gemma 4. Default `0.7` works correctly for `gemma4:e4b` (2026-04-19 test) and has not caused issues. No action needed unless quality problems emerge; note in `config.example.yaml` if users ask.
 
