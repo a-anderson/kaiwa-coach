@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store'
 
+export type Tab = 'chat' | 'monologue' | 'narration'
+
 export interface UIState {
   sidebarOpen: boolean
   isSubmitting: boolean
@@ -10,6 +12,8 @@ export interface UIState {
   // True while the pending turn's TTS audio is ready to play but the turn has
   // not yet committed. Cleared on SSE complete or on any error/finally path.
   autoplayPending: boolean
+  activeTab: Tab
+  settingsOpen: boolean
 }
 
 export const uiStore = writable<UIState>({
@@ -18,4 +22,6 @@ export const uiStore = writable<UIState>({
   stageStatuses: {},
   shadowingTurnId: null,
   autoplayPending: false,
+  activeTab: 'chat',
+  settingsOpen: false,
 })
