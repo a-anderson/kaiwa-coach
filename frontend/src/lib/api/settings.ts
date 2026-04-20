@@ -1,9 +1,9 @@
+import { checkOk } from './client'
+
 export interface UserProfile {
   user_name: string | null
   language_proficiency: Record<string, string>
 }
-
-import { checkOk } from './client'
 
 export async function getProfile(): Promise<UserProfile> {
   const res = await checkOk(await fetch('/api/settings/profile'))

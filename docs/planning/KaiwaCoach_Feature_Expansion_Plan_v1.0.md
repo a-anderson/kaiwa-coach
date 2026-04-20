@@ -833,7 +833,7 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 | 1     | ✅     | `feature/new-features-exploration` | Planning docs only (this branch)                                                                | None — merge immediately  |
 | 2     | ✅     | `feature/tab-bar-navigation`       | Feature 0: tab bar + settings stub + narration/monologue stubs                                  | PR 1 merged               |
 | 3     | ✅     | `feature/user-settings`            | Feature 1: user_profile schema, orchestrator methods, settings API routes, SettingsPanel        | PR 2 merged               |
-| 4     | ⬜     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
+| 4     | ✅     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
 | 5     | ⬜     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
 | 6     | ⬜     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
 
