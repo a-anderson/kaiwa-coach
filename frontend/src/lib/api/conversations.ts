@@ -4,7 +4,7 @@ import { checkOk } from './client'
 export async function listConversations(
   type?: 'chat' | 'monologue',
 ): Promise<ConversationSummary[]> {
-  const url = type ? `/api/conversations?type=${type}` : '/api/conversations'
+  const url = type ? `/api/conversations?conversation_type=${type}` : '/api/conversations'
   const res = await checkOk(await fetch(url))
   return res.json()
 }

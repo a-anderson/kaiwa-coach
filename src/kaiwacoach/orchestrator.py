@@ -67,8 +67,8 @@ class MonologueTurnResult:
     input_text: str
     asr_text: str | None
     asr_meta: dict | None
-    corrections: dict
-    summary: dict
+    corrections: dict[str, Any]
+    summary: dict[str, Any]
 
 
 class ConversationOrchestrator:
@@ -1305,47 +1305,29 @@ class ConversationOrchestrator:
             If set, filter to conversations with this type ('chat' or 'monologue').
             If None, return all conversations.
         """
-        if conversation_type is not None:
-            query = """
-                SELECT
-                    id,
-                    title,
-                    language,
-                    updated_at,
-                    (
-                        SELECT a.reply_text
-                        FROM assistant_turns a
-                        WHERE a.conversation_id = conversations.id
-                        ORDER BY datetime(a.created_at) DESC
-                        LIMIT 1
-                    ) AS preview_text,
-                    conversation_type
-                FROM conversations
-                WHERE conversation_type = ?
-                ORDER BY datetime(updated_at) DESC
-            """
-            with self._db.read_connection() as conn:
-                rows = conn.execute(query, (conversation_type,)).fetchall()
-        else:
-            query = """
-                SELECT
-                    id,
-                    title,
-                    language,
-                    updated_at,
-                    (
-                        SELECT a.reply_text
-                        FROM assistant_turns a
-                        WHERE a.conversation_id = conversations.id
-                        ORDER BY datetime(a.created_at) DESC
-                        LIMIT 1
-                    ) AS preview_text,
-                    conversation_type
-                FROM conversations
-                ORDER BY datetime(updated_at) DESC
-            """
-            with self._db.read_connection() as conn:
-                rows = conn.execute(query).fetchall()
+        base_query = """
+            SELECT
+                id,
+                title,
+                language,
+                updated_at,
+                (
+                    SELECT a.reply_text
+                    FROM assistant_turns a
+                    WHERE a.conversation_id = conversations.id
+                    ORDER BY datetime(a.created_at) DESC
+                    LIMIT 1
+                ) AS preview_text,
+                conversation_type
+            FROM conversations
+        """
+        where = "WHERE conversation_type = ?" if conversation_type is not None else ""
+        params: tuple = (conversation_type,) if conversation_type is not None else ()
+        with self._db.read_connection() as conn:
+            rows = conn.execute(
+                f"{base_query} {where} ORDER BY datetime(updated_at) DESC",
+                params,
+            ).fetchall()
         return [
             {
                 "id": row[0],

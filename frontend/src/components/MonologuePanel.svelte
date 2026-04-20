@@ -397,6 +397,11 @@
             <CopyButton text={summaryCopyText(resultSummary)} label="Copy full summary" />
           </div>
         </section>
+      {:else if !submitting}
+        <section class="result-section summary-section">
+          <h3>Summary</h3>
+          <p class="summary-unavailable">Summary is not available for past sessions.</p>
+        </section>
       {/if}
 
     {/if}
@@ -656,6 +661,13 @@
   }
 
   .no-errors {
+    font-size: 0.85rem;
+    color: #aaa;
+    margin: 0;
+    font-style: italic;
+  }
+
+  .summary-unavailable {
     font-size: 0.85rem;
     color: #aaa;
     margin: 0;

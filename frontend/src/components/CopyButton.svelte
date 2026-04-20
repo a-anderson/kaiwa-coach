@@ -30,7 +30,7 @@
     <!-- Two overlapping rounded squares -->
     <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <rect x="4" y="4" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-      <rect x="1" y="1" width="9" height="9" rx="1.5" fill="white" stroke="currentColor" stroke-width="1.4"/>
+      <rect x="1" y="1" width="9" height="9" rx="1.5" fill="var(--kc-bg, white)" stroke="currentColor" stroke-width="1.4"/>
     </svg>
   {/if}
 </button>

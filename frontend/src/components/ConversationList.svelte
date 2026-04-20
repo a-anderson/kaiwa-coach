@@ -16,14 +16,14 @@
   let pendingDeleteId: string | null = null
 
   export async function refresh(): Promise<void> {
-    await load()
+    await load(type)
   }
 
-  async function load(): Promise<void> {
+  async function load(t: typeof type): Promise<void> {
     loading = true
     error = null
     try {
-      conversations = await listConversations(type)
+      conversations = await listConversations(t)
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load conversations'
     } finally {
@@ -31,7 +31,7 @@
     }
   }
 
-  $: type, load()
+  $: load(type)
 
   async function confirmDelete(): Promise<void> {
     if (!pendingDeleteId) return

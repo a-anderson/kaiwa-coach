@@ -19,10 +19,10 @@ export interface SSEFrame {
   data: unknown
 }
 
-export async function* fetchSSE(
+export async function* fetchSSE<T extends SSEFrame = SSEFrame>(
   url: string,
   options: RequestInit,
-): AsyncGenerator<SSEFrame> {
+): AsyncGenerator<T> {
   const res = await fetch(url, options)
   if (!res.ok) {
     const text = await res.text().catch(() => '')
@@ -55,7 +55,7 @@ export async function* fetchSSE(
         }
         if (data) {
           try {
-            yield { event, data: JSON.parse(data) }
+            yield { event, data: JSON.parse(data) } as T
           } catch {
             // Skip malformed frames rather than crashing the stream.
             if (import.meta.env.DEV) {

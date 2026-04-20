@@ -51,7 +51,7 @@ def _build_monologue_sse_generator(orc: ConversationOrchestrator, run_fn):
         try:
             result = run_fn(on_stage)
             loop.call_soon_threadsafe(queue.put_nowait, {"_done": True, "result": result})
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — background thread; all errors must be funnelled to the SSE queue
             _logger.exception("Monologue processing failed request_id=%s", request_id)
             loop.call_soon_threadsafe(
                 queue.put_nowait,

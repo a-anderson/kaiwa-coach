@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -57,12 +56,17 @@ def _build_turn_record(
     )
 
 
+_VALID_CONVERSATION_TYPES = {"chat", "monologue"}
+
+
 @router.get("/conversations", response_model=list[ConversationSummary])
 async def list_conversations(
-    type: Optional[str] = Query(default=None),
+    conversation_type: str | None = Query(default=None),
     orc: ConversationOrchestrator = Depends(get_orchestrator),
 ) -> list[ConversationSummary]:
-    return [ConversationSummary(**c) for c in orc.list_conversations(conversation_type=type)]
+    if conversation_type is not None and conversation_type not in _VALID_CONVERSATION_TYPES:
+        raise HTTPException(status_code=422, detail=f"Invalid conversation type: {conversation_type!r}")
+    return [ConversationSummary(**c) for c in orc.list_conversations(conversation_type=conversation_type)]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)

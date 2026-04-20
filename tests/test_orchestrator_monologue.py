@@ -47,8 +47,7 @@ def _make_summary_result(areas=None, assessment="good work") -> ParseResult:
 
 def _make_llm():
     llm = MagicMock()
-    llm.model_id = None    # prevent _resolve_model_id from returning a MagicMock
-    llm._model_id = None   # fallback attribute also needs to be None
+    llm.model_id = "mock-llm"  # truthy string satisfies _resolve_model_id without falling through
     # detect_and_correct and monologue_summary use generate_json
     # explain_and_native uses generate() via _generate_with_repair
     llm.generate_json.side_effect = [

@@ -68,18 +68,18 @@ def test_create_monologue_conversation_calls_orchestrator(client, mock_orchestra
     mock_orchestrator.create_monologue_conversation.assert_called_once()
 
 
-# ── GET /api/conversations?type= ─────────────────────────────────────────────
+# ── GET /api/conversations?conversation_type= ────────────────────────────────
 
 
 def test_list_conversations_passes_type_chat(client, mock_orchestrator):
     mock_orchestrator.list_conversations.return_value = []
-    client.get("/api/conversations?type=chat")
+    client.get("/api/conversations?conversation_type=chat")
     mock_orchestrator.list_conversations.assert_called_once_with(conversation_type="chat")
 
 
 def test_list_conversations_passes_type_monologue(client, mock_orchestrator):
     mock_orchestrator.list_conversations.return_value = []
-    client.get("/api/conversations?type=monologue")
+    client.get("/api/conversations?conversation_type=monologue")
     mock_orchestrator.list_conversations.assert_called_once_with(conversation_type="monologue")
 
 

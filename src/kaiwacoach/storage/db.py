@@ -320,21 +320,24 @@ class SQLiteWriter:
 
         Each step is idempotent: if the column already exists, the step is skipped.
         Append new steps here when columns are added; never remove or reorder existing steps.
+        Each step documents its target version so the UPDATE is unambiguous when adding v4+.
         """
         logger = logging.getLogger(__name__)
-        migrated = False
+        migrated_to: int | None = None
 
         # v2 → v3: add conversation_type column
+        _V3 = 3
         cols = {r[1] for r in connection.execute("PRAGMA table_info(conversations)").fetchall()}
         if cols and "conversation_type" not in cols:
             logger.info("schema_migration: adding conversation_type to conversations")
             connection.execute(
                 "ALTER TABLE conversations ADD COLUMN conversation_type TEXT NOT NULL DEFAULT 'chat'"
             )
-            migrated = True
+            migrated_to = _V3
 
-        if migrated:
+        if migrated_to is not None:
             connection.execute(
-                "UPDATE schema_version SET version = 3, applied_at = datetime('now') WHERE id = 1"
+                "UPDATE schema_version SET version = ?, applied_at = datetime('now') WHERE id = 1",
+                (migrated_to,),
             )
             connection.commit()
