@@ -47,6 +47,7 @@ async def set_profile(
                 detail=f"Invalid proficiency level: {level}",
             )
     current = orc.get_user_profile()
+    # Merge incoming keys — unmentioned languages are preserved.
     merged_proficiency = {**current["language_proficiency"], **body.language_proficiency}
     orc.set_user_profile(
         user_name=body.user_name,
