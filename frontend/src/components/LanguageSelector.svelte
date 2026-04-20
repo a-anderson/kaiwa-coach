@@ -2,18 +2,18 @@
   import { createEventDispatcher } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
   import { setSessionLanguage, createConversation, getConversation, deleteConversation } from '../lib/api/conversations'
-  import { LANGUAGE_NATIVE_NAMES, LANGUAGE_ENGLISH_NAMES } from '../lib/constants'
+  import { LANGUAGE_NATIVE_NAMES } from '../lib/constants'
 
   const dispatch = createEventDispatcher<{ newconversation: void }>()
 
   // Mirrors SUPPORTED_LANGUAGES in src/kaiwacoach/constants.py
   const LANGUAGE_OPTIONS: { code: string; flag: string; label: string }[] = [
-    { code: 'ja',    flag: '🇯🇵', label: `${LANGUAGE_NATIVE_NAMES['ja']} (${LANGUAGE_ENGLISH_NAMES['ja']})` },
-    { code: 'fr',    flag: '🇫🇷', label: `${LANGUAGE_NATIVE_NAMES['fr']} (${LANGUAGE_ENGLISH_NAMES['fr']})` },
+    { code: 'ja',    flag: '🇯🇵', label: LANGUAGE_NATIVE_NAMES['ja'] },
+    { code: 'fr',    flag: '🇫🇷', label: LANGUAGE_NATIVE_NAMES['fr'] },
     { code: 'en',    flag: '🇬🇧', label: LANGUAGE_NATIVE_NAMES['en'] },
-    { code: 'es',    flag: '🇪🇸', label: `${LANGUAGE_NATIVE_NAMES['es']} (${LANGUAGE_ENGLISH_NAMES['es']})` },
-    { code: 'it',    flag: '🇮🇹', label: `${LANGUAGE_NATIVE_NAMES['it']} (${LANGUAGE_ENGLISH_NAMES['it']})` },
-    { code: 'pt-br', flag: '🇧🇷', label: `${LANGUAGE_NATIVE_NAMES['pt-br']} (${LANGUAGE_ENGLISH_NAMES['pt-br']})` },
+    { code: 'es',    flag: '🇪🇸', label: LANGUAGE_NATIVE_NAMES['es'] },
+    { code: 'it',    flag: '🇮🇹', label: LANGUAGE_NATIVE_NAMES['it'] },
+    { code: 'pt-br', flag: '🇧🇷', label: LANGUAGE_NATIVE_NAMES['pt-br'] },
   ]
 
   async function onLanguageChange(event: Event) {

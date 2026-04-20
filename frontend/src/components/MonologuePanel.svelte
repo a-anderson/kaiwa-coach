@@ -1,11 +1,14 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte'
-  import { uiStore } from '../lib/stores/ui'
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
-  import { createMonologueConversation, getConversation } from '../lib/api/conversations'
+  import { LANGUAGE_NATIVE_NAMES } from '../lib/constants'
+  import { createMonologueConversation } from '../lib/api/conversations'
   import { submitMonologueText, submitMonologueAudio } from '../lib/api/monologue'
   import AudioRecorder from './AudioRecorder.svelte'
-  import type { MonologueCorrections, MonologueSummary } from '../lib/types/api'
+  import CopyButton from './CopyButton.svelte'
+  import type { CorrectionData, TurnRecord, MonologueCorrections, MonologueSummary } from '../lib/types/api'
+
+  const dispatch = createEventDispatcher<{ turncomplete: void }>()
 
   type InputMode = 'text' | 'mic' | 'file'
 
@@ -18,21 +21,55 @@
   let stageStatuses: Record<string, 'running' | 'complete'> = {}
   let submitError: string | null = null
 
-  // Results from the most recently completed submission
   let resultTranscript: string | null = null
   let resultCorrections: MonologueCorrections | null = null
   let resultSummary: MonologueSummary | null = null
   let hasResult = false
 
-  // Selected past session (read-only view)
-  let selectedSessionId: string | null = null
-  let loadingSession = false
-  let sessionLoadError: string | null = null
+  $: language = $sessionStore.language
+  $: languageDisplay = LANGUAGE_NATIVE_NAMES[language] ?? language.toUpperCase()
 
-  // Reset selected session when switching away from monologue tab
-  $: if ($uiStore.activeTab !== 'monologue') {
-    selectedSessionId = null
-  }
+  // Track the last conversation ID loaded into the results display.
+  // Prevents the store subscription from overwriting live SSE results when
+  // handleSubmit pushes the completed turn into the store.
+  let _lastHandledId: string | null = null
+  let _unsub: (() => void) | null = null
+
+  onMount(() => {
+    _unsub = sessionStore.subscribe(($s) => {
+      const id = $s.conversationId
+      const type = $s.conversationType
+
+      if (
+        type === 'monologue' &&
+        id !== null &&
+        id !== _lastHandledId &&
+        !submitting &&
+        $s.turns.length > 0
+      ) {
+        // Sidebar selection or tab-switch restore — load from already-fetched turns.
+        _lastHandledId = id
+        const turn = $s.turns[0]
+        resultTranscript = turn.user_text ?? turn.asr_text ?? null
+        resultCorrections = turn.correction ?? null
+        resultSummary = null  // summary is not persisted
+        hasResult = true
+      } else if (type === 'monologue' && id === null && !submitting) {
+        // "New Monologue" was clicked — reset to empty form.
+        _lastHandledId = null
+        hasResult = false
+        resultTranscript = null
+        resultCorrections = null
+        resultSummary = null
+        submitError = null
+        stageStatuses = {}
+      }
+    })
+  })
+
+  onDestroy(() => {
+    _unsub?.()
+  })
 
   function setMode(mode: InputMode) {
     if (mode === inputMode) return
@@ -48,9 +85,7 @@
 
   function handleFileChange() {
     const file = fileInput?.files?.[0]
-    if (file) {
-      audioBlob = file
-    }
+    if (file) audioBlob = file
   }
 
   async function handleSubmit() {
@@ -69,6 +104,10 @@
     try {
       const { conversation_id } = await createMonologueConversation()
 
+      // Set _lastHandledId before the store update that follows SSE completion,
+      // so the subscription does not overwrite the live results we are about to show.
+      _lastHandledId = conversation_id
+
       const generator =
         inputMode === 'text'
           ? submitMonologueText({ conversation_id, text: textInput.trim() })
@@ -81,10 +120,31 @@
             resultTranscript = (event.data as { transcript?: string }).transcript ?? null
           }
         } else if (event.event === 'complete') {
-          resultTranscript = resultTranscript ?? event.data.asr_text ?? null
+          resultTranscript = resultTranscript ?? event.data.asr_text ?? event.data.input_text ?? null
           resultCorrections = event.data.corrections
           resultSummary = event.data.summary
           hasResult = true
+
+          // Push a synthetic TurnRecord into the store so results survive a tab switch.
+          const syntheticTurn: TurnRecord = {
+            user_turn_id: event.data.user_turn_id,
+            assistant_turn_id: null,
+            user_text: event.data.input_text ?? null,
+            asr_text: event.data.asr_text ?? null,
+            reply_text: null,
+            correction: event.data.corrections as unknown as CorrectionData,
+            has_user_audio: inputMode !== 'text',
+            has_assistant_audio: false,
+            user_audio_url: null,
+            assistant_audio_url: null,
+          }
+          sessionStore.update((s) => ({
+            ...s,
+            conversationId: conversation_id,
+            conversationType: 'monologue',
+            turns: [syntheticTurn],
+          }))
+          dispatch('turncomplete')
         } else if (event.event === 'error') {
           submitError = event.data.message || 'An error occurred'
         }
@@ -96,32 +156,32 @@
     }
   }
 
-  async function loadPastSession(id: string) {
-    selectedSessionId = id
-    loadingSession = true
-    sessionLoadError = null
-    hasResult = false
-    resultTranscript = null
-    resultCorrections = null
-    resultSummary = null
+  // ── Copy helpers ─────────────────────────────────────────────────────────────
 
-    try {
-      const convo = await getConversation(id)
-      const turn = convo.turns[0]
-      if (turn) {
-        resultTranscript = turn.asr_text ?? null
-        if (turn.correction) {
-          resultCorrections = turn.correction
-        }
-        // Summary is not stored in TurnRecord; show corrections only for past sessions.
-        hasResult = true
-      }
-    } catch (e) {
-      sessionLoadError = e instanceof Error ? e.message : 'Failed to load session'
-    } finally {
-      loadingSession = false
+  function correctionsCopyText(c: MonologueCorrections): string {
+    const parts: string[] = []
+    if (c.errors.length > 0) {
+      parts.push('Errors:\n' + c.errors.map((e) => `• ${e}`).join('\n'))
     }
+    if (c.corrected) parts.push(`Corrected: ${c.corrected}`)
+    if (c.native) parts.push(`Natural phrasing: ${c.native}`)
+    if (c.explanation) parts.push(`Explanation: ${c.explanation}`)
+    return parts.join('\n\n')
   }
+
+  function summaryCopyText(s: MonologueSummary): string {
+    const parts: string[] = []
+    if (s.improvement_areas.length > 0) {
+      parts.push(
+        'Areas to focus on:\n' +
+        s.improvement_areas.map((a, i) => `${i + 1}. ${a}`).join('\n'),
+      )
+    }
+    if (s.overall_assessment) parts.push(`Overall: ${s.overall_assessment}`)
+    return parts.join('\n\n')
+  }
+
+  // ── Progress ─────────────────────────────────────────────────────────────────
 
   const STAGE_LABELS: Record<string, string> = {
     asr: 'Transcribing',
@@ -136,251 +196,255 @@
 </script>
 
 <div class="monologue-panel">
-  {#if selectedSessionId && !loadingSession && hasResult}
-    <!-- Read-only past session view -->
-    <div class="results-view">
-      <button class="back-btn" on:click={() => { selectedSessionId = null; hasResult = false }}>
-        ← Back
-      </button>
+  <div class="monologue-inner">
+
+    <h2 class="panel-title">Analyse in <span class="lang-label">{languageDisplay}</span></h2>
+
+    <!-- Mode selector -->
+    <div class="mode-tabs" role="tablist">
+      <button
+        role="tab"
+        aria-selected={inputMode === 'text'}
+        class="mode-tab"
+        class:active={inputMode === 'text'}
+        on:click={() => setMode('text')}
+        disabled={submitting}
+      >Text</button>
+      <button
+        role="tab"
+        aria-selected={inputMode === 'mic'}
+        class="mode-tab"
+        class:active={inputMode === 'mic'}
+        on:click={() => setMode('mic')}
+        disabled={submitting}
+      >Mic</button>
+      <button
+        role="tab"
+        aria-selected={inputMode === 'file'}
+        class="mode-tab"
+        class:active={inputMode === 'file'}
+        on:click={() => setMode('file')}
+        disabled={submitting}
+      >Upload</button>
+    </div>
+
+    <!-- Input area -->
+    {#if inputMode === 'text'}
+      <div class="textarea-wrap">
+        <textarea
+          class="text-input"
+          bind:value={textInput}
+          placeholder="Type or paste your {languageDisplay} text here…"
+          disabled={submitting}
+          rows={6}
+        ></textarea>
+        <button
+          class="clear-btn"
+          on:click={() => { textInput = '' }}
+          disabled={!textInput || submitting}
+          aria-label="Clear text"
+          title="Clear text"
+        >✕ Clear</button>
+      </div>
+    {:else if inputMode === 'mic'}
+      <div class="audio-area">
+        <AudioRecorder on:recorded={handleRecorded} />
+        {#if audioBlob}
+          <p class="audio-ready">Recording ready — click Analyse to submit.</p>
+        {/if}
+      </div>
+    {:else if inputMode === 'file'}
+      <div class="audio-area">
+        <input
+          type="file"
+          accept="audio/*"
+          bind:this={fileInput}
+          on:change={handleFileChange}
+          disabled={submitting}
+          class="file-input"
+        />
+        {#if audioBlob}
+          <p class="audio-ready">File selected — click Analyse to submit.</p>
+        {/if}
+      </div>
+    {/if}
+
+    <button
+      class="analyse-btn"
+      on:click={handleSubmit}
+      disabled={submitting
+        || (inputMode === 'text' && !textInput.trim())
+        || ((inputMode === 'mic' || inputMode === 'file') && !audioBlob)}
+    >
+      {submitting ? 'Analysing…' : 'Analyse'}
+    </button>
+
+    <!-- Pipeline progress -->
+    {#if submitting}
+      <div class="progress" role="status" aria-live="polite">
+        {#each progressStages as stage (stage.name)}
+          <span class="stage" class:running={stage.status === 'running'} class:done={stage.status === 'complete'}>
+            {#if stage.status === 'complete'}
+              <span class="icon">✓</span>
+            {:else}
+              <span class="icon spinner" aria-hidden="true">◌</span>
+            {/if}
+            {stage.label}
+          </span>
+        {/each}
+        {#if progressStages.length === 0}
+          <span class="stage running">
+            <span class="icon spinner" aria-hidden="true">◌</span>
+            Starting…
+          </span>
+        {/if}
+      </div>
+    {/if}
+
+    {#if submitError}
+      <p class="error-msg">{submitError}</p>
+    {/if}
+
+    <!-- Results -->
+    {#if hasResult}
+      <hr class="divider" />
+
       {#if resultTranscript}
         <section class="result-section">
-          <h3>Transcript</h3>
+          <h3>Your text</h3>
           <p class="result-text">{resultTranscript}</p>
+          <div class="section-footer">
+            <CopyButton text={resultTranscript} label="Copy text" />
+          </div>
         </section>
       {/if}
+
       {#if resultCorrections}
-        {#if resultCorrections.errors.length > 0}
-          <section class="result-section">
-            <h3>Errors</h3>
+        {@const hasErrors = resultCorrections.errors.length > 0}
+        <section class="result-section">
+          <h3>Corrections</h3>
+          {#if hasErrors}
             <ul class="errors-list">
               {#each resultCorrections.errors as err}
                 <li>{err}</li>
               {/each}
             </ul>
-          </section>
-        {/if}
-        {#if resultCorrections.corrected}
-          <section class="result-section">
-            <h3>Corrected</h3>
-            <p class="result-text">{resultCorrections.corrected}</p>
-          </section>
-        {/if}
-        {#if resultCorrections.native}
-          <section class="result-section">
-            <h3>Native</h3>
-            <p class="result-text">{resultCorrections.native}</p>
-          </section>
-        {/if}
-        {#if resultCorrections.explanation}
-          <section class="result-section">
-            <h3>Explanation</h3>
-            <p class="result-text">{resultCorrections.explanation}</p>
-          </section>
-        {/if}
-      {/if}
-    </div>
-  {:else}
-    <!-- Submission form -->
-    <div class="form-area">
-      <div class="mode-tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={inputMode === 'text'}
-          class="mode-tab"
-          class:active={inputMode === 'text'}
-          on:click={() => setMode('text')}
-          disabled={submitting}
-        >Text</button>
-        <button
-          role="tab"
-          aria-selected={inputMode === 'mic'}
-          class="mode-tab"
-          class:active={inputMode === 'mic'}
-          on:click={() => setMode('mic')}
-          disabled={submitting}
-        >Mic</button>
-        <button
-          role="tab"
-          aria-selected={inputMode === 'file'}
-          class="mode-tab"
-          class:active={inputMode === 'file'}
-          on:click={() => setMode('file')}
-          disabled={submitting}
-        >Upload</button>
-        <div class="mode-spacer"></div>
-        <button
-          class="analyse-btn"
-          on:click={handleSubmit}
-          disabled={submitting
-            || (inputMode === 'text' && !textInput.trim())
-            || ((inputMode === 'mic' || inputMode === 'file') && !audioBlob)}
-        >
-          {submitting ? 'Analysing…' : 'Analyse'}
-        </button>
-      </div>
-
-      <div class="input-area">
-        {#if inputMode === 'text'}
-          <textarea
-            class="text-input"
-            bind:value={textInput}
-            placeholder="Type or paste your {$sessionStore.language} text here…"
-            disabled={submitting}
-            rows="5"
-          ></textarea>
-        {:else if inputMode === 'mic'}
-          <div class="recorder-wrapper">
-            <AudioRecorder on:recorded={handleRecorded} />
-            {#if audioBlob}
-              <p class="audio-ready">Recording ready — click Analyse to submit.</p>
-            {/if}
-          </div>
-        {:else if inputMode === 'file'}
-          <div class="file-wrapper">
-            <input
-              type="file"
-              accept="audio/*"
-              bind:this={fileInput}
-              on:change={handleFileChange}
-              disabled={submitting}
-              class="file-input"
-            />
-            {#if audioBlob}
-              <p class="audio-ready">File selected — click Analyse to submit.</p>
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Pipeline progress -->
-      {#if submitting}
-        <div class="progress" role="status" aria-live="polite">
-          {#each progressStages as stage (stage.name)}
-            <span class="stage" class:running={stage.status === 'running'} class:done={stage.status === 'complete'}>
-              {#if stage.status === 'complete'}
-                <span class="icon">✓</span>
-              {:else}
-                <span class="icon spinner" aria-hidden="true">◌</span>
-              {/if}
-              {stage.label}
-            </span>
-          {/each}
-          {#if progressStages.length === 0}
-            <span class="stage running">
-              <span class="icon spinner" aria-hidden="true">◌</span>
-              Starting…
-            </span>
+          {:else}
+            <p class="no-errors">No errors detected.</p>
           {/if}
-        </div>
+          {#if resultCorrections.corrected}
+            <div class="sub-section">
+              <h4>Corrected</h4>
+              <p class="result-text">{resultCorrections.corrected}</p>
+              <div class="section-footer">
+                <CopyButton text={resultCorrections.corrected} label="Copy corrected text" />
+              </div>
+            </div>
+          {/if}
+          {#if resultCorrections.native}
+            <div class="sub-section">
+              <h4>Natural phrasing</h4>
+              <p class="result-text">{resultCorrections.native}</p>
+              <div class="section-footer">
+                <CopyButton text={resultCorrections.native} label="Copy natural phrasing" />
+              </div>
+            </div>
+          {/if}
+          {#if resultCorrections.explanation}
+            <div class="sub-section">
+              <h4>Explanation</h4>
+              <p class="result-text">{resultCorrections.explanation}</p>
+              <div class="section-footer">
+                <CopyButton text={resultCorrections.explanation} label="Copy explanation" />
+              </div>
+            </div>
+          {/if}
+          <div class="section-footer section-footer--section">
+            <CopyButton text={correctionsCopyText(resultCorrections)} label="Copy all corrections" />
+          </div>
+        </section>
       {/if}
 
-      {#if submitError}
-        <p class="error-msg">{submitError}</p>
+      {#if resultSummary}
+        <section class="result-section summary-section">
+          <h3>Summary</h3>
+          {#if resultSummary.improvement_areas.length > 0}
+            <div class="sub-section">
+              <h4>Areas to focus on</h4>
+              <ol class="areas-list">
+                {#each resultSummary.improvement_areas as area}
+                  <li>{area}</li>
+                {/each}
+              </ol>
+              <div class="section-footer">
+                <CopyButton
+                  text={resultSummary.improvement_areas.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+                  label="Copy areas to focus on"
+                />
+              </div>
+            </div>
+          {/if}
+          {#if resultSummary.overall_assessment}
+            <div class="sub-section">
+              <h4>Overall</h4>
+              <p class="result-text">{resultSummary.overall_assessment}</p>
+              <div class="section-footer">
+                <CopyButton text={resultSummary.overall_assessment} label="Copy overall assessment" />
+              </div>
+            </div>
+          {/if}
+          <div class="section-footer section-footer--section">
+            <CopyButton text={summaryCopyText(resultSummary)} label="Copy full summary" />
+          </div>
+        </section>
       {/if}
-    </div>
 
-    <!-- Results -->
-    {#if hasResult}
-      <div class="results-area">
-        {#if resultTranscript}
-          <section class="result-section">
-            <h3>Transcript</h3>
-            <p class="result-text">{resultTranscript}</p>
-          </section>
-        {/if}
-
-        {#if resultCorrections}
-          <section class="result-section">
-            <h3>Corrections</h3>
-            {#if resultCorrections.errors.length > 0}
-              <div class="corrections-block">
-                <p class="label">Errors:</p>
-                <ul class="errors-list">
-                  {#each resultCorrections.errors as err}
-                    <li>{err}</li>
-                  {/each}
-                </ul>
-              </div>
-            {:else}
-              <p class="no-errors">No errors detected.</p>
-            {/if}
-            {#if resultCorrections.corrected}
-              <div class="corrections-block">
-                <p class="label">Corrected:</p>
-                <p class="result-text">{resultCorrections.corrected}</p>
-              </div>
-            {/if}
-            {#if resultCorrections.native}
-              <div class="corrections-block">
-                <p class="label">Native:</p>
-                <p class="result-text">{resultCorrections.native}</p>
-              </div>
-            {/if}
-            {#if resultCorrections.explanation}
-              <div class="corrections-block">
-                <p class="label">Explanation:</p>
-                <p class="result-text">{resultCorrections.explanation}</p>
-              </div>
-            {/if}
-          </section>
-        {/if}
-
-        {#if resultSummary}
-          <section class="result-section summary-section">
-            <h3>Summary</h3>
-            {#if resultSummary.improvement_areas.length > 0}
-              <div class="corrections-block">
-                <p class="label">Areas to focus on:</p>
-                <ol class="areas-list">
-                  {#each resultSummary.improvement_areas as area, i}
-                    <li>{area}</li>
-                  {/each}
-                </ol>
-              </div>
-            {/if}
-            {#if resultSummary.overall_assessment}
-              <div class="corrections-block">
-                <p class="label">Overall:</p>
-                <p class="result-text">{resultSummary.overall_assessment}</p>
-              </div>
-            {/if}
-          </section>
-        {/if}
-      </div>
     {/if}
-  {/if}
+
+  </div>
 </div>
 
 <style>
   .monologue-panel {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     overflow-y: auto;
-    padding: 20px 24px;
-    gap: 16px;
+    padding: 2rem 1rem;
   }
 
-  .form-area {
+  .monologue-inner {
+    width: 100%;
+    max-width: 680px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    max-width: 760px;
+    gap: 1rem;
   }
+
+  .panel-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #222;
+  }
+
+  .lang-label {
+    color: var(--kc-primary, #555);
+  }
+
+  /* ── Mode tabs ── */
 
   .mode-tabs {
     display: flex;
-    align-items: center;
     gap: 6px;
-    flex-wrap: wrap;
   }
 
   .mode-tab {
     padding: 5px 14px;
-    border: 1px solid #ddd;
+    border: 1px solid #d0d0d0;
     border-radius: 6px;
     background: #f7f7f7;
-    font-size: 0.82rem;
+    font-size: 0.83rem;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
@@ -396,40 +460,25 @@
     cursor: default;
   }
 
-  .mode-spacer {
-    flex: 1;
-  }
+  /* ── Input ── */
 
-  .analyse-btn {
-    padding: 6px 18px;
-    background: var(--kc-primary, #555);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-
-  .analyse-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .input-area {
+  .textarea-wrap {
     display: flex;
     flex-direction: column;
+    gap: 4px;
   }
 
   .text-input {
     width: 100%;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 0.9rem;
-    font-family: inherit;
     resize: vertical;
-    min-height: 100px;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #d0d0d0;
+    background: #fff;
+    color: #222;
+    font-size: 0.95rem;
+    font-family: inherit;
+    line-height: 1.5;
     box-sizing: border-box;
   }
 
@@ -438,12 +487,38 @@
     border-color: var(--kc-primary, #555);
   }
 
-  .recorder-wrapper,
-  .file-wrapper {
+  .text-input:disabled {
+    background: #f8f8f8;
+    opacity: 0.7;
+  }
+
+  .clear-btn {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #bbb;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.15s, opacity 0.15s;
+    line-height: 1;
+  }
+
+  .clear-btn:not(:disabled):hover {
+    color: #888;
+  }
+
+  .clear-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .audio-area {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 12px 0;
+    padding: 0.5rem 0;
   }
 
   .file-input {
@@ -456,13 +531,32 @@
     margin: 0;
   }
 
+  /* ── Analyse button ── */
+
+  .analyse-btn {
+    align-self: flex-start;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 5px;
+    background: var(--kc-primary, #555);
+    color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .analyse-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
   /* ── Progress ── */
 
   .progress {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 12px;
-    padding: 4px 0;
+    padding: 6px 0 2px;
     font-size: 0.78rem;
   }
 
@@ -498,56 +592,31 @@
   }
 
   .error-msg {
-    font-size: 0.82rem;
-    color: #c0392b;
+    color: #e57373;
+    font-size: 0.85rem;
     margin: 0;
   }
 
   /* ── Results ── */
 
-  .results-area {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 760px;
-    border-top: 1px solid #eee;
-    padding-top: 16px;
-  }
-
-  .results-view {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 760px;
-  }
-
-  .back-btn {
-    align-self: flex-start;
-    background: none;
+  .divider {
     border: none;
-    color: var(--kc-primary, #555);
-    font-size: 0.85rem;
-    cursor: pointer;
-    padding: 0;
-    margin-bottom: 4px;
-  }
-
-  .back-btn:hover {
-    text-decoration: underline;
+    border-top: 1px solid #e0e0e0;
+    margin: 0;
   }
 
   .result-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0.5rem;
   }
 
   .result-section h3 {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #888;
+    color: #999;
     margin: 0;
   }
 
@@ -555,16 +624,18 @@
     color: var(--kc-primary, #555);
   }
 
-  .corrections-block {
+  .sub-section {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
   }
 
-  .label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #999;
+  .sub-section h4 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #bbb;
     margin: 0;
   }
 
@@ -589,5 +660,20 @@
     color: #aaa;
     margin: 0;
     font-style: italic;
+  }
+
+  /* ── Copy buttons ── */
+
+  .section-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1px;
+  }
+
+  /* Bottom-of-section copy button gets a faint top border to separate it from sub-sections */
+  .section-footer--section {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid #f0f0f0;
   }
 </style>

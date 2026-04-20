@@ -872,17 +872,17 @@ class ConversationOrchestrator:
         return result.audio_path
 
     def create_monologue_conversation(self) -> str:
-        """Create a conversation with conversation_type='monologue' and an auto-generated title.
+        """Create a conversation with conversation_type='monologue'.
+
+        Title starts as NULL and is set from the first user input by
+        process_monologue_turn, matching chat conversation behaviour.
 
         Returns
         -------
         str
             The new conversation_id.
         """
-        import datetime as _datetime
-
         conversation_id = str(uuid.uuid4())
-        title = f"Monologue – {_datetime.date.today().isoformat()}"
 
         def _insert(conn) -> None:
             conn.execute(
@@ -895,7 +895,7 @@ class ConversationOrchestrator:
                 """,
                 (
                     conversation_id,
-                    title,
+                    None,
                     self._language,
                     self._asr_model_id,
                     self._llm_model_id,
@@ -980,6 +980,9 @@ class ConversationOrchestrator:
             t0 = time.perf_counter()
             self._db.run_write(_insert_user)
             timings["user_insert_seconds"] = time.perf_counter() - t0
+
+        # Set title from first user input, matching chat conversation behaviour.
+        self._maybe_set_auto_title(conversation_id, input_text)
 
         # Corrections stage
         if on_stage:

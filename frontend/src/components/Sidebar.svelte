@@ -27,6 +27,7 @@
         conversationId: id,
         language: convo.language,
         turns: convo.turns,
+        conversationType: (convo.conversation_type ?? 'chat') as 'chat' | 'monologue',
       }))
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Failed to load conversation'
@@ -38,7 +39,7 @@
     loadError = null
     try {
       await deleteAllConversations()
-      sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
+      sessionStore.update((s) => ({ ...s, conversationId: null, turns: [], conversationType: 'chat' }))
       await listRef.refresh()
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Failed to delete all conversations'
@@ -46,6 +47,17 @@
   }
 
   async function handleNew(): Promise<void> {
+    if (listType === 'monologue') {
+      // Monologue conversations are created per-submission; "New Monologue" just resets the panel.
+      sessionStore.update((s) => ({
+        ...s,
+        conversationId: null,
+        turns: [],
+        conversationType: 'monologue',
+      }))
+      await listRef.refresh()
+      return
+    }
     creating = true
     loadError = null
     try {
@@ -68,7 +80,7 @@
   <div class="list-container">
     <div class="new-btn-row">
       <button class="new-btn" on:click={handleNew} disabled={creating}>
-        {creating ? 'Creating…' : '+ New conversation'}
+        {creating ? 'Creating…' : listType === 'monologue' ? '+ New Monologue' : '+ New conversation'}
       </button>
     </div>
     <ConversationList bind:this={listRef} type={listType} on:select={(e) => handleSelect(e.detail)} />

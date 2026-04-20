@@ -93,9 +93,7 @@ def test_create_monologue_conversation_persists_type(tmp_path: Path) -> None:
         db.close()
 
 
-def test_create_monologue_conversation_title_format(tmp_path: Path) -> None:
-    import datetime
-
+def test_create_monologue_conversation_title_is_null(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)
     try:
         orch = _make_orch(db)
@@ -103,8 +101,37 @@ def test_create_monologue_conversation_title_format(tmp_path: Path) -> None:
         with db.read_connection() as conn:
             row = conn.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,)).fetchone()
         assert row is not None
-        today = datetime.date.today().isoformat()
-        assert row[0] == f"Monologue – {today}"
+        assert row[0] is None
+    finally:
+        db.close()
+
+
+def test_process_monologue_turn_sets_auto_title(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    try:
+        orch = _make_orch(db)
+        conv_id = orch.create_monologue_conversation()
+        orch.process_monologue_turn(conversation_id=conv_id, text="私は昨日学校に行きました。")
+        with db.read_connection() as conn:
+            row = conn.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+        assert row is not None
+        assert row[0] == "私は昨日学校に行きました。"
+    finally:
+        db.close()
+
+
+def test_process_monologue_turn_truncates_long_title(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    try:
+        orch = _make_orch(db)
+        conv_id = orch.create_monologue_conversation()
+        long_text = "あ" * 60
+        orch.process_monologue_turn(conversation_id=conv_id, text=long_text)
+        with db.read_connection() as conn:
+            row = conn.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+        assert row is not None
+        assert len(row[0]) <= 50
+        assert row[0].endswith("…")
     finally:
         db.close()
 
