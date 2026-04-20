@@ -837,6 +837,29 @@ class ConversationOrchestrator:
             )
             return None
 
+    def generate_narration(self, text: str) -> str:
+        """Synthesise text to audio using self._language; return the raw audio path.
+
+        The route handler converts the path to a URL via audio_path_to_url().
+        """
+        if self._tts is None:
+            raise ValueError("TTS must be configured to generate narration.")
+
+        normalised_text = self._normalise_for_tts(text)
+        voice = self._tts_voice
+        if voice == "default":
+            voice = None
+
+        result = self._tts.synthesize(
+            conversation_id="narrations",
+            turn_id=str(__import__("uuid").uuid4()),
+            text=normalised_text,
+            voice=voice,
+            speed=self._tts_speed,
+            language=self._language,
+        )
+        return result.audio_path
+
     def regenerate_turn_audio(self, assistant_turn_id: str) -> TTSResult:
         """Regenerate TTS audio for a single assistant turn."""
         if self._tts is None:

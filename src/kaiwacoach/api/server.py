@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from kaiwacoach.api.routes.audio import router as audio_router
 from kaiwacoach.api.routes.conversations import router as conversations_router
 from kaiwacoach.api.routes.regen import router as regen_router
+from kaiwacoach.api.routes.narration import router as narration_router
 from kaiwacoach.api.routes.settings import router as settings_router
 from kaiwacoach.api.routes.turns import router as turns_router
 from kaiwacoach.api.schemas.conversation import SetLanguageRequest
@@ -62,6 +63,7 @@ def create_app(
     app.include_router(audio_router, prefix="/api")
     app.include_router(turns_router, prefix="/api")
     app.include_router(regen_router, prefix="/api")
+    app.include_router(narration_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
 
     # ── Session / settings endpoints ─────────────────────────────────────
