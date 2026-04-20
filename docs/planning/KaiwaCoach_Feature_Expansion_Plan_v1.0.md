@@ -624,17 +624,17 @@ This component already manages the conversation list — update the fetch call b
 
 ### Definition of Done
 
-- [ ] `poetry run pytest -q tests/test_storage_schema.py` — `conversation_type` column asserted on conversations table; existing chat conversation tests still pass
-- [ ] `poetry run pytest -q tests/test_orchestrator_monologue.py` (new file) — `process_monologue_turn` with mock LLM, real DB; assert `user_turn` row created; assert `corrections` row created; assert **no** `assistant_turn` row; assert `MonologueTurnResult` fields correct; `create_monologue_conversation` creates row with `conversation_type='monologue'`; `list_conversations(conversation_type='monologue')` returns only monologue conversations; `list_conversations(conversation_type='chat')` returns no monologue conversations
-- [ ] `poetry run pytest -q tests/test_sse_monologue.py` (new file) — text route: stage events in correct order → complete; audio route: asr stage fires first; mid-stream failure case for both routes; error event includes `request_id`
-- [ ] `poetry run pytest -q tests/test_api_monologue.py` (new file) — POST `/api/conversations/monologue` returns 201 with `conversation_id`; mock orchestrator used
-- [ ] `poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py` — monologue_summary prompt and schema covered
-- [ ] `poetry run pytest -q -m "not slow"` — full fast suite passes; no regressions in existing chat flow; `GET /api/conversations?type=chat` does not return monologue conversations
-- [ ] Manual (text input): type a sentence with deliberate errors; click Analyse; corrections + summary rendered
-- [ ] Manual (mic input): record a sentence; submit; ASR stage fires; corrections + summary rendered
-- [ ] Manual (file upload): upload a pre-recorded audio file; result displays correctly
-- [ ] Manual: session appears in sidebar under Monologue tab; clicking it shows read-only results with no input form
-- [ ] No TypeScript errors; `npm run build` succeeds
+- [x] `poetry run pytest -q tests/test_storage_schema.py` — `conversation_type` column asserted on conversations table; existing chat conversation tests still pass
+- [x] `poetry run pytest -q tests/test_orchestrator_monologue.py` (new file) — `process_monologue_turn` with mock LLM, real DB; assert `user_turn` row created; assert `corrections` row created; assert **no** `assistant_turn` row; assert `MonologueTurnResult` fields correct; `create_monologue_conversation` creates row with `conversation_type='monologue'`; `list_conversations(conversation_type='monologue')` returns only monologue conversations; `list_conversations(conversation_type='chat')` returns no monologue conversations
+- [x] `poetry run pytest -q tests/test_sse_monologue.py` (new file) — text route: stage events in correct order → complete; audio route: asr stage fires first; mid-stream failure case for both routes; error event includes `request_id`
+- [x] `poetry run pytest -q tests/test_api_monologue.py` (new file) — POST `/api/conversations/monologue` returns 201 with `conversation_id`; mock orchestrator used
+- [x] `poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py` — monologue_summary prompt and schema covered
+- [x] `poetry run pytest -q -m "not slow"` — full fast suite passes; no regressions in existing chat flow; `GET /api/conversations?type=chat` does not return monologue conversations
+- [x] Manual (text input): type a sentence with deliberate errors; click Analyse; corrections + summary rendered
+- [x] Manual (mic input): record a sentence; submit; ASR stage fires; corrections + summary rendered
+- [x] Manual (file upload): upload a pre-recorded audio file; result displays correctly
+- [x] Manual: session appears in sidebar under Monologue tab; clicking it shows read-only results with no input form
+- [x] No TypeScript errors; `npm run build` succeeds
 
 ---
 
@@ -834,8 +834,9 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 | 2     | ✅     | `feature/tab-bar-navigation`       | Feature 0: tab bar + settings stub + narration/monologue stubs                                  | PR 1 merged               |
 | 3     | ✅     | `feature/user-settings`            | Feature 1: user_profile schema, orchestrator methods, settings API routes, SettingsPanel        | PR 2 merged               |
 | 4     | ✅     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
-| 5     | ⬜     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
+| 5     | ✅     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
 | 6     | ⬜     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
+| 7     | ✅     | `feature/db-migration-strategy`    | Replace full-DB-reset with targeted ALTER TABLE migrations; preserve data on additive changes   | PR 5 merged               |
 
 ### Per-branch scope
 
@@ -909,6 +910,29 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 - `tests/test_orchestrator_summary.py`, `tests/test_api_summary.py` — new
 - Definition of done: §8 checklist.
 
+**PR 7 — `feature/db-migration-strategy`** (cut from main after PR 5 merges)
+
+Replace the full-file-delete reset strategy in `storage/db.py` with targeted `ALTER TABLE` migrations for additive schema changes. The current approach deletes all user data (conversations, corrections, settings) whenever a new column is added — this is unacceptable outside an early MVP.
+
+**Goal**: additive schema changes (new column with a default or nullable) must never destroy existing data.
+
+**Approach**:
+
+- Replace `_schema_needs_reset` + full file-delete with an `_apply_migrations` step that runs after `executescript`.
+- For each known additive change, check whether the column already exists and run `ALTER TABLE ... ADD COLUMN ...` if not.
+- Only fall back to a destructive reset for genuinely incompatible changes (removed columns, type changes) — and even then, warn explicitly in the log and only proceed if a `KAIWACOACH_ALLOW_DB_RESET=true` env var is set.
+- Migration steps are append-only and keyed by schema version so each runs at most once.
+
+**Files**:
+- `src/kaiwacoach/storage/db.py` — replace `_schema_needs_reset` with `_apply_migrations`; add version-keyed migration registry
+- `tests/test_storage_schema.py` — tests asserting that applying v3 schema to a v2 DB preserves existing rows and adds the column without data loss
+
+**Definition of done**:
+- [x] Applying the v3 schema to a database that has v2 data preserves all conversations, turns, corrections, and user_profile rows
+- [x] The `conversation_type` column is added with default `'chat'` on existing rows
+- [x] A DB with already-correct columns is unaffected (idempotent)
+- [x] `poetry run pytest -q -m "not slow"` passes; no regressions
+
 ### Parallelism
 
-PRs 3, 4, and 6 can be developed concurrently (no shared file conflicts aside from `orchestrator.py` — coordinate if pairing). PRs 5 and 6 share `json_enforcement.py` and `settings.py` but the additions are additive; merge order does not matter as long as both rebase onto main before opening PRs.
+PRs 3, 4, and 6 can be developed concurrently (no shared file conflicts aside from `orchestrator.py` — coordinate if pairing). PRs 5 and 6 share `json_enforcement.py` and `settings.py` but the additions are additive; merge order does not matter as long as both rebase onto main before opening PRs. PR 7 depends on PR 5 being merged first.

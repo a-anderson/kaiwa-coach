@@ -31,6 +31,7 @@ poetry run python scripts/llm_smoke.py --language ja
 ```
 
 macOS setup (required once for local model dependencies):
+
 ```bash
 poetry run bash scripts/setup_macos.sh
 ```
@@ -59,22 +60,23 @@ The Python environment is pre-created and owned by the maintainer.
 
 **Module boundaries** — do not blur these:
 
-| Module | Responsibility |
-|---|---|
-| `frontend/` | Svelte + Vite SPA — all UI logic; communicates with backend via REST + SSE only |
-| `src/kaiwacoach/api/server.py` | FastAPI app factory, router registration, static file serving, lifespan |
-| `src/kaiwacoach/api/routes/` | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py` |
-| `src/kaiwacoach/orchestrator.py` | Turn lifecycle: sequencing, timing, persistence; steps are pure functions |
+| Module                               | Responsibility                                                                                                                                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend/`                          | Svelte + Vite SPA — all UI logic; communicates with backend via REST + SSE only                                                                                                             |
+| `src/kaiwacoach/api/server.py`       | FastAPI app factory, router registration, static file serving, lifespan                                                                                                                     |
+| `src/kaiwacoach/api/routes/`         | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py`                                                                                                                      |
+| `src/kaiwacoach/orchestrator.py`     | Turn lifecycle: sequencing, timing, persistence; steps are pure functions                                                                                                                   |
 | `src/kaiwacoach/models/protocols.py` | Shared result types (`ASRResult`, `LLMResult`, `TTSResult`) and `@runtime_checkable` protocols (`ASRProtocol`, `LLMProtocol`, `TTSProtocol`) — concrete files import result types from here |
-| `src/kaiwacoach/models/factory.py` | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here |
-| `src/kaiwacoach/models/` | Concrete wrappers: `asr_whisper.py`, `llm_qwen.py`, `tts_kokoro.py`; JSON enforcement: `json_enforcement.py` — no DB or UI dependencies |
-| `src/kaiwacoach/prompts/` | Markdown prompt templates + `loader.py` (renders with `{var}` substitution, returns SHA256) |
-| `src/kaiwacoach/textnorm/` | All normalisation logic — no normalisation inside model wrappers |
-| `src/kaiwacoach/storage/` | `db.py` (SQLite single-writer queue, single source of truth — no hidden caches), `blobs.py` (audio file cache) |
-| `src/kaiwacoach/settings.py` | Config loading: defaults → `config.yaml` → env vars (`KAIWACOACH_*`) |
-| `src/kaiwacoach/config/models.py` | Default model IDs (ASR/LLM/TTS) |
+| `src/kaiwacoach/models/factory.py`   | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here                                    |
+| `src/kaiwacoach/models/`             | Concrete wrappers: `asr_whisper.py`, `llm_qwen.py`, `tts_kokoro.py`; JSON enforcement: `json_enforcement.py` — no DB or UI dependencies                                                     |
+| `src/kaiwacoach/prompts/`            | Markdown prompt templates + `loader.py` (renders with `{var}` substitution, returns SHA256)                                                                                                 |
+| `src/kaiwacoach/textnorm/`           | All normalisation logic — no normalisation inside model wrappers                                                                                                                            |
+| `src/kaiwacoach/storage/`            | `db.py` (SQLite single-writer queue, single source of truth — no hidden caches), `blobs.py` (audio file cache)                                                                              |
+| `src/kaiwacoach/settings.py`         | Config loading: defaults → `config.yaml` → env vars (`KAIWACOACH_*`)                                                                                                                        |
+| `src/kaiwacoach/config/models.py`    | Default model IDs (ASR/LLM/TTS)                                                                                                                                                             |
 
 **Turn pipeline** (in `orchestrator.py`):
+
 1. User input (text or audio) → ASR if audio
 2. Persist intermediates **before** side effects (e.g. save text before TTS)
 3. Conversation LLM role → `ConversationReply`
@@ -83,6 +85,7 @@ The Python environment is pre-created and owned by the maintainer.
 6. Persist all artefacts to SQLite + blob storage
 
 **LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`). Each role has:
+
 - A Pydantic schema in `json_enforcement.py`
 - A markdown prompt in `src/kaiwacoach/prompts/`
 - An explicit per-role token cap
@@ -95,6 +98,7 @@ The Python environment is pre-created and owned by the maintainer.
 **Config**: `load_config()` in `settings.py` merges three layers. Env var names follow `KAIWACOACH_<SECTION>_<KEY>` (e.g. `KAIWACOACH_SESSION_LANGUAGE`). Model defaults come from `config/models.py`. Copy `config.example.yaml` to `config.yaml` for file-based overrides. UI asset locations (e.g. logos) come from config and are passed into UI builders explicitly — do not use brittle `Path(...).parents[n]` traversal in feature code.
 
 **Default models** (local, MLX-based, Apple Silicon only):
+
 - ASR: `mlx-community/whisper-large-v3-mlx`
 - LLM: `mlx-community/Qwen3-14B-8bit`
 - TTS: `mlx-community/Kokoro-82M-bf16`
@@ -114,6 +118,7 @@ The Python environment is pre-created and owned by the maintainer.
 ## Performance
 
 Caching is hash-based:
+
 - ASR: audio content hash
 - LLM: prompt hash + role
 - TTS: text + voice + speed
@@ -148,6 +153,8 @@ When modifying `src/kaiwacoach/storage/schema.sql`, also update:
 3. **`schema_version`** — bump the version integer in `schema.sql`.
 
 Prefer nullable columns or columns with defaults for additive changes. The current behaviour on a column-set mismatch is a full local DB reset (acceptable for single-user MVP — note this in any schema PR).
+
+**STOP AND ASK before triggering a DB reset.** If a schema change requires adding a column to `_schema_needs_reset` (which will delete all local data on next startup), you must explicitly warn the user and get their confirmation before proceeding. Provide the manual migration SQL (`ALTER TABLE ... ADD COLUMN ...`) as an alternative so they can preserve existing data. Never silently ship a change that will destroy the user's database.
 
 ## Frontend (Svelte / Vite)
 
@@ -198,7 +205,7 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - Prefer small explicit helpers over large callback bodies when output ordering or state transitions are non-trivial.
 - When refactoring: move code first, then change behaviour in a separate step.
 - Add docstrings/comments only for non-obvious behaviour, tradeoffs, or framework quirks. When a docstring is warranted, the description must be one concise sentence; Parameters and Returns sections are permitted where they add clarity.
-- Start with the simplest solution that is likely to work. If choosing a more complex option, document why the simpler one was insufficient.
+- Start with the simplest solution that is likely to work, but still conforms to software engineering best practices. If choosing a more complex option, document why the simpler one was insufficient.
 - Keep changes focused and diffs small; avoid broad refactors unless explicitly requested.
 - **Python type hints**: use built-in types directly — `dict`, `list`, `tuple` — not `Dict`, `List` from `typing` (Python 3.9+ is required). Use `X | None` instead of `Optional[X]`.
 - **Timing variables**: when measuring multiple sub-steps in the same function, use a short-lived local (e.g. `t0`) that is reassigned for each step, and a separate `start_total` that is never reassigned, so the total and per-step durations are unambiguously distinct.

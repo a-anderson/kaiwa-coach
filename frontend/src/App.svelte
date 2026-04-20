@@ -72,7 +72,7 @@
         class="tab-content"
       >
         {#if $uiStore.activeTab === 'chat'}
-          {#if $sessionStore.conversationId === null}
+          {#if $sessionStore.conversationId === null || $sessionStore.conversationType !== 'chat'}
             <div class="no-conversation">
               <p class="empty-title">No conversation selected</p>
               <p class="empty-hint">Choose one from the sidebar, or click <strong>+ New</strong> to start.</p>
@@ -86,7 +86,7 @@
             <InputArea on:turncomplete={() => sidebarRef?.refresh()} />
           {/if}
         {:else if $uiStore.activeTab === 'monologue'}
-          <MonologuePanel />
+          <MonologuePanel on:turncomplete={() => sidebarRef?.refresh()} />
         {:else if $uiStore.activeTab === 'narration'}
           <NarrationPanel />
         {/if}

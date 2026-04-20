@@ -4,6 +4,7 @@ import type { TurnRecord } from '../types/api'
 export interface SessionState {
   language: string
   conversationId: string | null
+  conversationType: 'chat' | 'monologue'
   turns: TurnRecord[]
   // Live in-progress turn — populated on submit, cleared when complete fires.
   pendingTurn: TurnRecord | null
@@ -12,6 +13,7 @@ export interface SessionState {
 export const sessionStore = writable<SessionState>({
   language: 'ja',
   conversationId: null,
+  conversationType: 'chat',
   turns: [],
   pendingTurn: null,
 })

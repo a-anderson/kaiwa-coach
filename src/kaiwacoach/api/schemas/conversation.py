@@ -31,6 +31,7 @@ class ConversationSummary(BaseModel):
     language: str
     updated_at: str | None
     preview_text: str | None
+    conversation_type: str = "chat"
 
 
 class ConversationDetail(BaseModel):
@@ -40,6 +41,7 @@ class ConversationDetail(BaseModel):
     created_at: str | None
     updated_at: str | None
     turns: list[TurnRecord]
+    conversation_type: str = "chat"
 
 
 class CreateConversationRequest(BaseModel):
