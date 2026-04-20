@@ -94,12 +94,29 @@ def test_post_profile_updates_ja_and_ja_kanji_independently(client, mock_orchest
     )
 
 
+def test_post_profile_merges_language_proficiency(client, mock_orchestrator) -> None:
+    mock_orchestrator.get_user_profile.return_value = {
+        "user_name": None,
+        "language_proficiency": {"fr": "B1"},
+    }
+    res = client.post(
+        "/api/settings/profile",
+        json={"language_proficiency": {"ja": "N3"}},
+    )
+    assert res.status_code == 204
+    mock_orchestrator.set_user_profile.assert_called_once_with(
+        user_name=None,
+        language_proficiency={"fr": "B1", "ja": "N3"},
+    )
+
+
 def test_post_profile_invalid_level_returns_422(client, mock_orchestrator) -> None:
     res = client.post(
         "/api/settings/profile",
         json={"language_proficiency": {"ja": "fluent"}},
     )
     assert res.status_code == 422
+    assert "Invalid proficiency level" in res.json()["detail"]
     mock_orchestrator.set_user_profile.assert_not_called()
 
 
@@ -109,6 +126,7 @@ def test_post_profile_unknown_language_returns_422(client, mock_orchestrator) ->
         json={"language_proficiency": {"zh": "B1"}},
     )
     assert res.status_code == 422
+    assert "Unknown proficiency language" in res.json()["detail"]
     mock_orchestrator.set_user_profile.assert_not_called()
 
 

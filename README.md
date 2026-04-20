@@ -366,7 +366,7 @@ The project currently provides evidence in three areas:
 
 Latest full local snapshot (2026-04-20):
 
-- `307 passed`
+- `309 passed`
 
 ### Schema and repair robustness
 

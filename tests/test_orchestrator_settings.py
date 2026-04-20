@@ -149,3 +149,19 @@ def test_user_name_for_prompt_returns_name(tmp_path: Path) -> None:
         assert orch._user_name_for_prompt() == "Ashley"
     finally:
         db.close()
+
+
+def test_get_user_profile_handles_corrupt_json(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    try:
+        import sqlite3
+        conn = sqlite3.connect(tmp_path / "kaiwacoach.sqlite")
+        conn.execute("UPDATE user_profile SET language_proficiency_json = 'not-json' WHERE id = 1")
+        conn.commit()
+        conn.close()
+
+        orch = _make_orch(db)
+        profile = orch.get_user_profile()
+        assert profile["language_proficiency"] == {}
+    finally:
+        db.close()

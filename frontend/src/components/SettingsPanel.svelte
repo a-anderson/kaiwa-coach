@@ -1,17 +1,22 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, tick } from 'svelte'
   import { fly } from 'svelte/transition'
   import { uiStore } from '../lib/stores/ui'
   import { getProfile, setProfile } from '../lib/api/settings'
+  import { SUPPORTED_LANGUAGES as LANGUAGE_CODES } from '../lib/constants'
 
-  const SUPPORTED_LANGUAGES = [
-    { code: 'ja', label: 'Japanese' },
-    { code: 'fr', label: 'French' },
-    { code: 'en', label: 'English' },
-    { code: 'es', label: 'Spanish' },
-    { code: 'it', label: 'Italian' },
-    { code: 'pt-br', label: 'Portuguese (Brazil)' },
-  ]
+  const LANGUAGE_LABELS: Record<string, string> = {
+    ja: 'Japanese',
+    fr: 'French',
+    en: 'English',
+    es: 'Spanish',
+    it: 'Italian',
+    'pt-br': 'Portuguese (Brazil)',
+  }
+  const SUPPORTED_LANGUAGES = LANGUAGE_CODES.map((code) => ({
+    code,
+    label: LANGUAGE_LABELS[code] ?? code,
+  }))
   const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Native']
   const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
 
@@ -94,6 +99,7 @@
   onMount(async () => {
     previousFocus = document.activeElement as HTMLElement | null
     await load()
+    await tick()
     const first = panelEl.querySelector<HTMLElement>(FOCUSABLE)
     first?.focus()
     window.addEventListener('keydown', handleKeydown)

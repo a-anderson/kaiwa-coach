@@ -519,9 +519,10 @@ class ConversationOrchestrator:
         """
         if timings is None:
             timings = {}
-        user_name = self._user_name_for_prompt()
-        user_level = self._user_level_for(self._language)
-        user_kanji_level = self._user_kanji_level_for()
+        profile = self.get_user_profile()
+        user_name = self._user_name_for_prompt(profile)
+        user_level = self._user_level_for(self._language, profile)
+        user_kanji_level = self._user_kanji_level_for(profile)
         profile_vars = {
             "user_name": user_name,
             "user_level": user_level,
@@ -671,8 +672,9 @@ class ConversationOrchestrator:
         if timings is None:
             timings = {}
         start_total = time.perf_counter()
-        user_level = self._user_level_for(self._language)
-        user_kanji_level = self._user_kanji_level_for()
+        profile = self.get_user_profile()
+        user_level = self._user_level_for(self._language, profile)
+        user_kanji_level = self._user_kanji_level_for(profile)
 
         # Call 1: detect errors and produce corrected sentence in a single LLM call.
         # No repair path: the errors field is a list, which makes a generic repair
@@ -967,39 +969,45 @@ class ConversationOrchestrator:
             {"id": 1},
         )
 
-    def _user_level_for(self, language: str) -> str:
+    def _user_level_for(self, language: str, profile: dict | None = None) -> str:
         """Return the stored grammar/overall level for the given language.
 
         Defaults: 'N5' for 'ja', 'A1' for all other supported languages.
+        Pass a pre-fetched profile dict to avoid an extra DB read.
         """
-        profile = self.get_user_profile()
+        if profile is None:
+            profile = self.get_user_profile()
         stored = profile["language_proficiency"].get(language)
         if stored:
             return stored
         return "N5" if language == "ja" else "A1"
 
-    def _user_kanji_level_for(self) -> str:
+    def _user_kanji_level_for(self, profile: dict | None = None) -> str:
         """Return the stored kanji reading level (key 'ja_kanji').
 
         Falls back to the overall 'ja' level if 'ja_kanji' is not set.
         Returns '' for non-Japanese sessions so callers can pass it as an empty
         string to PromptLoader.render() without rendering the literal 'None'.
+        Pass a pre-fetched profile dict to avoid an extra DB read.
         """
         if self._language != "ja":
             return ""
-        profile = self.get_user_profile()
+        if profile is None:
+            profile = self.get_user_profile()
         proficiency = profile["language_proficiency"]
         stored = proficiency.get("ja_kanji")
         if stored:
             return stored
         return proficiency.get("ja") or "N5"
 
-    def _user_name_for_prompt(self) -> str:
+    def _user_name_for_prompt(self, profile: dict | None = None) -> str:
         """Return the user's name, or '' if not set.
 
         Callers must not pass None to PromptLoader.render() — it renders as 'None'.
+        Pass a pre-fetched profile dict to avoid an extra DB read.
         """
-        profile = self.get_user_profile()
+        if profile is None:
+            profile = self.get_user_profile()
         return profile["user_name"] or ""
 
     def reset_session(self) -> None:

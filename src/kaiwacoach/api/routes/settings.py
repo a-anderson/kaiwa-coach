@@ -17,11 +17,16 @@ class UserProfileRequest(BaseModel):
     language_proficiency: dict[str, str] = {}
 
 
+class UserProfileResponse(BaseModel):
+    user_name: str | None
+    language_proficiency: dict[str, str]
+
+
 @router.get("/settings/profile")
 async def get_profile(
     orc: ConversationOrchestrator = Depends(get_orchestrator),
-) -> dict:
-    return orc.get_user_profile()
+) -> UserProfileResponse:
+    return UserProfileResponse(**orc.get_user_profile())
 
 
 @router.post("/settings/profile", status_code=204)
@@ -34,14 +39,16 @@ async def set_profile(
         if valid_levels is None:
             raise HTTPException(
                 status_code=422,
-                detail=f"Unknown language '{language}'",
+                detail=f"Unknown proficiency language: {language}",
             )
         if level not in valid_levels:
             raise HTTPException(
                 status_code=422,
-                detail=f"Invalid level '{level}' for language '{language}'",
+                detail=f"Invalid proficiency level: {level}",
             )
+    current = orc.get_user_profile()
+    merged_proficiency = {**current["language_proficiency"], **body.language_proficiency}
     orc.set_user_profile(
         user_name=body.user_name,
-        language_proficiency=body.language_proficiency,
+        language_proficiency=merged_proficiency,
     )
