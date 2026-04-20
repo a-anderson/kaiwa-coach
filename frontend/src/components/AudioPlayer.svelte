@@ -30,11 +30,17 @@
       url: src,
     })
 
-    ws.on('ready', () => { ready = true; if (autoplay) ws.play() })
+    ws.on('ready', () => { ready = true; if (autoplay) ws?.play() })
     ws.on('play', () => { playing = true })
     ws.on('pause', () => { playing = false })
     ws.on('finish', () => { playing = false })
   })
+
+  $: if (ws && src) {
+    ready = false
+    playing = false
+    ws.load(src)
+  }
 
   onDestroy(() => {
     ws?.destroy()

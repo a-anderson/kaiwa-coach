@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
   import { generateNarration } from '../lib/api/narration'
+  import { LANGUAGE_NATIVE_NAMES } from '../lib/constants'
   import AudioPlayer from './AudioPlayer.svelte'
 
   let text = ''
@@ -11,6 +12,7 @@
   let prevBlobUrl: string | null = null
 
   $: language = $sessionStore.language
+  $: languageDisplay = LANGUAGE_NATIVE_NAMES[language] ?? language.toUpperCase()
 
   function revokePrev() {
     if (prevBlobUrl) {
@@ -45,7 +47,7 @@
 
 <div class="narration-panel">
   <div class="narration-inner">
-    <h2 class="panel-title">Narrate in <span class="lang-label">{language.toUpperCase()}</span></h2>
+    <h2 class="panel-title">Narrate in <span class="lang-label">{languageDisplay}</span></h2>
 
     <textarea
       class="narration-textarea"
@@ -113,11 +115,11 @@
     font-size: 1.1rem;
     font-weight: 600;
     margin: 0;
-    color: var(--kc-text, #e0e0e0);
+    color: #222;
   }
 
   .lang-label {
-    color: var(--kc-primary, #888);
+    color: var(--kc-primary, #555);
   }
 
   .narration-textarea {
@@ -125,9 +127,9 @@
     resize: vertical;
     padding: 0.75rem;
     border-radius: 6px;
-    border: 1px solid var(--kc-border, #333);
-    background: var(--kc-input-bg, #1e1e1e);
-    color: var(--kc-text, #e0e0e0);
+    border: 1px solid #d0d0d0;
+    background: #fff;
+    color: #222;
     font-size: 0.95rem;
     font-family: inherit;
     line-height: 1.5;
@@ -140,7 +142,8 @@
   }
 
   .narration-textarea:disabled {
-    opacity: 0.6;
+    background: #f8f8f8;
+    opacity: 0.7;
   }
 
   .generate-btn {
@@ -187,22 +190,22 @@
   .preview-label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--kc-secondary-text, #aaa);
+    color: #555;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
 
   .download-btn {
     font-size: 0.8rem;
-    color: var(--kc-secondary-text, #aaa);
+    color: #555;
     text-decoration: none;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
-    border: 1px solid var(--kc-border, #444);
+    border: 1px solid #d0d0d0;
     transition: background 0.15s;
   }
 
   .download-btn:hover {
-    background: var(--kc-hover-bg, #2a2a2a);
+    background: #f0f0f0;
   }
 </style>
