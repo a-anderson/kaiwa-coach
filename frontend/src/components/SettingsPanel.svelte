@@ -3,20 +3,13 @@
   import { fly } from 'svelte/transition'
   import { uiStore } from '../lib/stores/ui'
   import { getProfile, setProfile } from '../lib/api/settings'
-  import { SUPPORTED_LANGUAGES as LANGUAGE_CODES } from '../lib/constants'
+  import { SUPPORTED_LANGUAGES as LANGUAGE_CODES, LANGUAGE_NATIVE_NAMES, LANGUAGE_ENGLISH_NAMES } from '../lib/constants'
 
-  const LANGUAGE_LABELS: Record<string, string> = {
-    ja: 'Japanese',
-    fr: 'French',
-    en: 'English',
-    es: 'Spanish',
-    it: 'Italian',
-    'pt-br': 'Portuguese (Brazil)',
-  }
-  const SUPPORTED_LANGUAGES = LANGUAGE_CODES.map((code) => ({
-    code,
-    label: LANGUAGE_LABELS[code] ?? code,
-  }))
+  const SUPPORTED_LANGUAGES = LANGUAGE_CODES.map((code) => {
+    const native = LANGUAGE_NATIVE_NAMES[code] ?? code
+    const english = LANGUAGE_ENGLISH_NAMES[code]
+    return { code, label: english && english !== native ? `${native} (${english})` : native }
+  })
   const JLPT_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Native']
   const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Native']
 

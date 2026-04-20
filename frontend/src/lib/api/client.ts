@@ -6,6 +6,14 @@
  * SSE frames manually.
  */
 
+export async function checkOk(res: Response): Promise<Response> {
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
+  }
+  return res
+}
+
 export interface SSEFrame {
   event: string
   data: unknown

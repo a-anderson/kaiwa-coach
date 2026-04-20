@@ -30,6 +30,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
     - assistant reply generation
     - optional correction pipeline (detect errors + corrected sentence → explanation + native rewrite)
     - TTS synthesis of assistant reply
+- Narration tab: paste text → TTS synthesis → preview and download (stateless, no conversation created)
 - Persists conversations and supports list, load, resume, and delete
 - Audio regeneration per-turn or per-conversation
 - Shadowing mode: side-by-side listen + record comparison for any assistant turn
@@ -252,6 +253,13 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
     - All other languages: CEFR level (A1–Native)
 - Levels take effect on the next turn; no conversation restart is required.
 
+### Narration
+
+- Click the **Narration** tab to open the narration panel.
+- Paste or type text in the current session language and click **Generate Audio**.
+- Preview the synthesised audio inline; click **↓ Download** to save the file.
+- No conversation is created — narration is stateless and session-only.
+
 ### Audio regeneration
 
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
@@ -366,7 +374,7 @@ The project currently provides evidence in three areas:
 
 Latest full local snapshot (2026-04-20):
 
-- `309 passed`
+- `318 passed`
 
 ### Schema and repair robustness
 

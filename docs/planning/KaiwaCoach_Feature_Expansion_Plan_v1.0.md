@@ -396,13 +396,13 @@ generateNarration(text: string): Promise<{ audio_url: string }>
 
 ### Definition of Done
 
-- [ ] `poetry run pytest -q tests/test_orchestrator_narration.py` (new file) — `generate_narration` calls TTS with `self._language`; mocked TTS returns a path; method returns the raw path string (not a URL)
-- [ ] `poetry run pytest -q tests/test_api_narration.py` (new file) — POST with valid text returns `audio_url` (route calls `audio_path_to_url` with correct cache root); POST with empty text returns 400; mock orchestrator used; audio_cache state is wired correctly in the test fixture
-- [ ] Manual: switch to Narration tab; sidebar is gone, panel is full-width
-- [ ] Manual: paste a sentence in the target language; click Generate Audio; audio player appears and plays correctly
-- [ ] Manual: Download button saves a WAV file
-- [ ] Manual: generate a second narration; first blob URL is revoked (no memory leak)
-- [ ] No TypeScript errors; `npm run build` succeeds
+- [x] `poetry run pytest -q tests/test_orchestrator_narration.py` (new file) — `generate_narration` calls TTS with `self._language`; mocked TTS returns a path; method returns the raw path string (not a URL)
+- [x] `poetry run pytest -q tests/test_api_narration.py` (new file) — POST with valid text returns `audio_url` (route calls `audio_path_to_url` with correct cache root); POST with empty text returns 400; mock orchestrator used; audio_cache state is wired correctly in the test fixture
+- [x] Manual: switch to Narration tab; sidebar is gone, panel is full-width
+- [x] Manual: paste a sentence in the target language; click Generate Audio; audio player appears and plays correctly
+- [x] Manual: Download button saves a WAV file
+- [x] Manual: generate a second narration; first blob URL is revoked (no memory leak)
+- [x] No TypeScript errors; `npm run build` succeeds
 
 ---
 
@@ -833,7 +833,7 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 | 1     | ✅     | `feature/new-features-exploration` | Planning docs only (this branch)                                                                | None — merge immediately  |
 | 2     | ✅     | `feature/tab-bar-navigation`       | Feature 0: tab bar + settings stub + narration/monologue stubs                                  | PR 1 merged               |
 | 3     | ✅     | `feature/user-settings`            | Feature 1: user_profile schema, orchestrator methods, settings API routes, SettingsPanel        | PR 2 merged               |
-| 4     | ⬜     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
+| 4     | ✅     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
 | 5     | ⬜     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
 | 6     | ⬜     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
 

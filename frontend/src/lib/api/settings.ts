@@ -1,14 +1,8 @@
+import { checkOk } from './client'
+
 export interface UserProfile {
   user_name: string | null
   language_proficiency: Record<string, string>
-}
-
-async function checkOk(res: Response): Promise<Response> {
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-  }
-  return res
 }
 
 export async function getProfile(): Promise<UserProfile> {

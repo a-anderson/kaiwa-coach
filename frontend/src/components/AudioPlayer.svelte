@@ -27,14 +27,22 @@
       barGap: 1,
       barRadius: 2,
       interact: true,
-      url: src,
     })
 
-    ws.on('ready', () => { ready = true; if (autoplay) ws.play() })
+    ws.on('ready', () => { ready = true; if (autoplay) ws?.play() })
     ws.on('play', () => { playing = true })
     ws.on('pause', () => { playing = false })
     ws.on('finish', () => { playing = false })
+    // ws assignment triggers the reactive statement below, which performs the initial load.
   })
+
+  // Single code path for all loads: fires on initial mount (ws goes null→instance)
+  // and on every subsequent src change.
+  $: if (ws && src) {
+    ready = false
+    playing = false
+    ws.load(src)
+  }
 
   onDestroy(() => {
     ws?.destroy()
