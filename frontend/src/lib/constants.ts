@@ -15,3 +15,13 @@ export const LANGUAGE_NATIVE_NAMES: Record<string, string> = {
   it: 'Italiano',
   'pt-br': 'Português',
 }
+
+/** English display name for each supported language code. */
+export const LANGUAGE_ENGLISH_NAMES: Record<string, string> = {
+  ja: 'Japanese',
+  fr: 'French',
+  en: 'English',
+  es: 'Spanish',
+  it: 'Italian',
+  'pt-br': 'Portuguese (Brazil)',
+}

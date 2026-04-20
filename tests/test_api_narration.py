@@ -63,11 +63,15 @@ def test_narrate_returns_audio_url(client, mock_orchestrator) -> None:
     mock_orchestrator.generate_narration.assert_called_once_with("Bonjour le monde")
 
 
-def test_narrate_calls_audio_path_to_url_with_cache_root(client, mock_orchestrator, mock_audio_cache) -> None:
+def test_narrate_audio_url_is_relative_to_cache_root(client, mock_audio_cache) -> None:
     response = client.post("/api/narrate", json={"text": "Hello"})
     assert response.status_code == 200
-    # The route must pass the cache root, not a hardcoded path
-    mock_orchestrator.generate_narration.assert_called_once()
+    audio_url = response.json()["audio_url"]
+    # audio_path_to_url relativises the path against the cache root — the URL
+    # must contain the filename from the mock audio path, not an absolute FS path.
+    # audio_path_to_url produces a root-relative /api/audio/... path, not a raw FS path
+    assert "test.wav" in audio_url
+    assert audio_url.startswith("/api/audio/")
 
 
 def test_narrate_empty_text_returns_400(client) -> None:

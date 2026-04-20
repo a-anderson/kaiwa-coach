@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
   import { generateNarration } from '../lib/api/narration'
   import { LANGUAGE_NATIVE_NAMES } from '../lib/constants'
@@ -9,17 +8,9 @@
   let loading = false
   let error = ''
   let audioUrl: string | null = null
-  let prevBlobUrl: string | null = null
 
   $: language = $sessionStore.language
   $: languageDisplay = LANGUAGE_NATIVE_NAMES[language] ?? language.toUpperCase()
-
-  function revokePrev() {
-    if (prevBlobUrl) {
-      URL.revokeObjectURL(prevBlobUrl)
-      prevBlobUrl = null
-    }
-  }
 
   async function handleGenerate() {
     if (!text.trim()) return
@@ -28,9 +19,6 @@
 
     try {
       const result = await generateNarration(text)
-      revokePrev()
-      // The URL from the server is a direct path, not a blob URL — no revocation needed
-      // but we track it for consistency if we ever switch to blob URLs.
       audioUrl = result.audio_url
     } catch (err: unknown) {
       error = err instanceof Error ? err.message : 'Failed to generate audio'
@@ -39,10 +27,6 @@
       loading = false
     }
   }
-
-  onDestroy(() => {
-    revokePrev()
-  })
 </script>
 
 <div class="narration-panel">

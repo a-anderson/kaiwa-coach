@@ -1,12 +1,5 @@
 import type { ConversationSummary, ConversationDetail } from '../types/api'
-
-async function checkOk(res: Response): Promise<Response> {
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
-  }
-  return res
-}
+import { checkOk } from './client'
 
 export async function listConversations(): Promise<ConversationSummary[]> {
   const res = await checkOk(await fetch('/api/conversations'))

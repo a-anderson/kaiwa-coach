@@ -852,7 +852,7 @@ class ConversationOrchestrator:
 
         result = self._tts.synthesize(
             conversation_id="narrations",
-            turn_id=str(__import__("uuid").uuid4()),
+            turn_id=str(uuid.uuid4()),
             text=normalised_text,
             voice=voice,
             speed=self._tts_speed,
