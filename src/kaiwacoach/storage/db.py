@@ -43,6 +43,7 @@ class SQLiteWriter:
             "updated_at",
         },
         "artifacts": {"kind", "path", "meta_json", "updated_at"},
+        "user_profile": {"user_name", "language_proficiency_json", "updated_at"},
     }
 
     def __init__(self, db_path: str | Path, schema_path: str | Path) -> None:

@@ -187,6 +187,11 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - **SSE error events**: must include a `request_id` field (generated per request in `_build_sse_generator`) so failures can be correlated between server logs and client-side error reports.
 - **Shared route utilities**: if a helper function would appear in more than one route file, add it to `src/kaiwacoach/api/utils.py` and import from there. Do not duplicate.
 
+## Investigation discipline
+
+- **Target what you actually need to check.** Use `grep` or targeted `Read` with line offsets rather than reading whole files. Read a file in full only when the full content is genuinely needed.
+- For "what's missing / what's broken?" questions: `git diff --name-only`, grep the changed files for relevant symbols, run the tests. Don't read every changed file top-to-bottom.
+
 ## Code quality
 
 - Write to a standard suitable for senior+ review: clear, testable, easy to reason about.
