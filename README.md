@@ -31,6 +31,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
     - optional correction pipeline (detect errors + corrected sentence → explanation + native rewrite)
     - TTS synthesis of assistant reply
 - Narration tab: paste text → TTS synthesis → preview and download (stateless, no conversation created)
+- Monologue mode: submit text/audio → corrections + improvement summary; persisted to SQLite
 - Persists conversations and supports list, load, resume, and delete
 - Audio regeneration per-turn or per-conversation
 - Shadowing mode: side-by-side listen + record comparison for any assistant turn
@@ -374,7 +375,7 @@ The project currently provides evidence in three areas:
 
 Latest full local snapshot (2026-04-20):
 
-- `318 passed`
+- `353 passed`
 
 ### Schema and repair robustness
 

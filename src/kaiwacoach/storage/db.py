@@ -30,6 +30,7 @@ class SQLiteWriter:
             "llm_model_id",
             "tts_model_id",
             "model_metadata_json",
+            "conversation_type",
             "updated_at",
         },
         "user_turns": {"input_text", "asr_text", "asr_meta_json", "updated_at"},
@@ -334,6 +335,7 @@ class SQLiteWriter:
             "created_at",
             "updated_at",
             "model_metadata_json",
+            "conversation_type",
         }
         rows = connection.execute("PRAGMA table_info(conversations)").fetchall()
         if not rows:

@@ -1,8 +1,18 @@
 import type { ConversationSummary, ConversationDetail } from '../types/api'
 import { checkOk } from './client'
 
-export async function listConversations(): Promise<ConversationSummary[]> {
-  const res = await checkOk(await fetch('/api/conversations'))
+export async function listConversations(
+  type?: 'chat' | 'monologue',
+): Promise<ConversationSummary[]> {
+  const url = type ? `/api/conversations?type=${type}` : '/api/conversations'
+  const res = await checkOk(await fetch(url))
+  return res.json()
+}
+
+export async function createMonologueConversation(): Promise<{ conversation_id: string }> {
+  const res = await checkOk(
+    await fetch('/api/conversations/monologue', { method: 'POST' }),
+  )
   return res.json()
 }
 

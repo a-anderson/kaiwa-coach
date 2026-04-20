@@ -35,11 +35,17 @@ class ExplainAndNative(BaseModel):
     native: StrictStr
 
 
+class MonologueSummary(BaseModel):
+    improvement_areas: conlist(StrictStr, min_length=1)
+    overall_assessment: StrictStr
+
+
 ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
     "conversation": ConversationReply,
     "jp_tts_normalisation": JpTtsNormalisation,
     "detect_and_correct": DetectAndCorrect,
     "explain_and_native": ExplainAndNative,
+    "monologue_summary": MonologueSummary,
 }
 
 

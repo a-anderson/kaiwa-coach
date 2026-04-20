@@ -8,6 +8,7 @@ export interface ConversationSummary {
   language: string
   updated_at: string | null
   preview_text: string | null
+  conversation_type?: string
 }
 
 export interface CorrectionData {
@@ -39,7 +40,36 @@ export interface ConversationDetail {
   created_at: string | null
   updated_at: string | null
   turns: TurnRecord[]
+  conversation_type?: string
 }
+
+// ── Monologue ──────────────────────────────────────────────────────────────
+
+export interface MonologueCorrections {
+  errors: string[]
+  corrected: string
+  native: string
+  explanation: string
+}
+
+export interface MonologueSummary {
+  improvement_areas: string[]
+  overall_assessment: string
+}
+
+export interface MonologueSSECompleteEvent {
+  conversation_id: string
+  user_turn_id: string
+  input_text: string
+  asr_text: string | null
+  corrections: MonologueCorrections
+  summary: MonologueSummary
+}
+
+export type MonologueSSEEvent =
+  | { event: 'stage'; data: { stage: string; status: 'running' | 'complete'; [key: string]: unknown } }
+  | { event: 'complete'; data: MonologueSSECompleteEvent }
+  | { event: 'error'; data: { message: string; request_id?: string } }
 
 // ── Turn requests ──────────────────────────────────────────────────────────
 

@@ -52,7 +52,7 @@ def test_schema_version_row_exists() -> None:
 
     row = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
     assert row is not None
-    assert row[0] == 2
+    assert row[0] == 3
 
 
 def test_user_profile_table_exists() -> None:
@@ -83,6 +83,26 @@ def test_user_profile_default_row_exists() -> None:
     assert row[0] == 1
     assert row[1] is None
     assert row[2] == "{}"
+
+
+def test_conversations_conversation_type_column() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.execute("PRAGMA foreign_keys = ON;")
+    _load_schema(connection)
+
+    columns = _column_names(connection, "conversations")
+    assert "conversation_type" in columns
+
+    # Default value for new rows must be 'chat'
+    connection.execute(
+        "INSERT INTO conversations (id, title, language, asr_model_id, llm_model_id, tts_model_id) "
+        "VALUES ('c1', 'Test', 'ja', 'asr', 'llm', 'tts')"
+    )
+    row = connection.execute(
+        "SELECT conversation_type FROM conversations WHERE id = 'c1'"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "chat"
 
 
 def test_schema_indexes_exist() -> None:

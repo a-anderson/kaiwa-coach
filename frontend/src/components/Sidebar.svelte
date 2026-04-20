@@ -1,10 +1,14 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
+  import { uiStore } from '../lib/stores/ui'
   import { createConversation, getConversation, deleteConversation, deleteAllConversations, setSessionLanguage } from '../lib/api/conversations'
   import ConversationList from './ConversationList.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
 
   let listRef: ConversationList
+
+  $: activeTab = $uiStore.activeTab
+  $: listType = activeTab === 'monologue' ? 'monologue' as const : 'chat' as const
 
   export async function refresh(): Promise<void> {
     await listRef.refresh()
@@ -67,7 +71,7 @@
         {creating ? 'Creating…' : '+ New conversation'}
       </button>
     </div>
-    <ConversationList bind:this={listRef} on:select={(e) => handleSelect(e.detail)} />
+    <ConversationList bind:this={listRef} type={listType} on:select={(e) => handleSelect(e.detail)} />
   </div>
 
   <footer class="sidebar-footer">

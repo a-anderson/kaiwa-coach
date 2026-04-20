@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from kaiwacoach.api.deps import get_orchestrator
 from kaiwacoach.api.schemas.conversation import (
@@ -58,9 +59,10 @@ def _build_turn_record(
 
 @router.get("/conversations", response_model=list[ConversationSummary])
 async def list_conversations(
+    type: Optional[str] = Query(default=None),
     orc: ConversationOrchestrator = Depends(get_orchestrator),
 ) -> list[ConversationSummary]:
-    return [ConversationSummary(**c) for c in orc.list_conversations()]
+    return [ConversationSummary(**c) for c in orc.list_conversations(conversation_type=type)]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
@@ -83,7 +85,16 @@ async def get_conversation(
         created_at=convo.get("created_at"),
         updated_at=convo.get("updated_at"),
         turns=turns,
+        conversation_type=convo.get("conversation_type", "chat"),
     )
+
+
+@router.post("/conversations/monologue", status_code=201)
+async def create_monologue_conversation(
+    orc: ConversationOrchestrator = Depends(get_orchestrator),
+) -> dict:
+    conversation_id = orc.create_monologue_conversation()
+    return {"conversation_id": conversation_id}
 
 
 @router.post("/conversations", response_model=ConversationSummary, status_code=201)

@@ -8,6 +8,8 @@
 
   const dispatch = createEventDispatcher<{ select: string }>()
 
+  export let type: 'chat' | 'monologue' = 'chat'
+
   let conversations: ConversationSummary[] = []
   let loading = true
   let error: string | null = null
@@ -21,13 +23,15 @@
     loading = true
     error = null
     try {
-      conversations = await listConversations()
+      conversations = await listConversations(type)
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load conversations'
     } finally {
       loading = false
     }
   }
+
+  $: type, load()
 
   async function confirmDelete(): Promise<void> {
     if (!pendingDeleteId) return

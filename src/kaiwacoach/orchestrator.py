@@ -60,6 +60,17 @@ class AudioTurnResult:
     tts_audio_path: str | None = None
 
 
+@dataclass(frozen=True)
+class MonologueTurnResult:
+    conversation_id: str
+    user_turn_id: str
+    input_text: str
+    asr_text: str | None
+    asr_meta: dict | None
+    corrections: dict
+    summary: dict
+
+
 class ConversationOrchestrator:
     """Orchestrator for text/audio turns, corrections, and TTS with persistence."""
 
@@ -860,6 +871,203 @@ class ConversationOrchestrator:
         )
         return result.audio_path
 
+    def create_monologue_conversation(self) -> str:
+        """Create a conversation with conversation_type='monologue' and an auto-generated title.
+
+        Returns
+        -------
+        str
+            The new conversation_id.
+        """
+        import datetime as _datetime
+
+        conversation_id = str(uuid.uuid4())
+        title = f"Monologue – {_datetime.date.today().isoformat()}"
+
+        def _insert(conn) -> None:
+            conn.execute(
+                """
+                INSERT INTO conversations (
+                    id, title, language, asr_model_id, llm_model_id, tts_model_id,
+                    model_metadata_json, conversation_type
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    conversation_id,
+                    title,
+                    self._language,
+                    self._asr_model_id,
+                    self._llm_model_id,
+                    self._tts_model_id,
+                    "{}",
+                    "monologue",
+                ),
+            )
+            conn.commit()
+
+        self._db.run_write(_insert)
+        return conversation_id
+
+    def process_monologue_turn(
+        self,
+        conversation_id: str,
+        text: str | None = None,
+        pcm_bytes: bytes | None = None,
+        audio_meta: AudioMeta | None = None,
+        on_stage: Callable[[str, str, dict], None] | None = None,
+    ) -> MonologueTurnResult:
+        """Run the monologue pipeline: ASR (if audio) → corrections → summary.
+
+        No assistant_turn row is created. Audio preparation (WebM→PCM conversion,
+        AudioMeta construction) must be done by the route handler before calling
+        this method.
+
+        Parameters
+        ----------
+        conversation_id : str
+            A monologue conversation created by create_monologue_conversation().
+        text : str | None
+            Pre-typed text input (mutually exclusive with pcm_bytes).
+        pcm_bytes : bytes | None
+            PCM audio bytes (mutually exclusive with text).
+        audio_meta : AudioMeta | None
+            Required when pcm_bytes is provided.
+        on_stage : Callable | None
+            Callback for stage progress events: on_stage(stage, status, data).
+
+        Returns
+        -------
+        MonologueTurnResult
+        """
+        if text is None and pcm_bytes is None:
+            raise ValueError("Either text or pcm_bytes must be provided.")
+        if pcm_bytes is not None and audio_meta is None:
+            raise ValueError("audio_meta is required when pcm_bytes is provided.")
+
+        timings: dict[str, float] = {}
+        asr_text: str | None = None
+        asr_meta_out: dict | None = None
+
+        # ASR stage (audio input only)
+        if pcm_bytes is not None:
+            if self._asr is None or self._audio_cache is None:
+                raise ValueError("ASR and audio_cache must be configured for audio monologue.")
+            if on_stage:
+                on_stage("asr", "running", {})
+            user_turn_id, _input_audio_path, asr_result, asr_meta_out = self._run_asr_with_caching(
+                pcm_bytes=pcm_bytes,
+                audio_meta=audio_meta,  # type: ignore[arg-type]
+                conversation_id=conversation_id,
+                timings=timings,
+            )
+            asr_text = asr_result.text
+            input_text = asr_result.text
+            if on_stage:
+                on_stage("asr", "complete", {"transcript": asr_text})
+        else:
+            # Text input: persist user turn directly
+            input_text = text  # type: ignore[assignment]
+            user_turn_id = str(uuid.uuid4())
+
+            def _insert_user(conn) -> None:
+                conn.execute(
+                    "INSERT INTO user_turns (id, conversation_id, input_text) VALUES (?, ?, ?)",
+                    (user_turn_id, conversation_id, input_text),
+                )
+                conn.commit()
+
+            t0 = time.perf_counter()
+            self._db.run_write(_insert_user)
+            timings["user_insert_seconds"] = time.perf_counter() - t0
+
+        # Corrections stage
+        if on_stage:
+            on_stage("corrections", "running", {})
+        corrections = self.run_corrections(
+            user_turn_id=user_turn_id,
+            user_text=input_text,
+            assistant_turn_id=None,
+            timings=timings,
+        )
+        if on_stage:
+            on_stage("corrections", "complete", {
+                "errors": corrections["errors"],
+                "corrected": corrections["corrected"],
+                "native": corrections["native"],
+                "explanation": corrections["explanation"],
+            })
+
+        # Summary stage
+        if on_stage:
+            on_stage("summary", "running", {})
+        summary = self._run_monologue_summary(
+            corrections=corrections,
+            timings=timings,
+        )
+        if on_stage:
+            on_stage("summary", "complete", {
+                "improvement_areas": summary["improvement_areas"],
+                "overall_assessment": summary["overall_assessment"],
+            })
+
+        self._log_timings("monologue_turn", timings)
+
+        return MonologueTurnResult(
+            conversation_id=conversation_id,
+            user_turn_id=user_turn_id,
+            input_text=input_text,
+            asr_text=asr_text,
+            asr_meta=asr_meta_out,
+            corrections=corrections,
+            summary=summary,
+        )
+
+    def _run_monologue_summary(
+        self,
+        corrections: dict[str, Any],
+        timings: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
+        """Call the monologue_summary LLM role and return the result dict."""
+        if timings is None:
+            timings = {}
+        profile = self.get_user_profile()
+        user_level = self._user_level_for(self._language, profile)
+
+        errors_list: list[str] = corrections.get("errors") or []
+        errors_str = "; ".join(errors_list) if errors_list else "No errors detected"
+        # Escape braces so format_map doesn't treat error strings as placeholders.
+        errors_str = errors_str.replace("{", "{{").replace("}", "}}")
+        corrected = (corrections.get("corrected") or "").replace("{", "{{").replace("}", "}}")
+        explanation = (corrections.get("explanation") or "").replace("{", "{{").replace("}", "}}")
+
+        prompt = self._prompt_loader.render(
+            "monologue_summary.md",
+            {
+                "language": self._language,
+                "errors": errors_str,
+                "corrected": corrected,
+                "explanation": explanation,
+                "user_level": user_level,
+            },
+        )
+        t0 = time.perf_counter()
+        result = self._safe_generate_json(prompt=prompt.text, role="monologue_summary")
+        if timings is not None:
+            timings["monologue_summary_seconds"] = time.perf_counter() - t0
+
+        if result.model is not None:
+            return {
+                "improvement_areas": list(getattr(result.model, "improvement_areas", [])),
+                "overall_assessment": getattr(result.model, "overall_assessment", ""),
+            }
+        _logger.warning(
+            "monologue_summary.invalid language=%s error=%s",
+            self._language,
+            result.error,
+        )
+        return {"improvement_areas": [], "overall_assessment": ""}
+
     def regenerate_turn_audio(self, assistant_turn_id: str) -> TTSResult:
         """Regenerate TTS audio for a single assistant turn."""
         if self._tts is None:
@@ -1085,26 +1293,56 @@ class ConversationOrchestrator:
 
         self._db.run_write(_update)
 
-    def list_conversations(self) -> list[dict[str, Any]]:
-        """Return a summary list of conversations for UI selection."""
-        query = """
-            SELECT
-                id,
-                title,
-                language,
-                updated_at,
-                (
-                    SELECT a.reply_text
-                    FROM assistant_turns a
-                    WHERE a.conversation_id = conversations.id
-                    ORDER BY datetime(a.created_at) DESC
-                    LIMIT 1
-                ) AS preview_text
-            FROM conversations
-            ORDER BY datetime(updated_at) DESC
+    def list_conversations(self, conversation_type: str | None = None) -> list[dict[str, Any]]:
+        """Return a summary list of conversations for UI selection.
+
+        Parameters
+        ----------
+        conversation_type : str | None
+            If set, filter to conversations with this type ('chat' or 'monologue').
+            If None, return all conversations.
         """
-        with self._db.read_connection() as conn:
-            rows = conn.execute(query).fetchall()
+        if conversation_type is not None:
+            query = """
+                SELECT
+                    id,
+                    title,
+                    language,
+                    updated_at,
+                    (
+                        SELECT a.reply_text
+                        FROM assistant_turns a
+                        WHERE a.conversation_id = conversations.id
+                        ORDER BY datetime(a.created_at) DESC
+                        LIMIT 1
+                    ) AS preview_text,
+                    conversation_type
+                FROM conversations
+                WHERE conversation_type = ?
+                ORDER BY datetime(updated_at) DESC
+            """
+            with self._db.read_connection() as conn:
+                rows = conn.execute(query, (conversation_type,)).fetchall()
+        else:
+            query = """
+                SELECT
+                    id,
+                    title,
+                    language,
+                    updated_at,
+                    (
+                        SELECT a.reply_text
+                        FROM assistant_turns a
+                        WHERE a.conversation_id = conversations.id
+                        ORDER BY datetime(a.created_at) DESC
+                        LIMIT 1
+                    ) AS preview_text,
+                    conversation_type
+                FROM conversations
+                ORDER BY datetime(updated_at) DESC
+            """
+            with self._db.read_connection() as conn:
+                rows = conn.execute(query).fetchall()
         return [
             {
                 "id": row[0],
@@ -1112,6 +1350,7 @@ class ConversationOrchestrator:
                 "language": row[2],
                 "updated_at": row[3],
                 "preview_text": row[4],
+                "conversation_type": row[5],
             }
             for row in rows
         ]
@@ -1121,7 +1360,7 @@ class ConversationOrchestrator:
         with self._db.read_connection() as conn:
             convo = conn.execute(
                 """
-                SELECT id, title, language, created_at, updated_at
+                SELECT id, title, language, created_at, updated_at, conversation_type
                 FROM conversations WHERE id = ?
                 """,
                 (conversation_id,),
@@ -1150,6 +1389,7 @@ class ConversationOrchestrator:
             "language": convo[2],
             "created_at": convo[3],
             "updated_at": convo[4],
+            "conversation_type": convo[5],
             "turns": [
                 {
                     "user_turn_id": row[0],
