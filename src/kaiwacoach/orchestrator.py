@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from kaiwacoach.constants import SUPPORTED_LANGUAGES
+from kaiwacoach.constants import SUPPORTED_LANGUAGES, VALID_PROFICIENCY_LEVELS
 from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
@@ -519,9 +519,18 @@ class ConversationOrchestrator:
         """
         if timings is None:
             timings = {}
+        user_name = self._user_name_for_prompt()
+        user_level = self._user_level_for(self._language)
+        user_kanji_level = self._user_kanji_level_for()
+        profile_vars = {
+            "user_name": user_name,
+            "user_level": user_level,
+            "user_kanji_level": user_kanji_level,
+        }
         conversation_history = self._truncate_conversation_history(
             conversation_history=conversation_history,
             user_text=user_text,
+            extra_render_vars=profile_vars,
         )
         start = time.perf_counter()
         prompt = self._prompt_loader.render(
@@ -530,6 +539,7 @@ class ConversationOrchestrator:
                 "language": self._language,
                 "conversation_history": conversation_history,
                 "user_text": user_text,
+                **profile_vars,
             },
         )
         timings["prompt_render_seconds"] = time.perf_counter() - start
@@ -585,7 +595,12 @@ class ConversationOrchestrator:
         timings["assistant_insert_seconds"] = time.perf_counter() - start
         return assistant_turn_id, reply_text
 
-    def _truncate_conversation_history(self, conversation_history: str, user_text: str) -> str:
+    def _truncate_conversation_history(
+        self,
+        conversation_history: str,
+        user_text: str,
+        extra_render_vars: dict[str, Any] | None = None,
+    ) -> str:
         token_counter = getattr(self._llm, "count_tokens", None)
         max_context_tokens = getattr(self._llm, "max_context_tokens", None)
         if not callable(token_counter) or not isinstance(max_context_tokens, int):
@@ -593,13 +608,16 @@ class ConversationOrchestrator:
 
         history = conversation_history
         while True:
+            render_vars: dict[str, Any] = {
+                "language": self._language,
+                "conversation_history": history,
+                "user_text": user_text,
+            }
+            if extra_render_vars:
+                render_vars.update(extra_render_vars)
             prompt = self._prompt_loader.render(
                 "conversation.md",
-                {
-                    "language": self._language,
-                    "conversation_history": history,
-                    "user_text": user_text,
-                },
+                render_vars,
             )
             tokens = token_counter(prompt.text)
             if tokens is None or tokens <= max_context_tokens:
@@ -653,6 +671,8 @@ class ConversationOrchestrator:
         if timings is None:
             timings = {}
         start_total = time.perf_counter()
+        user_level = self._user_level_for(self._language)
+        user_kanji_level = self._user_kanji_level_for()
 
         # Call 1: detect errors and produce corrected sentence in a single LLM call.
         # No repair path: the errors field is a list, which makes a generic repair
@@ -660,7 +680,12 @@ class ConversationOrchestrator:
         # (empty errors list, original user_text as corrected).
         detect_correct_prompt = self._prompt_loader.render(
             "detect_and_correct.md",
-            {"language": self._language, "user_text": user_text},
+            {
+                "language": self._language,
+                "user_text": user_text,
+                "user_level": user_level,
+                "user_kanji_level": user_kanji_level,
+            },
         )
         t0 = time.perf_counter()
         detect_correct_result = self._safe_generate_json(
@@ -687,6 +712,7 @@ class ConversationOrchestrator:
                 "user_text": user_text,
                 "corrected_text": corrected_text,
                 "errors": errors_text,
+                "user_level": user_level,
             },
         )
         t0 = time.perf_counter()
@@ -915,6 +941,66 @@ class ConversationOrchestrator:
 
         with self._db.read_connection() as conn:
             return _fetch(conn)
+
+    def get_user_profile(self) -> dict[str, Any]:
+        """Return {"user_name": str | None, "language_proficiency": dict[str, str]}."""
+        with self._db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT user_name, language_proficiency_json FROM user_profile WHERE id = 1"
+            ).fetchone()
+        if row is None:
+            return {"user_name": None, "language_proficiency": {}}
+        try:
+            proficiency = json.loads(row[1]) if row[1] else {}
+        except (json.JSONDecodeError, TypeError):
+            proficiency = {}
+        return {"user_name": row[0], "language_proficiency": proficiency}
+
+    def set_user_profile(self, user_name: str | None, language_proficiency: dict[str, str]) -> None:
+        """Persist user name and per-language proficiency levels."""
+        self._db.execute_update(
+            "user_profile",
+            {
+                "user_name": user_name,
+                "language_proficiency_json": json.dumps(language_proficiency, ensure_ascii=False),
+            },
+            {"id": 1},
+        )
+
+    def _user_level_for(self, language: str) -> str:
+        """Return the stored grammar/overall level for the given language.
+
+        Defaults: 'N5' for 'ja', 'A1' for all other supported languages.
+        """
+        profile = self.get_user_profile()
+        stored = profile["language_proficiency"].get(language)
+        if stored:
+            return stored
+        return "N5" if language == "ja" else "A1"
+
+    def _user_kanji_level_for(self) -> str:
+        """Return the stored kanji reading level (key 'ja_kanji').
+
+        Falls back to the overall 'ja' level if 'ja_kanji' is not set.
+        Returns '' for non-Japanese sessions so callers can pass it as an empty
+        string to PromptLoader.render() without rendering the literal 'None'.
+        """
+        if self._language != "ja":
+            return ""
+        profile = self.get_user_profile()
+        proficiency = profile["language_proficiency"]
+        stored = proficiency.get("ja_kanji")
+        if stored:
+            return stored
+        return proficiency.get("ja") or "N5"
+
+    def _user_name_for_prompt(self) -> str:
+        """Return the user's name, or '' if not set.
+
+        Callers must not pass None to PromptLoader.render() — it renders as 'None'.
+        """
+        profile = self.get_user_profile()
+        return profile["user_name"] or ""
 
     def reset_session(self) -> None:
         """Reset session-scoped state such as audio and LLM caches."""

@@ -52,7 +52,37 @@ def test_schema_version_row_exists() -> None:
 
     row = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
     assert row is not None
+    assert row[0] == 2
+
+
+def test_user_profile_table_exists() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.execute("PRAGMA foreign_keys = ON;")
+    _load_schema(connection)
+
+    tables = _table_names(connection)
+    assert "user_profile" in tables
+
+    columns = _column_names(connection, "user_profile")
+    assert "id" in columns
+    assert "user_name" in columns
+    assert "language_proficiency_json" in columns
+    assert "created_at" in columns
+    assert "updated_at" in columns
+
+
+def test_user_profile_default_row_exists() -> None:
+    connection = sqlite3.connect(":memory:")
+    connection.execute("PRAGMA foreign_keys = ON;")
+    _load_schema(connection)
+
+    row = connection.execute(
+        "SELECT id, user_name, language_proficiency_json FROM user_profile WHERE id = 1"
+    ).fetchone()
+    assert row is not None
     assert row[0] == 1
+    assert row[1] is None
+    assert row[2] == "{}"
 
 
 def test_schema_indexes_exist() -> None:

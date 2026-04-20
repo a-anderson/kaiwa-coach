@@ -125,9 +125,15 @@ def test_truncate_conversation_history_drops_oldest(tmp_path: Path) -> None:
         full_history = "User: A\nAssistant: B\nUser: C\nAssistant: D"
         trimmed_history = "User: C\nAssistant: D"
         user_text = "E"
+        profile_vars = {"user_name": "", "user_level": "N5", "user_kanji_level": "N5"}
         prompt_trimmed = prompt_loader.render(
             "conversation.md",
-            {"language": "ja", "conversation_history": trimmed_history, "user_text": user_text},
+            {
+                "language": "ja",
+                "conversation_history": trimmed_history,
+                "user_text": user_text,
+                **profile_vars,
+            },
         )
         llm = _FakeLLM(max_context_tokens=len(prompt_trimmed.text))
         orch = ConversationOrchestrator(
@@ -136,7 +142,9 @@ def test_truncate_conversation_history_drops_oldest(tmp_path: Path) -> None:
             prompt_loader=prompt_loader,
             language="ja",
         )
-        result = orch._truncate_conversation_history(full_history, user_text)
+        result = orch._truncate_conversation_history(
+            full_history, user_text, extra_render_vars=profile_vars
+        )
         assert result == trimmed_history
     finally:
         db.close()
@@ -545,7 +553,12 @@ def test_correction_prompt_hash_matches_template(tmp_path: Path) -> None:
 
         expected_prompt = prompts.render(
             "detect_and_correct.md",
-            {"language": "ja", "user_text": "こんにちは"},
+            {
+                "language": "ja",
+                "user_text": "こんにちは",
+                "user_level": "N5",
+                "user_kanji_level": "N5",
+            },
         )
 
         with db.read_connection() as conn:

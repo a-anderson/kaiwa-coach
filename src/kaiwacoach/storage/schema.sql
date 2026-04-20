@@ -1,4 +1,4 @@
--- KaiwaCoach SQLite schema (v1)
+-- KaiwaCoach SQLite schema (v2)
 -- Forward compatibility notes:
 -- - Schema changes should be handled with migrations; avoid in-place edits without a migration plan.
 -- - Prefer nullable columns or defaults for additive changes, then backfill if needed.
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 INSERT OR IGNORE INTO schema_version (id, version)
-VALUES (1, 1);
+VALUES (1, 2);
 
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
@@ -87,3 +87,16 @@ CREATE INDEX IF NOT EXISTS idx_corrections_user_turn_id
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_conversation_id
   ON artifacts(conversation_id);
+
+-- Singleton user profile row (id must be 1).
+-- language_proficiency_json stores a JSON object keyed by language code,
+-- e.g. {"ja": "N4", "ja_kanji": "N2", "fr": "B1"}.
+CREATE TABLE IF NOT EXISTS user_profile (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  user_name TEXT,
+  language_proficiency_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO user_profile (id) VALUES (1);

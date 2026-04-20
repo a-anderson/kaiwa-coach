@@ -243,6 +243,15 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 - Conversations are automatically titled from the first user message and update in the sidebar as soon as the turn completes.
 - Delete a single conversation or clear all history from the sidebar.
 
+### User settings
+
+- Click the ⚙ gear icon in the top bar to open the settings panel.
+- Set an optional display name; the assistant will address you by name where natural.
+- Set a proficiency level per language:
+    - Japanese: two independent levels — grammar/vocabulary (N5–Native) and kanji reading (N5–Native)
+    - All other languages: CEFR level (A1–Native)
+- Levels take effect on the next turn; no conversation restart is required.
+
 ### Audio regeneration
 
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
@@ -355,9 +364,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-04-19):
+Latest full local snapshot (2026-04-20):
 
-- `277 passed`
+- `307 passed`
 
 ### Schema and repair robustness
 
