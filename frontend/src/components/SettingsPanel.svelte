@@ -10,6 +10,7 @@
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
   function close() {
+    previousFocus?.focus()
     uiStore.update((s) => ({ ...s, settingsOpen: false }))
   }
 
@@ -116,7 +117,7 @@
   }
 
   .close-btn:hover {
-    color: #333;
+    color: var(--kc-primary, #333);
   }
 
   .panel-body {
