@@ -1,14 +1,53 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte'
+  import { fly } from 'svelte/transition'
   import { uiStore } from '../lib/stores/ui'
+
+  let panelEl: HTMLElement
+  let previousFocus: HTMLElement | null = null
+
+  const FOCUSABLE =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
   function close() {
     uiStore.update((s) => ({ ...s, settingsOpen: false }))
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key !== 'Tab') return
+    const focusable = Array.from(panelEl.querySelectorAll<HTMLElement>(FOCUSABLE))
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+  }
+
+  onMount(() => {
+    previousFocus = document.activeElement as HTMLElement | null
+    const first = panelEl.querySelector<HTMLElement>(FOCUSABLE)
+    first?.focus()
+    window.addEventListener('keydown', handleKeydown)
+  })
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown)
+    previousFocus?.focus()
+  })
 </script>
 
 <div class="overlay" role="dialog" aria-label="Settings" aria-modal="true">
   <button class="backdrop" on:click={close} aria-label="Close settings" tabindex="-1" />
-  <div class="panel">
+  <div class="panel" bind:this={panelEl} transition:fly={{ x: 320, duration: 200 }}>
     <div class="panel-header">
       <span class="panel-title">Settings</span>
       <button class="close-btn" on:click={close} aria-label="Close settings">✕</button>
@@ -55,13 +94,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px;
-    border-bottom: 1px solid #e0e0e0;
+    background: var(--kc-user-bubble, #f5f5f5);
+    border-bottom: 1px solid color-mix(in srgb, var(--kc-primary, #ccc) 20%, transparent);
   }
 
   .panel-title {
     font-size: 1rem;
     font-weight: 600;
-    color: #333;
+    color: var(--kc-primary, #333);
   }
 
   .close-btn {
