@@ -306,39 +306,35 @@ class SQLiteWriter:
 
         Returns
         -------
-        None
+        sqlite3.Connection
+            The same connection after schema and migrations are applied.
         """
         schema_sql = self._schema_path.read_text(encoding="utf-8")
         connection.executescript(schema_sql)
         connection.commit()
-        if self._schema_needs_reset(connection):
-            logging.getLogger(__name__).warning(
-                "schema_mismatch: resetting sqlite db at %s", self._db_path
-            )
-            connection.close()
-            if self._db_path.exists():
-                self._db_path.unlink()
-            connection = sqlite3.connect(self._db_path)
-            connection.execute("PRAGMA foreign_keys = ON;")
-            connection.executescript(schema_sql)
-            connection.commit()
+        self._apply_migrations(connection)
         return connection
 
-    def _schema_needs_reset(self, connection: sqlite3.Connection) -> bool:
-        required_columns = {
-            "id",
-            "title",
-            "language",
-            "asr_model_id",
-            "llm_model_id",
-            "tts_model_id",
-            "created_at",
-            "updated_at",
-            "model_metadata_json",
-            "conversation_type",
-        }
-        rows = connection.execute("PRAGMA table_info(conversations)").fetchall()
-        if not rows:
-            return False
-        columns = {row[1] for row in rows}
-        return not required_columns.issubset(columns)
+    def _apply_migrations(self, connection: sqlite3.Connection) -> None:
+        """Apply incremental ALTER TABLE migrations for additive schema changes.
+
+        Each step is idempotent: if the column already exists, the step is skipped.
+        Append new steps here when columns are added; never remove or reorder existing steps.
+        """
+        logger = logging.getLogger(__name__)
+        migrated = False
+
+        # v2 → v3: add conversation_type column
+        cols = {r[1] for r in connection.execute("PRAGMA table_info(conversations)").fetchall()}
+        if cols and "conversation_type" not in cols:
+            logger.info("schema_migration: adding conversation_type to conversations")
+            connection.execute(
+                "ALTER TABLE conversations ADD COLUMN conversation_type TEXT NOT NULL DEFAULT 'chat'"
+            )
+            migrated = True
+
+        if migrated:
+            connection.execute(
+                "UPDATE schema_version SET version = 3, applied_at = datetime('now') WHERE id = 1"
+            )
+            connection.commit()

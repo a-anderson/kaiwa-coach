@@ -73,6 +73,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - Before TTS, Japanese text is verified to ensure it was not accidentally altered.
 - The correction pipeline uses two combined LLM calls (`detect_and_correct`, `explain_and_native`) rather than four sequential single-purpose calls, halving correction latency.
 - The conversation role uses configurable sampling temperature (default `0.7`) for varied replies; all correction and normalisation roles use `0.0` for determinism.
+- Schema migrations are non-destructive: additive changes (new columns with defaults) are applied via `ALTER TABLE` at startup without data loss; a full reset is never triggered automatically.
 
 ## Build Learnings
 
@@ -261,6 +262,20 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 - Preview the synthesised audio inline; click **↓ Download** to save the file.
 - No conversation is created — narration is stateless and session-only.
 
+### Monologue mode
+
+- Click the **Monologue** tab to open the monologue panel.
+- Choose an input mode: **Text**, **Mic**, or **Upload**.
+  - Text: type or paste your input, then click **Analyse**.
+  - Mic: record using the microphone recorder, then click **Analyse**.
+  - Upload: select an audio file; click **Analyse** to submit.
+- The pipeline runs: ASR (audio only) → corrections → summary. Progress is shown per stage.
+- Results are displayed in two sections:
+  - **Results**: transcript (audio only), errors, corrected sentence, native rewrite, explanation.
+  - **Summary**: improvement areas and overall assessment.
+- Each result section has a copy button to copy the text to the clipboard.
+- Past sessions appear in the sidebar under the Monologue tab; clicking one shows the read-only results view.
+
 ### Audio regeneration
 
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
@@ -323,6 +338,9 @@ For changes that affect user-visible frontend behaviour, manual verification aga
 - Deleting a single conversation or all history removes it from the sidebar
 - Shadowing mode opens, records, and closes correctly
 - Audio regeneration updates the turn in place without a page reload
+- Monologue text input: submitting text produces corrections and summary results
+- Monologue audio input: ASR stage fires before corrections; results render on completion
+- Monologue sidebar: completed session appears under the Monologue tab; clicking it shows the read-only results view with no input form
 
 If the frontend acquires significant standalone logic in future — for example, client-side state machines, complex derived computations, or custom hooks — introducing Vitest at that point would be appropriate.
 
@@ -373,9 +391,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-04-20):
+Latest full local snapshot (2026-04-21):
 
-- `353 passed`
+- `357 passed`
 
 ### Schema and repair robustness
 
