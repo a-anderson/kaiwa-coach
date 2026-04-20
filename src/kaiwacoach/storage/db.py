@@ -326,14 +326,13 @@ class SQLiteWriter:
         migrated_to: int | None = None
 
         # v2 → v3: add conversation_type column
-        _V3 = 3
         cols = {r[1] for r in connection.execute("PRAGMA table_info(conversations)").fetchall()}
         if cols and "conversation_type" not in cols:
             logger.info("schema_migration: adding conversation_type to conversations")
             connection.execute(
                 "ALTER TABLE conversations ADD COLUMN conversation_type TEXT NOT NULL DEFAULT 'chat'"
             )
-            migrated_to = _V3
+            migrated_to = 3
 
         if migrated_to is not None:
             connection.execute(

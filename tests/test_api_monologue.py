@@ -83,6 +83,11 @@ def test_list_conversations_passes_type_monologue(client, mock_orchestrator):
     mock_orchestrator.list_conversations.assert_called_once_with(conversation_type="monologue")
 
 
+def test_list_conversations_invalid_type_returns_422(client, mock_orchestrator):
+    resp = client.get("/api/conversations?conversation_type=invalid")
+    assert resp.status_code == 422
+
+
 def test_list_conversations_no_type_passes_none(client, mock_orchestrator):
     mock_orchestrator.list_conversations.return_value = []
     client.get("/api/conversations")

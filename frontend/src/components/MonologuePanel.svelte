@@ -400,7 +400,7 @@
       {:else if !submitting}
         <section class="result-section summary-section">
           <h3>Summary</h3>
-          <p class="summary-unavailable">Summary is not available for past sessions.</p>
+          <p class="summary-unavailable">Summary is not saved — run a new analysis to see it.</p>
         </section>
       {/if}
 
