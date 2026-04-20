@@ -149,6 +149,8 @@ When modifying `src/kaiwacoach/storage/schema.sql`, also update:
 
 Prefer nullable columns or columns with defaults for additive changes. The current behaviour on a column-set mismatch is a full local DB reset (acceptable for single-user MVP — note this in any schema PR).
 
+**STOP AND ASK before triggering a DB reset.** If a schema change requires adding a column to `_schema_needs_reset` (which will delete all local data on next startup), you must explicitly warn the user and get their confirmation before proceeding. Provide the manual migration SQL (`ALTER TABLE ... ADD COLUMN ...`) as an alternative so they can preserve existing data. Never silently ship a change that will destroy the user's database.
+
 ## Frontend (Svelte / Vite)
 
 - The frontend lives in `frontend/` and is a standalone Vite + Svelte 4 SPA.

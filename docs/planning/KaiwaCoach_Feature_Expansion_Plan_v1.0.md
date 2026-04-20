@@ -836,6 +836,7 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 | 4     | ✅     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
 | 5     | ⬜     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
 | 6     | ⬜     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
+| 7     | ⬜     | `feature/db-migration-strategy`    | Replace full-DB-reset with targeted ALTER TABLE migrations; preserve data on additive changes   | PR 5 merged               |
 
 ### Per-branch scope
 
@@ -909,6 +910,29 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 - `tests/test_orchestrator_summary.py`, `tests/test_api_summary.py` — new
 - Definition of done: §8 checklist.
 
+**PR 7 — `feature/db-migration-strategy`** (cut from main after PR 5 merges)
+
+Replace the full-file-delete reset strategy in `storage/db.py` with targeted `ALTER TABLE` migrations for additive schema changes. The current approach deletes all user data (conversations, corrections, settings) whenever a new column is added — this is unacceptable outside an early MVP.
+
+**Goal**: additive schema changes (new column with a default or nullable) must never destroy existing data.
+
+**Approach**:
+
+- Replace `_schema_needs_reset` + full file-delete with an `_apply_migrations` step that runs after `executescript`.
+- For each known additive change, check whether the column already exists and run `ALTER TABLE ... ADD COLUMN ...` if not.
+- Only fall back to a destructive reset for genuinely incompatible changes (removed columns, type changes) — and even then, warn explicitly in the log and only proceed if a `KAIWACOACH_ALLOW_DB_RESET=true` env var is set.
+- Migration steps are append-only and keyed by schema version so each runs at most once.
+
+**Files**:
+- `src/kaiwacoach/storage/db.py` — replace `_schema_needs_reset` with `_apply_migrations`; add version-keyed migration registry
+- `tests/test_storage_schema.py` — tests asserting that applying v3 schema to a v2 DB preserves existing rows and adds the column without data loss
+
+**Definition of done**:
+- [ ] Applying the v3 schema to a database that has v2 data preserves all conversations, turns, corrections, and user_profile rows
+- [ ] The `conversation_type` column is added with default `'chat'` on existing rows
+- [ ] A DB with already-correct columns is unaffected (idempotent)
+- [ ] `poetry run pytest -q -m "not slow"` passes; no regressions
+
 ### Parallelism
 
-PRs 3, 4, and 6 can be developed concurrently (no shared file conflicts aside from `orchestrator.py` — coordinate if pairing). PRs 5 and 6 share `json_enforcement.py` and `settings.py` but the additions are additive; merge order does not matter as long as both rebase onto main before opening PRs.
+PRs 3, 4, and 6 can be developed concurrently (no shared file conflicts aside from `orchestrator.py` — coordinate if pairing). PRs 5 and 6 share `json_enforcement.py` and `settings.py` but the additions are additive; merge order does not matter as long as both rebase onto main before opening PRs. PR 7 depends on PR 5 being merged first.
