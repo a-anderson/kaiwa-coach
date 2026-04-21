@@ -38,6 +38,9 @@ _logger = logging.getLogger(__name__)
 # in-process ASR cache. Oldest entries are evicted when the limit is reached.
 _ASR_CACHE_MAX_SIZE = 128
 
+# Matches hiragana, katakana, and CJK unified ideographs (kanji).
+_JAPANESE_CHAR_RE = re.compile(r"[぀-ゟ゠-ヿ一-鿿]")
+
 
 @dataclass(frozen=True)
 class TextTurnResult:
@@ -1357,16 +1360,21 @@ class ConversationOrchestrator:
     def _user_name_for_prompt(self, language: str, profile: dict | None = None) -> str:
         """Return the language-appropriate name form, or '' if not set.
 
-        Uses the stored katakana form for Japanese sessions and the romanised form
-        for all others, falling back to the raw user_name if the derived form is absent.
+        For Japanese sessions: names that are already in Japanese script are used
+        as-is (田中 stays 田中); Latin-script names use the stored katakana form
+        (Ashley → アシュリー). For all other sessions the romanised form is used,
+        falling back to the raw name if derivation was absent or failed.
         Callers must not pass None to PromptLoader.render() — it renders as 'None'.
         Pass a pre-fetched profile dict to avoid an extra DB read.
         """
         if profile is None:
             profile = self.get_user_profile()
+        raw = profile.get("user_name") or ""
         if language == "ja":
-            return profile.get("user_name_katakana") or profile.get("user_name") or ""
-        return profile.get("user_name_romanised") or profile.get("user_name") or ""
+            if _JAPANESE_CHAR_RE.search(raw):
+                return raw
+            return profile.get("user_name_katakana") or raw
+        return profile.get("user_name_romanised") or raw
 
     def reset_session(self) -> None:
         """Reset session-scoped state such as audio and LLM caches."""
