@@ -8,6 +8,7 @@
 
   const dispatch = createEventDispatcher<{ select: string }>()
 
+  // Default guarantees type is never undefined; the union excludes it at the type level.
   export let type: 'chat' | 'monologue' = 'chat'
 
   let conversations: ConversationSummary[] = []
@@ -16,14 +17,14 @@
   let pendingDeleteId: string | null = null
 
   export async function refresh(): Promise<void> {
-    await load(type)
+    await load()
   }
 
-  async function load(t: typeof type): Promise<void> {
+  async function load(): Promise<void> {
     loading = true
     error = null
     try {
-      conversations = await listConversations(t)
+      conversations = await listConversations(type)
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load conversations'
     } finally {
@@ -31,7 +32,9 @@
     }
   }
 
-  $: load(type)
+  // Comma expression makes `type` an explicit reactive dependency so load()
+  // re-runs on every tab switch without needing to pass it as an argument.
+  $: type, load()
 
   async function confirmDelete(): Promise<void> {
     if (!pendingDeleteId) return
@@ -42,7 +45,7 @@
       if ($sessionStore.conversationId === id) {
         sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
       }
-      await load(type)
+      await load()
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete conversation'
     }
@@ -54,7 +57,7 @@
 {:else if error}
   <div class="state-msg error">
     {error}
-    <button class="retry-btn" on:click={() => load(type)}>Retry</button>
+    <button class="retry-btn" on:click={load}>Retry</button>
   </div>
 {:else if conversations.length === 0}
   <div class="state-msg empty">No conversations yet.</div>
