@@ -49,8 +49,8 @@
 <style>
   .summary-panel {
     background: var(--kc-bot-bubble, #f9f9f9);
-    border-bottom: 1px solid color-mix(in srgb, var(--kc-primary, #888) 15%, transparent);
-    padding: 12px 24px;
+    border-bottom: 1px solid color-mix(in srgb, var(--kc-secondary, #aaa) 30%, transparent);
+    padding: 6px 16px;
     font-size: 0.85rem;
   }
 
