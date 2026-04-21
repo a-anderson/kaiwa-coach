@@ -176,7 +176,7 @@ class QwenLLM:
     # think block signals to the model that the reasoning phase is complete
     # and it should output the answer directly, avoiding wasted token budget.
     _NO_THINK_ROLES: frozenset[str] = frozenset(
-        {"jp_tts_normalisation", "detect_and_correct", "explain_and_native"}
+        {"jp_tts_normalisation", "detect_and_correct", "explain_and_native", "normalise_name"}
     )
 
     def _default_generator(self, *, prompt: str, max_new_tokens: int, role: str) -> tuple[str, dict[str, Any]]:

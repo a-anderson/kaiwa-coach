@@ -170,11 +170,20 @@ def test_no_think_suffix_added_for_json_roles() -> None:
     llm = QwenLLM(
         model_id="model-x",
         max_context_tokens=100,
-        role_max_new_tokens={"detect_and_correct": 96, "conversation": 256},
+        role_max_new_tokens={
+            "detect_and_correct": 96,
+            "normalise_name": 64,
+            "conversation": 256,
+        },
         backend=_CapturingBackend(),
     )
 
     llm.generate("my prompt", role="detect_and_correct")
+    assert received_prompts[-1].endswith("<think>\n\n</think>")
+
+    # normalise_name must suppress thinking — without this the 64-token cap is
+    # consumed by the <think> block and the JSON output is never written.
+    llm.generate("my prompt", role="normalise_name")
     assert received_prompts[-1].endswith("<think>\n\n</think>")
 
     llm.generate("my prompt", role="conversation")
