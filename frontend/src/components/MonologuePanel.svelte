@@ -5,6 +5,7 @@
   import { createMonologueConversation } from '../lib/api/conversations'
   import { submitMonologueText, submitMonologueAudio } from '../lib/api/monologue'
   import AudioRecorder from './AudioRecorder.svelte'
+  import AudioPlayer from './AudioPlayer.svelte'
   import CopyButton from './CopyButton.svelte'
   import type { CorrectionData, TurnRecord, MonologueCorrections, MonologueSummary } from '../lib/types/api'
 
@@ -16,6 +17,7 @@
   let textInput = ''
   let audioBlob: Blob | null = null
   let fileInput: HTMLInputElement
+  let filePreviewUrl: string | null = null
 
   let submitting = false
   let stageStatuses: Record<string, 'running' | 'complete'> = {}
@@ -69,6 +71,7 @@
 
   onDestroy(() => {
     _unsub?.()
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
   })
 
   function setMode(mode: InputMode) {
@@ -77,15 +80,26 @@
     audioBlob = null
     textInput = ''
     submitError = null
+    if (filePreviewUrl) { URL.revokeObjectURL(filePreviewUrl); filePreviewUrl = null }
   }
 
   function handleRecorded(e: CustomEvent<{ blob: Blob }>) {
     audioBlob = e.detail.blob
   }
 
+  function handleRecorderCancel() {
+    audioBlob = null
+  }
+
   function handleFileChange() {
     const file = fileInput?.files?.[0]
-    if (file) audioBlob = file
+    if (filePreviewUrl) { URL.revokeObjectURL(filePreviewUrl); filePreviewUrl = null }
+    if (file) {
+      audioBlob = file
+      filePreviewUrl = URL.createObjectURL(file)
+    } else {
+      audioBlob = null
+    }
   }
 
   async function handleSubmit() {
@@ -248,10 +262,11 @@
       </div>
     {:else if inputMode === 'mic'}
       <div class="audio-area">
-        <AudioRecorder on:recorded={handleRecorded} />
-        {#if audioBlob}
-          <p class="audio-ready">Recording ready — click Analyse to submit.</p>
-        {/if}
+        <AudioRecorder
+          showSendButton={false}
+          on:recorded={handleRecorded}
+          on:cancel={handleRecorderCancel}
+        />
       </div>
     {:else if inputMode === 'file'}
       <div class="audio-area">
@@ -263,8 +278,8 @@
           disabled={submitting}
           class="file-input"
         />
-        {#if audioBlob}
-          <p class="audio-ready">File selected — click Analyse to submit.</p>
+        {#if filePreviewUrl}
+          <AudioPlayer src={filePreviewUrl} variant="user" />
         {/if}
       </div>
     {/if}
@@ -530,11 +545,6 @@
     font-size: 0.85rem;
   }
 
-  .audio-ready {
-    font-size: 0.82rem;
-    color: #666;
-    margin: 0;
-  }
 
   /* ── Analyse button ── */
 

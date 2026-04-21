@@ -3,22 +3,26 @@
    * AudioRecorder — live waveform via WaveSurfer Record plugin.
    *
    * Events:
-   *   on:recorded  — fires with { blob: Blob } when recording stops
-   *   on:cancel    — fires when user discards the recording
+   *   on:recorded  — fires with { blob: Blob } when recording is ready to submit
+   *   on:cancel    — fires when user cancels (chat: closes recorder; monologue: clears ready blob)
    */
   import { onMount, onDestroy, createEventDispatcher } from 'svelte'
   import WaveSurfer from 'wavesurfer.js'
   import RecordPlugin from 'wavesurfer.js/dist/plugins/record.js'
+  import AudioPlayer from './AudioPlayer.svelte'
 
   const dispatch = createEventDispatcher<{ recorded: { blob: Blob }; cancel: void }>()
 
   export let autostart = false
+  /** When false (monologue): hides Send button and auto-emits 'recorded' when recording stops. */
+  export let showSendButton: boolean = true
 
   let container: HTMLElement
   let ws: WaveSurfer | null = null
   let record: InstanceType<typeof RecordPlugin> | null = null
   let recording = false
   let blob: Blob | null = null
+  let previewUrl: string | null = null
 
   onMount(async () => {
     ws = WaveSurfer.create({
@@ -37,6 +41,9 @@
     record.on('record-end', (b: Blob) => {
       blob = b
       recording = false
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      previewUrl = URL.createObjectURL(b)
+      if (!showSendButton) dispatch('recorded', { blob: b })
     })
 
     if (autostart) {
@@ -50,6 +57,8 @@
     ws?.destroy()
     ws = null
     record = null
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    previewUrl = null
   })
 
   async function toggleRecording() {
@@ -58,32 +67,57 @@
       record.stopRecording()
     } else {
       blob = null
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
       await record.startRecording()
       recording = true
     }
   }
 
   function send() {
-    if (blob) dispatch('recorded', { blob })
+    if (blob) {
+      dispatch('recorded', { blob })
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
+    }
+  }
+
+  async function reRecord() {
+    blob = null
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
+    // In monologue context, tell parent the ready blob is gone.
+    if (!showSendButton) dispatch('cancel')
+    if (record) {
+      await record.startRecording()
+      recording = true
+    }
   }
 
   function cancel() {
     blob = null
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
     dispatch('cancel')
   }
 </script>
 
 <div class="recorder">
-  <div class="wave" bind:this={container} />
+  <div class="wave" bind:this={container} class:hidden={!!blob} />
+
+  {#if blob && previewUrl}
+    <AudioPlayer src={previewUrl} variant="user" />
+  {/if}
 
   <div class="controls">
     {#if blob}
-      <button class="action-btn send-btn" on:click={send} aria-label="Send recording">
-        Send ↑
+      <button class="action-btn rerecord-btn" on:click={reRecord} aria-label="Re-record">
+        ↺ Re-record
       </button>
-      <button class="action-btn cancel-btn" on:click={cancel} aria-label="Discard recording">
-        Discard
-      </button>
+      {#if showSendButton}
+        <button class="action-btn cancel-btn" on:click={cancel} aria-label="Cancel recording">
+          ✕ Cancel
+        </button>
+        <button class="action-btn send-btn" on:click={send} aria-label="Send recording">
+          Send ↑
+        </button>
+      {/if}
     {:else}
       <button
         class="action-btn"
@@ -112,6 +146,10 @@
     min-height: 36px;
   }
 
+  .wave.hidden {
+    display: none;
+  }
+
   .controls {
     display: flex;
     align-items: center;
@@ -137,8 +175,19 @@
     background: #c0392b;
   }
 
-  .cancel-btn {
+  .rerecord-btn {
     background: #aaa;
+  }
+
+  .cancel-btn {
+    background: transparent;
+    color: #888;
+    border: 1px solid #ccc;
+  }
+
+  .cancel-btn:hover {
+    background: #f5f5f5;
+    opacity: 1;
   }
 
   .send-btn {
