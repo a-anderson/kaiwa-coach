@@ -32,9 +32,8 @@ PROMPT_VARIABLES = {
     },
     "jp_tts_normalise.md": {
         "original_text": "これはテストです",
-        "user_name": "Ashley",
     },
-    "romanise_name.md": {
+    "normalise_name.md": {
         "name": "田中",
     },
     "monologue_summary.md": {

@@ -44,7 +44,13 @@ class SQLiteWriter:
             "updated_at",
         },
         "artifacts": {"kind", "path", "meta_json", "updated_at"},
-        "user_profile": {"user_name", "language_proficiency_json", "updated_at"},
+        "user_profile": {
+            "user_name",
+            "user_name_romanised",
+            "user_name_katakana",
+            "language_proficiency_json",
+            "updated_at",
+        },
     }
 
     def __init__(self, db_path: str | Path, schema_path: str | Path) -> None:
@@ -333,6 +339,17 @@ class SQLiteWriter:
                 "ALTER TABLE conversations ADD COLUMN conversation_type TEXT NOT NULL DEFAULT 'chat'"
             )
             migrated_to = 3
+
+        # v3 → v4: add romanised/katakana name columns to user_profile
+        profile_cols = {r[1] for r in connection.execute("PRAGMA table_info(user_profile)").fetchall()}
+        if profile_cols and "user_name_romanised" not in profile_cols:
+            logger.info("schema_migration: adding user_name_romanised to user_profile")
+            connection.execute("ALTER TABLE user_profile ADD COLUMN user_name_romanised TEXT")
+            migrated_to = 4
+        if profile_cols and "user_name_katakana" not in profile_cols:
+            logger.info("schema_migration: adding user_name_katakana to user_profile")
+            connection.execute("ALTER TABLE user_profile ADD COLUMN user_name_katakana TEXT")
+            migrated_to = 4
 
         if migrated_to is not None:
             connection.execute(

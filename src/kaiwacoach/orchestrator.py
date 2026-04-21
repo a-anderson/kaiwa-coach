@@ -37,10 +37,6 @@ _logger = logging.getLogger(__name__)
 # Maximum number of unique (audio_hash, model_id, language) entries held in the
 # in-process ASR cache. Oldest entries are evicted when the limit is reached.
 _ASR_CACHE_MAX_SIZE = 128
-_ROMANISED_NAME_CACHE_MAX_SIZE = 16
-
-# Matches hiragana, katakana, and CJK unified ideographs (kanji).
-_JAPANESE_CHAR_RE = re.compile(r"[぀-ゟ゠-ヿ一-鿿]")
 
 
 @dataclass(frozen=True)
@@ -107,7 +103,6 @@ class ConversationOrchestrator:
             getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
         )
         self._asr_cache: BoundedDict = BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
-        self._romanised_name_cache: BoundedDict = BoundedDict(maxsize=_ROMANISED_NAME_CACHE_MAX_SIZE)
         self._logger = logging.getLogger(__name__)
         self._timing_logs_enabled = timing_logs_enabled
 
@@ -536,9 +531,7 @@ class ConversationOrchestrator:
         if timings is None:
             timings = {}
         profile = self.get_user_profile()
-        user_name = self._user_name_for_prompt(profile)
-        if user_name and self._language != "ja" and _JAPANESE_CHAR_RE.search(user_name):
-            user_name = self._romanise_name(user_name)
+        user_name = self._user_name_for_prompt(self._language, profile)
         user_level = self._user_level_for(self._language, profile)
         user_kanji_level = self._user_kanji_level_for(profile)
         profile_vars = {
@@ -1285,25 +1278,46 @@ class ConversationOrchestrator:
             return _fetch(conn)
 
     def get_user_profile(self) -> dict[str, Any]:
-        """Return {"user_name": str | None, "language_proficiency": dict[str, str]}."""
+        """Return user profile including name variants and language proficiency."""
         with self._db.read_connection() as conn:
             row = conn.execute(
-                "SELECT user_name, language_proficiency_json FROM user_profile WHERE id = 1"
+                "SELECT user_name, user_name_romanised, user_name_katakana, language_proficiency_json"
+                " FROM user_profile WHERE id = 1"
             ).fetchone()
         if row is None:
-            return {"user_name": None, "language_proficiency": {}}
+            return {
+                "user_name": None,
+                "user_name_romanised": None,
+                "user_name_katakana": None,
+                "language_proficiency": {},
+            }
         try:
-            proficiency = json.loads(row[1]) if row[1] else {}
+            proficiency = json.loads(row[3]) if row[3] else {}
         except (json.JSONDecodeError, TypeError):
             proficiency = {}
-        return {"user_name": row[0], "language_proficiency": proficiency}
+        return {
+            "user_name": row[0],
+            "user_name_romanised": row[1],
+            "user_name_katakana": row[2],
+            "language_proficiency": proficiency,
+        }
 
     def set_user_profile(self, user_name: str | None, language_proficiency: dict[str, str]) -> None:
-        """Persist user name and per-language proficiency levels."""
+        """Persist user name, derived name forms, and per-language proficiency levels."""
+        romanised: str | None = None
+        katakana: str | None = None
+        if user_name:
+            prompt = self._prompt_loader.render("normalise_name.md", {"name": user_name})
+            result = self._safe_generate_json(prompt=prompt.text, role="normalise_name")
+            if result.model is not None:
+                romanised = getattr(result.model, "romanised", None) or None
+                katakana = getattr(result.model, "katakana", None) or None
         self._db.execute_update(
             "user_profile",
             {
                 "user_name": user_name,
+                "user_name_romanised": romanised,
+                "user_name_katakana": katakana,
                 "language_proficiency_json": json.dumps(language_proficiency, ensure_ascii=False),
             },
             {"id": 1},
@@ -1340,29 +1354,19 @@ class ConversationOrchestrator:
             return stored
         return proficiency.get("ja") or "N5"
 
-    def _user_name_for_prompt(self, profile: dict | None = None) -> str:
-        """Return the user's name, or '' if not set.
+    def _user_name_for_prompt(self, language: str, profile: dict | None = None) -> str:
+        """Return the language-appropriate name form, or '' if not set.
 
+        Uses the stored katakana form for Japanese sessions and the romanised form
+        for all others, falling back to the raw user_name if the derived form is absent.
         Callers must not pass None to PromptLoader.render() — it renders as 'None'.
         Pass a pre-fetched profile dict to avoid an extra DB read.
         """
         if profile is None:
             profile = self.get_user_profile()
-        return profile["user_name"] or ""
-
-    def _romanise_name(self, name: str) -> str:
-        """Return a Latin-script romanisation of a Japanese-script name.
-
-        Result is cached by name. Falls back to the original on LLM failure.
-        """
-        cached = self._romanised_name_cache.get(name)
-        if cached is not None:
-            return cached
-        prompt = self._prompt_loader.render("romanise_name.md", {"name": name})
-        result = self._safe_generate_json(prompt=prompt.text, role="romanise_name")
-        romanised = getattr(result.model, "romanised", None) or name
-        self._romanised_name_cache[name] = romanised
-        return romanised
+        if language == "ja":
+            return profile.get("user_name_katakana") or profile.get("user_name") or ""
+        return profile.get("user_name_romanised") or profile.get("user_name") or ""
 
     def reset_session(self) -> None:
         """Reset session-scoped state such as audio and LLM caches."""
@@ -1568,12 +1572,8 @@ class ConversationOrchestrator:
         if self._language != "ja":
             return text
 
-        user_name = self._user_name_for_prompt()
-
         def _llm_rewrite(content: str) -> str:
-            prompt = self._prompt_loader.render(
-                "jp_tts_normalise.md", {"original_text": content, "user_name": user_name}
-            )
+            prompt = self._prompt_loader.render("jp_tts_normalise.md", {"original_text": content})
             result = self._safe_generate_json(prompt=prompt.text, role="jp_tts_normalisation")
             if result.model is None:
                 return content

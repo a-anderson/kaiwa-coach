@@ -77,7 +77,7 @@ class LLMRoleCaps:
     explain_and_native: int = 144
     monologue_summary: int = 256
     summarise_conversation: int = 512
-    romanise_name: int = 32
+    normalise_name: int = 64
 
 
 @dataclass(frozen=True)
@@ -139,7 +139,7 @@ class AppConfig:
                     "explain_and_native": self.llm.role_max_new_tokens.explain_and_native,
                     "monologue_summary": self.llm.role_max_new_tokens.monologue_summary,
                     "summarise_conversation": self.llm.role_max_new_tokens.summarise_conversation,
-                    "romanise_name": self.llm.role_max_new_tokens.romanise_name,
+                    "normalise_name": self.llm.role_max_new_tokens.normalise_name,
                 },
             },
             "storage": {
@@ -289,8 +289,8 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
             ("llm", "role_max_new_tokens", "summarise_conversation"),
             _to_int,
         ),
-        "KAIWACOACH_LLM_ROLE_ROMANISE_NAME_MAX_NEW_TOKENS": (
-            ("llm", "role_max_new_tokens", "romanise_name"),
+        "KAIWACOACH_LLM_ROLE_NORMALISE_NAME_MAX_NEW_TOKENS": (
+            ("llm", "role_max_new_tokens", "normalise_name"),
             _to_int,
         ),
         "KAIWACOACH_STORAGE_ROOT_DIR": (("storage", "root_dir"), _to_str),
@@ -479,9 +479,9 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
                     llm_caps.get("summarise_conversation", LLMRoleCaps.summarise_conversation),
                     "llm.role_max_new_tokens.summarise_conversation",
                 ),
-                romanise_name=_coerce_int(
-                    llm_caps.get("romanise_name", LLMRoleCaps.romanise_name),
-                    "llm.role_max_new_tokens.romanise_name",
+                normalise_name=_coerce_int(
+                    llm_caps.get("normalise_name", LLMRoleCaps.normalise_name),
+                    "llm.role_max_new_tokens.normalise_name",
                 ),
             ),
         ),
