@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from kaiwacoach.models.json_enforcement import NormalisedName, ParseResult
 from kaiwacoach.orchestrator import ConversationOrchestrator
 from kaiwacoach.prompts.loader import PromptLoader
 from kaiwacoach.storage.db import SQLiteWriter
@@ -190,6 +191,59 @@ def test_user_name_for_prompt_uses_original_for_japanese_name_in_ja_session(tmp_
         # Japanese-script name stays as-is in a Japanese session.
         assert orch._user_name_for_prompt("ja") == "田中"
         assert orch._user_name_for_prompt("fr") == "Tanaka"
+    finally:
+        db.close()
+
+
+def test_ensure_name_normalised_computes_missing_forms(tmp_path: Path) -> None:
+    import sqlite3 as _sqlite3
+    db = _setup_db(tmp_path)
+    try:
+        # Simulate a name set before the normalise_name feature existed (derived forms NULL).
+        conn = _sqlite3.connect(db._db_path)
+        conn.execute("UPDATE user_profile SET user_name = ? WHERE id = 1", ("田中",))
+        conn.commit()
+        conn.close()
+
+        orch = _make_orch(db, language="fr")
+        # Configure mock to return a valid NormalisedName on this call.
+        orch._llm.generate_json.return_value = ParseResult(
+            model=NormalisedName(romanised="Tanaka", katakana="タナカ"),
+            raw_json={"romanised": "Tanaka", "katakana": "タナカ"},
+            error=None,
+            repaired=False,
+        )
+
+        profile = orch.get_user_profile()
+        updated = orch._ensure_name_normalised(profile)
+
+        assert updated["user_name_romanised"] == "Tanaka"
+        assert updated["user_name_katakana"] == "タナカ"
+        # Verify forms were persisted so subsequent turns don't re-call the LLM.
+        persisted = orch.get_user_profile()
+        assert persisted["user_name_romanised"] == "Tanaka"
+        assert persisted["user_name_katakana"] == "タナカ"
+    finally:
+        db.close()
+
+
+def test_ensure_name_normalised_is_noop_when_forms_present(tmp_path: Path) -> None:
+    import sqlite3 as _sqlite3
+    db = _setup_db(tmp_path)
+    try:
+        conn = _sqlite3.connect(db._db_path)
+        conn.execute(
+            "UPDATE user_profile SET user_name = ?, user_name_romanised = ?, user_name_katakana = ? WHERE id = 1",
+            ("田中", "Tanaka", "タナカ"),
+        )
+        conn.commit()
+        conn.close()
+
+        orch = _make_orch(db, language="fr")
+        profile = orch.get_user_profile()
+        orch._ensure_name_normalised(profile)
+
+        assert orch._llm.generate_json.call_count == 0
     finally:
         db.close()
 
