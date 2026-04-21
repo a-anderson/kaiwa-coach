@@ -1100,8 +1100,6 @@ class ConversationOrchestrator:
         Returns a dict with top_error_patterns, priority_areas, overall_notes.
         When no corrections exist, returns an informational dict without calling the LLM.
         """
-        import json as _json
-
         rows = self.get_corrections_for_conversation(conversation_id)
 
         # Build corrections_text; skip rows with no errors.
@@ -1109,8 +1107,8 @@ class ConversationOrchestrator:
         n = 0
         for row in rows:
             try:
-                errors: list[str] = _json.loads(row["errors_json"]) if row["errors_json"] else []
-            except (_json.JSONDecodeError, TypeError):
+                errors: list[str] = json.loads(row["errors_json"]) if row["errors_json"] else []
+            except (json.JSONDecodeError, TypeError):
                 errors = []
             if not errors:
                 continue
@@ -1156,9 +1154,9 @@ class ConversationOrchestrator:
 
         if result.model is not None:
             return {
-                "top_error_patterns": list(getattr(result.model, "top_error_patterns", [])),
-                "priority_areas": list(getattr(result.model, "priority_areas", [])),
-                "overall_notes": getattr(result.model, "overall_notes", ""),
+                "top_error_patterns": list(result.model.top_error_patterns),
+                "priority_areas": list(result.model.priority_areas),
+                "overall_notes": result.model.overall_notes,
             }
 
         _logger.warning(

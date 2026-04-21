@@ -742,7 +742,9 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 ### Definition of Done
 
 - [x] `poetry run pytest -q tests/test_orchestrator_summary.py` (new file) — `summarise_conversation` with mock LLM, real DB with correction rows; assert correct corrections read (most recent 20); assert multi-error rows are joined with `"; "`; assert LLM called with correctly formatted `corrections_text`; assert return dict has all three fields; assert conversation with no corrections returns a safe fallback dict (no exception)
-- [x] `poetry run pytest -q tests/test_api_summary.py` (new file) — POST returns 200 with all three summary fields; 404 for unknown conversation; 400 for conversation with no corrections; mock orchestrator used
+- [x] `poetry run pytest -q tests/test_api_summary.py` (new file) — POST returns 200 with all three summary fields; 404 for unknown conversation; mock orchestrator used
+
+  > **Intentional deviation from spec**: the original spec called for a `400 "No corrections to summarise"` response when no correction records exist. After implementation, this was changed to a `200` with an informational `overall_notes` message (`"No corrections were recorded for this conversation."` or `"No conversation is available to summarise."` for empty conversations). Rationale: a missing-data condition for an analysis feature is not a client error; returning a 400 forces the frontend into an error-handling path for a state that is valid and expected. The 200 with a message renders gracefully in the summary panel without any additional frontend logic.
 - [x] `poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py` — summarise_conversation prompt and schema covered
 - [x] `poetry run pytest -q -m "not slow"` — full fast suite passes
 - [x] Manual: hold a multi-turn conversation with deliberate errors; click Summarise; collapsible panel appears above the chat with relevant patterns and areas to work on
