@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte'
+  import { createEventDispatcher } from 'svelte'
   import { sessionStore } from '../lib/stores/session'
   import { listConversations, deleteConversation } from '../lib/api/conversations'
   import ConversationItem from './ConversationItem.svelte'
@@ -42,13 +42,11 @@
       if ($sessionStore.conversationId === id) {
         sessionStore.update((s) => ({ ...s, conversationId: null, turns: [] }))
       }
-      await load()
+      await load(type)
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to delete conversation'
     }
   }
-
-  onMount(load)
 </script>
 
 {#if loading}
@@ -56,7 +54,7 @@
 {:else if error}
   <div class="state-msg error">
     {error}
-    <button class="retry-btn" on:click={load}>Retry</button>
+    <button class="retry-btn" on:click={() => load(type)}>Retry</button>
   </div>
 {:else if conversations.length === 0}
   <div class="state-msg empty">No conversations yet.</div>
