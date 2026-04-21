@@ -22,6 +22,8 @@ def _setup_db(tmp_path: Path) -> SQLiteWriter:
 
 def _make_orch(db: SQLiteWriter, language: str = "ja") -> ConversationOrchestrator:
     llm = MagicMock()
+    # Simulate LLM failure for name normalisation so no MagicMock leaks into SQLite.
+    llm.generate_json.return_value = MagicMock(model=None)
     prompts = PromptLoader(Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts")
     return ConversationOrchestrator(db=db, llm=llm, prompt_loader=prompts, language=language)
 
@@ -136,17 +138,58 @@ def test_user_name_for_prompt_returns_empty_when_null(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)
     try:
         orch = _make_orch(db)
-        assert orch._user_name_for_prompt() == ""
+        assert orch._user_name_for_prompt("ja") == ""
+        assert orch._user_name_for_prompt("fr") == ""
     finally:
         db.close()
 
 
-def test_user_name_for_prompt_returns_name(tmp_path: Path) -> None:
+def test_user_name_for_prompt_falls_back_to_raw_name_when_derived_absent(tmp_path: Path) -> None:
+    # LLM mock returns model=None so derived fields are not stored; raw name is the fallback.
     db = _setup_db(tmp_path)
     try:
         orch = _make_orch(db)
         orch.set_user_profile(user_name="Ashley", language_proficiency={})
-        assert orch._user_name_for_prompt() == "Ashley"
+        assert orch._user_name_for_prompt("fr") == "Ashley"
+        assert orch._user_name_for_prompt("de") == "Ashley"
+    finally:
+        db.close()
+
+
+def test_user_name_for_prompt_uses_katakana_for_latin_name_in_ja_session(tmp_path: Path) -> None:
+    import sqlite3 as _sqlite3
+    db = _setup_db(tmp_path)
+    try:
+        # Populate derived fields directly, bypassing the LLM.
+        conn = _sqlite3.connect(db._db_path)
+        conn.execute(
+            "UPDATE user_profile SET user_name = ?, user_name_romanised = ?, user_name_katakana = ? WHERE id = 1",
+            ("Ashley", "Ashley", "アシュリー"),
+        )
+        conn.commit()
+        conn.close()
+        orch = _make_orch(db, language="ja")
+        assert orch._user_name_for_prompt("ja") == "アシュリー"
+        assert orch._user_name_for_prompt("fr") == "Ashley"
+    finally:
+        db.close()
+
+
+def test_user_name_for_prompt_uses_original_for_japanese_name_in_ja_session(tmp_path: Path) -> None:
+    import sqlite3 as _sqlite3
+    db = _setup_db(tmp_path)
+    try:
+        conn = _sqlite3.connect(db._db_path)
+        conn.execute(
+            "UPDATE user_profile SET user_name = ?, user_name_romanised = ?, user_name_katakana = ? WHERE id = 1",
+            ("田中", "Tanaka", "タナカ"),
+        )
+        conn.commit()
+        conn.close()
+        orch = _make_orch(db, language="ja")
+        # Japanese-script name stays as-is in a Japanese session.
+        assert orch._user_name_for_prompt("ja") == "田中"
+        assert orch._user_name_for_prompt("fr") == "Tanaka"
     finally:
         db.close()
 
