@@ -33,9 +33,21 @@ PROMPT_VARIABLES = {
     "jp_tts_normalise.md": {
         "original_text": "これはテストです",
     },
+    "monologue_summary.md": {
+        "language": "ja",
+        "errors": "Wrong particle used",
+        "corrected": "私は行きます",
+        "explanation": "を should be は",
+        "user_level": "N3",
+    },
     "repair_json.md": {
         "json_schema": "{\"reply\": \"<text>\"}",
         "raw_output": "not json",
+    },
+    "summarise_conversation.md": {
+        "language": "ja",
+        "corrections_text": "[1] Errors: Wrong particle  |  Corrected: 私は行きます",
+        "user_level": "N3",
     },
 }
 

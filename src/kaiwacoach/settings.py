@@ -76,6 +76,7 @@ class LLMRoleCaps:
     detect_and_correct: int = 96
     explain_and_native: int = 144
     monologue_summary: int = 256
+    summarise_conversation: int = 512
 
 
 @dataclass(frozen=True)
@@ -136,6 +137,7 @@ class AppConfig:
                     "detect_and_correct": self.llm.role_max_new_tokens.detect_and_correct,
                     "explain_and_native": self.llm.role_max_new_tokens.explain_and_native,
                     "monologue_summary": self.llm.role_max_new_tokens.monologue_summary,
+                    "summarise_conversation": self.llm.role_max_new_tokens.summarise_conversation,
                 },
             },
             "storage": {
@@ -279,6 +281,10 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
         ),
         "KAIWACOACH_LLM_ROLE_MONOLOGUE_SUMMARY_MAX_NEW_TOKENS": (
             ("llm", "role_max_new_tokens", "monologue_summary"),
+            _to_int,
+        ),
+        "KAIWACOACH_LLM_ROLE_SUMMARISE_CONVERSATION_MAX_NEW_TOKENS": (
+            ("llm", "role_max_new_tokens", "summarise_conversation"),
             _to_int,
         ),
         "KAIWACOACH_STORAGE_ROOT_DIR": (("storage", "root_dir"), _to_str),
@@ -462,6 +468,10 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
                 monologue_summary=_coerce_int(
                     llm_caps.get("monologue_summary", LLMRoleCaps.monologue_summary),
                     "llm.role_max_new_tokens.monologue_summary",
+                ),
+                summarise_conversation=_coerce_int(
+                    llm_caps.get("summarise_conversation", LLMRoleCaps.summarise_conversation),
+                    "llm.role_max_new_tokens.summarise_conversation",
                 ),
             ),
         ),

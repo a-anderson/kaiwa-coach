@@ -741,14 +741,14 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 
 ### Definition of Done
 
-- [ ] `poetry run pytest -q tests/test_orchestrator_summary.py` (new file) — `summarise_conversation` with mock LLM, real DB with correction rows; assert correct corrections read (most recent 20); assert multi-error rows are joined with `"; "`; assert LLM called with correctly formatted `corrections_text`; assert return dict has all three fields; assert conversation with no corrections returns a safe fallback dict (no exception)
-- [ ] `poetry run pytest -q tests/test_api_summary.py` (new file) — POST returns 200 with all three summary fields; 404 for unknown conversation; 400 for conversation with no corrections; mock orchestrator used
-- [ ] `poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py` — summarise_conversation prompt and schema covered
-- [ ] `poetry run pytest -q -m "not slow"` — full fast suite passes
-- [ ] Manual: hold a multi-turn conversation with deliberate errors; click Summarise; collapsible panel appears above the chat with relevant patterns and areas to work on
-- [ ] Manual: collapse the panel; it animates closed; chat thread is fully visible
-- [ ] Manual: click Summarise again; panel re-opens with freshly generated summary
-- [ ] No TypeScript errors; `npm run build` succeeds
+- [x] `poetry run pytest -q tests/test_orchestrator_summary.py` (new file) — `summarise_conversation` with mock LLM, real DB with correction rows; assert correct corrections read (most recent 20); assert multi-error rows are joined with `"; "`; assert LLM called with correctly formatted `corrections_text`; assert return dict has all three fields; assert conversation with no corrections returns a safe fallback dict (no exception)
+- [x] `poetry run pytest -q tests/test_api_summary.py` (new file) — POST returns 200 with all three summary fields; 404 for unknown conversation; 400 for conversation with no corrections; mock orchestrator used
+- [x] `poetry run pytest -q tests/test_prompt_schemas.py tests/test_prompt_rendering_suite.py` — summarise_conversation prompt and schema covered
+- [x] `poetry run pytest -q -m "not slow"` — full fast suite passes
+- [x] Manual: hold a multi-turn conversation with deliberate errors; click Summarise; collapsible panel appears above the chat with relevant patterns and areas to work on
+- [x] Manual: collapse the panel; it animates closed; chat thread is fully visible
+- [x] Manual: click Summarise again; panel re-opens with freshly generated summary
+- [x] No TypeScript errors; `npm run build` succeeds
 
 ---
 
@@ -835,7 +835,7 @@ summariseConversation(conversationId: string): Promise<ConversationSummaryRespon
 | 3     | ✅     | `feature/user-settings`            | Feature 1: user_profile schema, orchestrator methods, settings API routes, SettingsPanel        | PR 2 merged               |
 | 4     | ✅     | `feature/narration-tab`            | Feature 2: narration orchestrator method, API route, NarrationPanel                             | PR 2 merged               |
 | 5     | ✅     | `feature/monologue-mode`           | Feature 3: conversation_type schema, monologue orchestrator methods, SSE routes, MonologuePanel | PRs 2 + 3 merged          |
-| 6     | ⬜     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
+| 6     | ✅     | `feature/conversation-summary`     | Feature 4: summarise_conversation role + route, ConversationSummaryPanel                        | PRs 2 + 3 merged          |
 | 7     | ✅     | `feature/db-migration-strategy`    | Replace full-DB-reset with targeted ALTER TABLE migrations; preserve data on additive changes   | PR 5 merged               |
 
 ### Per-branch scope

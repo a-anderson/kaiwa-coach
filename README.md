@@ -32,6 +32,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
     - TTS synthesis of assistant reply
 - Narration tab: paste text → TTS synthesis → preview and download (stateless, no conversation created)
 - Monologue mode: submit text/audio → corrections + improvement summary; persisted to SQLite
+- Conversation summary: on-demand analysis of error patterns across a conversation; ephemeral, not persisted
 - Persists conversations and supports list, load, resume, and delete
 - Audio regeneration per-turn or per-conversation
 - Shadowing mode: side-by-side listen + record comparison for any assistant turn
@@ -276,6 +277,14 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 - Each result section has a copy button to copy the text to the clipboard.
 - Past sessions appear in the sidebar under the Monologue tab; clicking one shows the read-only results view.
 
+### Conversation summary
+
+- Click **▼ Summarise** in the conversation header to analyse error patterns across the conversation.
+- A collapsible panel appears above the chat thread showing top error patterns, priority areas, and overall notes.
+- Click **▲ Summary** to collapse the panel, or use the × button inside it.
+- The summary is generated fresh on each click and is not persisted.
+- If no corrections were recorded for the conversation, an informational message is shown instead.
+
 ### Audio regeneration
 
 - Click **↺** on any assistant bubble to regenerate its TTS audio.
@@ -341,6 +350,7 @@ For changes that affect user-visible frontend behaviour, manual verification aga
 - Monologue text input: submitting text produces corrections and summary results
 - Monologue audio input: ASR stage fires before corrections; results render on completion
 - Monologue sidebar: completed session appears under the Monologue tab; clicking it shows the read-only results view with no input form
+- Conversation summary: Summarise button generates a collapsible panel above the chat; panel collapses and re-generates correctly; conversations with no corrections show an informational message
 
 If the frontend acquires significant standalone logic in future — for example, client-side state machines, complex derived computations, or custom hooks — introducing Vitest at that point would be appropriate.
 
@@ -393,7 +403,7 @@ The project currently provides evidence in three areas:
 
 Latest full local snapshot (2026-04-21):
 
-- `357 passed`
+- `384 passed`
 
 ### Schema and repair robustness
 

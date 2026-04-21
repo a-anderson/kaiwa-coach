@@ -1,11 +1,19 @@
 <script lang="ts">
   import { sessionStore } from '../lib/stores/session'
   import { regenConversationAudio } from '../lib/api/regen'
+  import { summariseConversation } from '../lib/api/conversations'
+  import type { ConversationSummaryResponse } from '../lib/api/conversations'
+  import ConversationSummaryPanel from './ConversationSummaryPanel.svelte'
 
   let regenPending = false
   let regenError: string | null = null
   let regenProgress = 0
   let regenTotal = 0
+
+  let summaryPending = false
+  let summaryOpen = false
+  let summaryError: string | null = null
+  let summaryData: ConversationSummaryResponse | null = null
 
   async function handleRegenAll() {
     const convId = $sessionStore.conversationId
@@ -40,6 +48,27 @@
       regenPending = false
     }
   }
+
+  async function handleSummarise() {
+    const convId = $sessionStore.conversationId
+    if (!convId || summaryPending) return
+
+    if (summaryOpen) {
+      summaryOpen = false
+      return
+    }
+
+    summaryPending = true
+    summaryError = null
+    try {
+      summaryData = await summariseConversation(convId)
+      summaryOpen = true
+    } catch (e) {
+      summaryError = e instanceof Error ? e.message : 'Summary failed'
+    } finally {
+      summaryPending = false
+    }
+  }
 </script>
 
 {#if $sessionStore.conversationId}
@@ -52,9 +81,22 @@
       {#if regenError}
         <span class="error">{regenError}</span>
       {/if}
+      {#if summaryError}
+        <span class="error">{summaryError}</span>
+      {/if}
 
       <button
-        class="regen-all-btn"
+        class="summarise-btn"
+        class:active={summaryOpen}
+        on:click={handleSummarise}
+        disabled={summaryPending || $sessionStore.turns.length === 0}
+        title="Summarise error patterns across this conversation"
+      >
+        {summaryPending ? '…' : summaryOpen ? '▲ Summary' : '▼ Summarise'}
+      </button>
+
+      <button
+        class="action-btn"
         on:click={handleRegenAll}
         disabled={regenPending || $sessionStore.turns.length === 0}
         title="Regenerate audio for all turns"
@@ -67,6 +109,10 @@
       </button>
     </div>
   </header>
+
+  {#if summaryOpen && summaryData}
+    <ConversationSummaryPanel data={summaryData} on:close={() => (summaryOpen = false)} />
+  {/if}
 {/if}
 
 <style>
@@ -98,7 +144,7 @@
     font-size: 0.75rem;
   }
 
-  .regen-all-btn {
+  .action-btn {
     background: none;
     border: 1px solid #ddd;
     border-radius: 6px;
@@ -110,12 +156,46 @@
     white-space: nowrap;
   }
 
-  .regen-all-btn:not(:disabled):hover {
+  .action-btn:not(:disabled):hover {
     border-color: var(--kc-primary, #555);
     color: var(--kc-primary, #555);
   }
 
-  .regen-all-btn:disabled {
+  .action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .summarise-btn {
+    background: color-mix(in srgb, var(--kc-primary, #555) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--kc-primary, #555) 35%, transparent);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--kc-primary, #555);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+
+  .summarise-btn:not(:disabled):hover {
+    background: color-mix(in srgb, var(--kc-primary, #555) 18%, transparent);
+    border-color: var(--kc-primary, #555);
+  }
+
+  .summarise-btn.active {
+    background: var(--kc-primary, #555);
+    border-color: var(--kc-primary, #555);
+    color: #fff;
+  }
+
+  .summarise-btn.active:not(:disabled):hover {
+    background: var(--kc-primary-light, #333);
+    border-color: var(--kc-primary-light, #333);
+  }
+
+  .summarise-btn:disabled {
     opacity: 0.45;
     cursor: default;
   }

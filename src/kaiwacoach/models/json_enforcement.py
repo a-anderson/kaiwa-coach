@@ -40,12 +40,19 @@ class MonologueSummary(BaseModel):
     overall_assessment: StrictStr
 
 
+class ConversationSummaryResult(BaseModel):
+    top_error_patterns: conlist(StrictStr, min_length=1)
+    priority_areas: conlist(StrictStr, min_length=1)
+    overall_notes: StrictStr
+
+
 ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
     "conversation": ConversationReply,
     "jp_tts_normalisation": JpTtsNormalisation,
     "detect_and_correct": DetectAndCorrect,
     "explain_and_native": ExplainAndNative,
     "monologue_summary": MonologueSummary,
+    "summarise_conversation": ConversationSummaryResult,
 }
 
 
