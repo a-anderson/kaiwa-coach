@@ -87,7 +87,7 @@
     audioBlob = e.detail.blob
   }
 
-  function handleRecorderCancel() {
+  function handleRecorderRerecord() {
     audioBlob = null
   }
 
@@ -265,7 +265,7 @@
         <AudioRecorder
           showSendButton={false}
           on:recorded={handleRecorded}
-          on:cancel={handleRecorderCancel}
+          on:rerecord={handleRecorderRerecord}
         />
       </div>
     {:else if inputMode === 'file'}
@@ -544,7 +544,6 @@
   .file-input {
     font-size: 0.85rem;
   }
-
 
   /* ── Analyse button ── */
 

@@ -3,18 +3,32 @@
    * AudioRecorder — live waveform via WaveSurfer Record plugin.
    *
    * Events:
-   *   on:recorded  — fires with { blob: Blob } when recording is ready to submit
-   *   on:cancel    — fires when user cancels (chat: closes recorder; monologue: clears ready blob)
+   *   on:recorded   — fires with { blob: Blob } when recording is ready to submit.
+   *                   When showSendButton=false (monologue), fires immediately on
+   *                   record-end so the parent holds the blob while user previews;
+   *                   re-recording dispatches 'rerecord' to rescind it.
+   *   on:rerecord   — fires when user chooses to re-record after previewing. Parent
+   *                   should clear any blob it received from the prior 'recorded' event.
+   *   on:cancel     — fires when user explicitly cancels (chat: closes the recorder).
    */
   import { onMount, onDestroy, createEventDispatcher } from 'svelte'
   import WaveSurfer from 'wavesurfer.js'
   import RecordPlugin from 'wavesurfer.js/dist/plugins/record.js'
   import AudioPlayer from './AudioPlayer.svelte'
 
-  const dispatch = createEventDispatcher<{ recorded: { blob: Blob }; cancel: void }>()
+  const dispatch = createEventDispatcher<{
+    recorded: { blob: Blob }
+    rerecord: void
+    cancel: void
+  }>()
 
   export let autostart = false
-  /** When false (monologue): hides Send button and auto-emits 'recorded' when recording stops. */
+  /**
+   * When false (monologue context): hides Send/Cancel buttons and auto-emits
+   * 'recorded' when recording stops. Re-record emits 'rerecord' to rescind it.
+   * Note: combining autostart=true with showSendButton=false causes 'recorded'
+   * to fire immediately on first stop with no explicit user gesture.
+   */
   export let showSendButton: boolean = true
 
   let container: HTMLElement
@@ -43,12 +57,13 @@
       recording = false
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       previewUrl = URL.createObjectURL(b)
+      // monologue: pre-commit blob so Analyse is enabled; user can re-record to rescind
       if (!showSendButton) dispatch('recorded', { blob: b })
     })
 
     if (autostart) {
+      recording = true  // optimistic: prevents Record button flash before await resolves
       await record.startRecording()
-      recording = true
     }
   })
 
@@ -68,14 +83,15 @@
     } else {
       blob = null
       if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
+      recording = true  // optimistic: prevents double-tap race before await resolves
       await record.startRecording()
-      recording = true
     }
   }
 
   function send() {
     if (blob) {
       dispatch('recorded', { blob })
+      blob = null
       if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
     }
   }
@@ -83,11 +99,12 @@
   async function reRecord() {
     blob = null
     if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null }
-    // In monologue context, tell parent the ready blob is gone.
-    if (!showSendButton) dispatch('cancel')
+    if (!showSendButton) dispatch('rerecord')
     if (record) {
+      recording = true  // optimistic: prevents Record button flash before await resolves
       await record.startRecording()
-      recording = true
+    } else {
+      if (import.meta.env.DEV) console.warn('[AudioRecorder] reRecord: WaveSurfer not initialised')
     }
   }
 
@@ -176,17 +193,17 @@
   }
 
   .rerecord-btn {
-    background: #aaa;
+    background: var(--kc-btn-secondary, #aaa);
   }
 
   .cancel-btn {
     background: transparent;
-    color: #888;
-    border: 1px solid #ccc;
+    color: var(--kc-btn-ghost-color, #888);
+    border: 1px solid var(--kc-btn-ghost-border, #ccc);
   }
 
   .cancel-btn:hover {
-    background: #f5f5f5;
+    background: var(--kc-btn-ghost-hover, #f5f5f5);
     opacity: 1;
   }
 
