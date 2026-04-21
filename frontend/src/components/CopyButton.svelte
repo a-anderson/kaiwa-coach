@@ -40,6 +40,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    appearance: none;
+    -webkit-appearance: none;
     background: none;
     border: none;
     cursor: pointer;

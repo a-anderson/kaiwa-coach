@@ -1071,6 +1071,105 @@ class ConversationOrchestrator:
         )
         return {"improvement_areas": [], "overall_assessment": ""}
 
+    def get_corrections_for_conversation(self, conversation_id: str) -> list[dict[str, Any]]:
+        """Return up to 20 most recent corrections for a conversation, oldest-first.
+
+        Returns a list of dicts with keys: errors_json, corrected_text, created_at.
+        """
+        with self._db.read_connection() as conn:
+            raw = conn.execute(
+                """
+                SELECT c.errors_json, c.corrected_text, c.created_at
+                FROM corrections c
+                JOIN user_turns ut ON c.user_turn_id = ut.id
+                WHERE ut.conversation_id = ?
+                ORDER BY c.created_at DESC LIMIT 20
+                """,
+                (conversation_id,),
+            ).fetchall()
+        rows = [
+            {"errors_json": r[0], "corrected_text": r[1], "created_at": r[2]}
+            for r in raw
+        ]
+        rows.reverse()
+        return rows
+
+    def summarise_conversation(self, conversation_id: str) -> dict[str, Any]:
+        """Read up to 20 most recent corrections and call the summarise_conversation LLM role.
+
+        Returns a dict with top_error_patterns, priority_areas, overall_notes.
+        When no corrections exist, returns an informational dict without calling the LLM.
+        """
+        rows = self.get_corrections_for_conversation(conversation_id)
+
+        # Build corrections_text; skip rows with no errors.
+        lines: list[str] = []
+        n = 0
+        for row in rows:
+            try:
+                errors: list[str] = json.loads(row["errors_json"]) if row["errors_json"] else []
+            except (json.JSONDecodeError, TypeError):
+                errors = []
+            if not errors:
+                continue
+            n += 1
+            errors_str = "; ".join(errors)
+            corrected = row.get("corrected_text") or ""
+            lines.append(f"[{n}] Errors: {errors_str}  |  Corrected: {corrected}")
+
+        if not lines:
+            with self._db.read_connection() as conn:
+                turn_count = conn.execute(
+                    "SELECT COUNT(*) FROM user_turns WHERE conversation_id = ?",
+                    (conversation_id,),
+                ).fetchone()[0]
+            if turn_count == 0:
+                return {
+                    "top_error_patterns": [],
+                    "priority_areas": [],
+                    "overall_notes": "No conversation is available to summarise.",
+                }
+            return {
+                "top_error_patterns": [],
+                "priority_areas": [],
+                "overall_notes": "No corrections were recorded for this conversation.",
+            }
+
+        corrections_text = "\n".join(lines)
+        # Escape braces so format_map doesn't treat correction content as placeholders.
+        corrections_text = corrections_text.replace("{", "{{").replace("}", "}}")
+
+        user_level = self._user_level_for(self._language)
+
+        prompt = self._prompt_loader.render(
+            "summarise_conversation.md",
+            {
+                "language": self._language,
+                "corrections_text": corrections_text,
+                "user_level": user_level,
+            },
+        )
+
+        result = self._safe_generate_json(prompt=prompt.text, role="summarise_conversation")
+
+        if result.model is not None:
+            return {
+                "top_error_patterns": list(result.model.top_error_patterns),
+                "priority_areas": list(result.model.priority_areas),
+                "overall_notes": result.model.overall_notes,
+            }
+
+        _logger.warning(
+            "summarise_conversation.invalid language=%s error=%s",
+            self._language,
+            result.error,
+        )
+        return {
+            "top_error_patterns": [],
+            "priority_areas": [],
+            "overall_notes": "",
+        }
+
     def regenerate_turn_audio(self, assistant_turn_id: str) -> TTSResult:
         """Regenerate TTS audio for a single assistant turn."""
         if self._tts is None:

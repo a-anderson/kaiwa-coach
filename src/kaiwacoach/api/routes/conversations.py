@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -14,7 +15,7 @@ from kaiwacoach.api.schemas.conversation import (
     CreateConversationRequest,
     TurnRecord,
 )
-from kaiwacoach.api.utils import audio_path_to_url
+from kaiwacoach.api.utils import _ML_EXECUTOR, audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
@@ -115,6 +116,22 @@ async def create_conversation(
     if created is None:
         raise HTTPException(status_code=500, detail="Created conversation not found")
     return ConversationSummary(**created)
+
+
+@router.post("/conversations/{conversation_id}/summarise")
+async def summarise_conversation(
+    conversation_id: str,
+    orc: ConversationOrchestrator = Depends(get_orchestrator),
+) -> dict:
+    try:
+        orc.get_conversation(conversation_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _ML_EXECUTOR, lambda: orc.summarise_conversation(conversation_id)
+    )
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
