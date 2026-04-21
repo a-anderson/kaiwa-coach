@@ -534,6 +534,7 @@ class ConversationOrchestrator:
         if timings is None:
             timings = {}
         profile = self.get_user_profile()
+        profile = self._ensure_name_normalised(profile)
         user_name = self._user_name_for_prompt(self._language, profile)
         user_level = self._user_level_for(self._language, profile)
         user_kanji_level = self._user_kanji_level_for(profile)
@@ -1356,6 +1357,34 @@ class ConversationOrchestrator:
         if stored:
             return stored
         return proficiency.get("ja") or "N5"
+
+    def _ensure_name_normalised(self, profile: dict) -> dict:
+        """Compute and store derived name forms if they are missing.
+
+        Handles names that existed before this feature was added, or cases where
+        the normalise_name LLM call failed at settings-save time. Only triggers
+        an LLM call when both derived forms are absent; subsequent calls are no-ops.
+        Returns the profile dict with any newly computed forms merged in.
+        """
+        raw = profile.get("user_name")
+        if not raw:
+            return profile
+        if profile.get("user_name_romanised") or profile.get("user_name_katakana"):
+            return profile
+        prompt = self._prompt_loader.render("normalise_name.md", {"name": raw})
+        result = self._safe_generate_json(prompt=prompt.text, role="normalise_name")
+        if result.model is None:
+            return profile
+        romanised = getattr(result.model, "romanised", None) or None
+        katakana = getattr(result.model, "katakana", None) or None
+        if romanised or katakana:
+            self._db.execute_update(
+                "user_profile",
+                {"user_name_romanised": romanised, "user_name_katakana": katakana},
+                {"id": 1},
+            )
+            return {**profile, "user_name_romanised": romanised, "user_name_katakana": katakana}
+        return profile
 
     def _user_name_for_prompt(self, language: str, profile: dict | None = None) -> str:
         """Return the language-appropriate name form, or '' if not set.
