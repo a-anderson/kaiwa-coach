@@ -11,6 +11,14 @@
  * Japanese uses dark grey as the secondary rather than white.
  */
 
+/* Neutral UI chrome — not language-specific; language themes may override */
+:root {
+  --kc-btn-secondary:             #aaa;     /* Re-record and other secondary buttons */
+  --kc-btn-ghost-color:           #888;     /* Ghost button text */
+  --kc-btn-ghost-border:          #ccc;     /* Ghost button border */
+  --kc-btn-ghost-hover:           #f5f5f5;  /* Ghost button hover background */
+}
+
 /* 🇯🇵 Japanese — crimson red + neutral grey */
 :root[data-language="ja"] {
   --kc-primary:                 #b91c1c;  /* deep crimson (flag red: #bc002d) */
