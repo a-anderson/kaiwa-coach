@@ -1547,8 +1547,12 @@ class ConversationOrchestrator:
         if self._language != "ja":
             return text
 
+        user_name = self._user_name_for_prompt()
+
         def _llm_rewrite(content: str) -> str:
-            prompt = self._prompt_loader.render("jp_tts_normalise.md", {"original_text": content})
+            prompt = self._prompt_loader.render(
+                "jp_tts_normalise.md", {"original_text": content, "user_name": user_name}
+            )
             result = self._safe_generate_json(prompt=prompt.text, role="jp_tts_normalisation")
             if result.model is None:
                 return content

@@ -32,6 +32,7 @@ PROMPT_VARIABLES = {
     },
     "jp_tts_normalise.md": {
         "original_text": "これはテストです",
+        "user_name": "Ashley",
     },
     "monologue_summary.md": {
         "language": "ja",
