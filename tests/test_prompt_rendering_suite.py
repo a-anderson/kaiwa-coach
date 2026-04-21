@@ -34,6 +34,9 @@ PROMPT_VARIABLES = {
         "original_text": "これはテストです",
         "user_name": "Ashley",
     },
+    "romanise_name.md": {
+        "name": "田中",
+    },
     "monologue_summary.md": {
         "language": "ja",
         "errors": "Wrong particle used",

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from kaiwacoach.models.json_enforcement import (
     ConversationSummaryResult,
     MonologueSummary,
+    RomanisedName,
     ROLE_SCHEMAS,
 )
 
@@ -80,3 +81,16 @@ def test_monologue_summary_rejects_empty_improvement_areas() -> None:
 def test_monologue_summary_registered_in_role_schemas() -> None:
     assert "monologue_summary" in ROLE_SCHEMAS
     assert ROLE_SCHEMAS["monologue_summary"] is MonologueSummary
+
+
+# ── RomanisedName ─────────────────────────────────────────────────────────────
+
+
+def test_romanised_name_validates_correct_payload() -> None:
+    model = RomanisedName.model_validate({"romanised": "Tanaka"})
+    assert model.romanised == "Tanaka"
+
+
+def test_romanised_name_registered_in_role_schemas() -> None:
+    assert "romanise_name" in ROLE_SCHEMAS
+    assert ROLE_SCHEMAS["romanise_name"] is RomanisedName

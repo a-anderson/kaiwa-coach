@@ -37,6 +37,10 @@ _logger = logging.getLogger(__name__)
 # Maximum number of unique (audio_hash, model_id, language) entries held in the
 # in-process ASR cache. Oldest entries are evicted when the limit is reached.
 _ASR_CACHE_MAX_SIZE = 128
+_ROMANISED_NAME_CACHE_MAX_SIZE = 16
+
+# Matches hiragana, katakana, and CJK unified ideographs (kanji).
+_JAPANESE_CHAR_RE = re.compile(r"[぀-ゟ゠-ヿ一-鿿]")
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,7 @@ class ConversationOrchestrator:
             getattr(audio_cache, "expected_sample_rate", None) if audio_cache is not None else None
         )
         self._asr_cache: BoundedDict = BoundedDict(maxsize=_ASR_CACHE_MAX_SIZE)
+        self._romanised_name_cache: BoundedDict = BoundedDict(maxsize=_ROMANISED_NAME_CACHE_MAX_SIZE)
         self._logger = logging.getLogger(__name__)
         self._timing_logs_enabled = timing_logs_enabled
 
@@ -532,6 +537,8 @@ class ConversationOrchestrator:
             timings = {}
         profile = self.get_user_profile()
         user_name = self._user_name_for_prompt(profile)
+        if user_name and self._language != "ja" and _JAPANESE_CHAR_RE.search(user_name):
+            user_name = self._romanise_name(user_name)
         user_level = self._user_level_for(self._language, profile)
         user_kanji_level = self._user_kanji_level_for(profile)
         profile_vars = {
@@ -1342,6 +1349,20 @@ class ConversationOrchestrator:
         if profile is None:
             profile = self.get_user_profile()
         return profile["user_name"] or ""
+
+    def _romanise_name(self, name: str) -> str:
+        """Return a Latin-script romanisation of a Japanese-script name.
+
+        Result is cached by name. Falls back to the original on LLM failure.
+        """
+        cached = self._romanised_name_cache.get(name)
+        if cached is not None:
+            return cached
+        prompt = self._prompt_loader.render("romanise_name.md", {"name": name})
+        result = self._safe_generate_json(prompt=prompt.text, role="romanise_name")
+        romanised = getattr(result.model, "romanised", None) or name
+        self._romanised_name_cache[name] = romanised
+        return romanised
 
     def reset_session(self) -> None:
         """Reset session-scoped state such as audio and LLM caches."""

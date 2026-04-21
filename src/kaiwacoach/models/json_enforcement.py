@@ -46,6 +46,10 @@ class ConversationSummaryResult(BaseModel):
     overall_notes: StrictStr
 
 
+class RomanisedName(BaseModel):
+    romanised: StrictStr
+
+
 ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
     "conversation": ConversationReply,
     "jp_tts_normalisation": JpTtsNormalisation,
@@ -53,6 +57,7 @@ ROLE_SCHEMAS: dict[str, Type[BaseModel]] = {
     "explain_and_native": ExplainAndNative,
     "monologue_summary": MonologueSummary,
     "summarise_conversation": ConversationSummaryResult,
+    "romanise_name": RomanisedName,
 }
 
 
