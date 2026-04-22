@@ -175,6 +175,7 @@ def test_text_turn_emits_stage_events(client, mock_orchestrator):
     assert ("corrections", "running") in stage_names
     assert ("tts", "running") in stage_names
     assert ("tts", "complete") in stage_names
+    assert stage_names.index(("corrections", "running")) < stage_names.index(("tts", "running"))
 
 
 def test_text_turn_emits_complete_event(client, mock_orchestrator):
@@ -311,6 +312,7 @@ def test_audio_turn_emits_asr_stage(client, mock_orchestrator, monkeypatch):
     stage_names = [(e["data"]["stage"], e["data"]["status"]) for e in events if e.get("event") == "stage"]
     assert ("asr", "running") in stage_names
     assert ("asr", "complete") in stage_names
+    assert stage_names.index(("corrections", "running")) < stage_names.index(("tts", "running"))
 
 
 def test_audio_turn_complete_event_includes_asr_text(client, mock_orchestrator, monkeypatch):
@@ -377,7 +379,7 @@ def test_audio_turn_orchestrator_exception_emits_error_event(client, mock_orches
 
 
 def _configure_text_turn_fails_after_llm(mock_orchestrator, reply_text: str) -> None:
-    """Emit LLM stage events then raise during TTS — simulates a mid-stream failure."""
+    """Emit LLM stage events then raise before corrections — simulates a mid-stream failure."""
 
     def fake_process_text_turn(
         conversation_id, user_text, conversation_history="", corrections_enabled=True, on_stage=None
