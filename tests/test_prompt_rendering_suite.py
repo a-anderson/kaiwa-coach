@@ -78,6 +78,33 @@ def test_conversation_prompt_renders_with_empty_profile_vars() -> None:
     assert result.text
 
 
+_CONVERSATION_BASE = {
+    "language": "fr",
+    "conversation_history": "",
+    "user_text": "Bonjour",
+    "user_name": "",
+    "user_level": "A1",
+    "user_kanji_level": "",
+}
+
+
+def test_conversation_prompt_includes_name_when_set() -> None:
+    """The user's name must appear verbatim in the rendered prompt so the LLM can use it."""
+    root = Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts"
+    loader = PromptLoader(root)
+    result = loader.render("conversation.md", {**_CONVERSATION_BASE, "user_name": "Ashley"})
+    assert "User name: Ashley" in result.text
+
+
+def test_conversation_prompt_shows_blank_name_when_unset() -> None:
+    """An empty user_name must render as a blank label so the LLM knows not to use a name."""
+    root = Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts"
+    loader = PromptLoader(root)
+    result = loader.render("conversation.md", {**_CONVERSATION_BASE, "user_name": ""})
+    # The period is the sentence-ending punctuation from the template, not a name value.
+    assert "User name: . If the name above is not blank" in result.text
+
+
 def test_detect_correct_prompt_renders_with_empty_kanji_level() -> None:
     """Empty user_kanji_level (non-Japanese session) must not raise."""
     root = Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts"
