@@ -95,7 +95,7 @@
 }
 
 /* 🇧🇷 Brazilian Portuguese — green (primary) + gold (secondary) */
-:root[data-language="pt"] {
+:root[data-language="pt-br"] {
   --kc-primary:                 #1a7040;  /* Brazilian green (flag green: #009c3b) */
   --kc-primary-light:           #228a4e;
   --kc-secondary:               #ca8a04;  /* Brazilian gold (flag gold: #fedf00) */

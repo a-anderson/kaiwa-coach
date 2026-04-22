@@ -25,17 +25,17 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 
 ## What It Does
 
-- Runs a local conversational loop with:
+- **Chat**: Runs a local conversational loop with:
     - user text/audio input
     - assistant reply generation
     - optional correction pipeline (detect errors + corrected sentence → explanation + native rewrite)
     - TTS synthesis of assistant reply
-- Narration tab: paste text → TTS synthesis → preview and download (stateless, no conversation created)
-- Monologue mode: submit text/audio → corrections + improvement summary; persisted to SQLite
-- Conversation summary: on-demand analysis of error patterns across a conversation; ephemeral, not persisted
+- **Narration**: paste text → TTS synthesis → preview and download (stateless, no conversation created)
+- **Monologue**: submit text/audio → corrections + improvement summary; persisted to SQLite
+- **Conversation Summary**: on-demand analysis of error patterns across a conversation; ephemeral, not persisted
 - Persists conversations and supports list, load, resume, and delete
-- Audio regeneration per-turn or per-conversation
-- Shadowing mode: side-by-side listen + record comparison for any assistant turn
+- **Audio regeneration** per-turn or per-conversation
+- **Shadowing**: side-by-side listen + record comparison for any assistant turn
 - Enforces JSON schema on LLM role outputs with bounded repair behaviour
 - Applies Japanese TTS normalisation with invariant checks and fallback behaviour
 
@@ -183,6 +183,8 @@ Use [config.example.yaml](config.example.yaml) as the file-based template.
 
 The default LLM is `mlx-community/Qwen3-14B-8bit`. Two model families are supported: **Qwen3** and **Gemma 4**, each available via MLX (Apple Silicon) or Ollama.
 
+Recent model comparison shows the best balance of speed and performance comes from starting the Ollama server with MLX support enabled (`OLLAMA_MLX=1 ollama serve`) and setting `llm_backend: "ollama"` and `llm_id: "gemma4:e4b"` in the `config.yaml`.
+
 **Qwen3 via MLX** (`llm_backend: "mlx"`):
 
 | Variant         | Model ID                       | Trade-off                   |
@@ -193,21 +195,21 @@ The default LLM is `mlx-community/Qwen3-14B-8bit`. Two model families are suppor
 
 **Gemma 4 via MLX** (`llm_backend: "mlx"`):
 
-| Variant              | Model ID                                    | Notes                          |
-| -------------------- | ------------------------------------------- | ------------------------------ |
-| e2b-it 8-bit         | `mlx-community/gemma-4-e2b-it-8bit`        | 2B dense, lowest VRAM          |
-| e4b-it 4-bit         | `mlx-community/gemma-4-e4b-it-4bit`        | 4B dense, low VRAM             |
-| e4b-it bf16          | `mlx-community/gemma-4-e4b-it-bf16`        | 4B dense, full precision       |
-| 26b-a4b-it 8-bit     | `mlx-community/gemma-4-26b-a4b-it-8bit`    | 26B MoE (~4B active), balanced |
-| 26b-a4b-it 4-bit     | `mlx-community/gemma-4-26b-a4b-it-4bit`    | 26B MoE, minimum VRAM          |
+| Variant          | Model ID                                | Notes                          |
+| ---------------- | --------------------------------------- | ------------------------------ |
+| e2b-it 8-bit     | `mlx-community/gemma-4-e2b-it-8bit`     | 2B dense, lowest VRAM          |
+| e4b-it 4-bit     | `mlx-community/gemma-4-e4b-it-4bit`     | 4B dense, low VRAM             |
+| e4b-it bf16      | `mlx-community/gemma-4-e4b-it-bf16`     | 4B dense, full precision       |
+| 26b-a4b-it 8-bit | `mlx-community/gemma-4-26b-a4b-it-8bit` | 26B MoE (~4B active), balanced |
+| 26b-a4b-it 4-bit | `mlx-community/gemma-4-26b-a4b-it-4bit` | 26B MoE, minimum VRAM          |
 
 **Via Ollama** (`llm_backend: "ollama"`, requires [Ollama](https://ollama.com) running locally):
 
-| Model       | `llm_id`      |
-| ----------- | ------------- |
-| Qwen3 14B   | `qwen3:14b`   |
-| Gemma 4 e4b | `gemma4:e4b`  |
-| Gemma 4 26b | `gemma4:26b`  |
+| Model       | `llm_id`     |
+| ----------- | ------------ |
+| Qwen3 14B   | `qwen3:14b`  |
+| Gemma 4 e4b | `gemma4:e4b` |
+| Gemma 4 26b | `gemma4:26b` |
 
 Set in `config.yaml`:
 
@@ -250,7 +252,7 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 ### User settings
 
 - Click the ⚙ gear icon in the top bar to open the settings panel.
-- Set an optional display name; the assistant will address you by name where natural.
+- Set an optional display name; the assistant will address you by name where natural. (Currently only works when the name is written with letters from the English alphabet)
 - Set a proficiency level per language:
     - Japanese: two independent levels — grammar/vocabulary (N5–Native) and kanji reading (N5–Native)
     - All other languages: CEFR level (A1–Native)
@@ -260,20 +262,20 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 
 - Click the **Narration** tab to open the narration panel.
 - Paste or type text in the current session language and click **Generate Audio**.
-- Preview the synthesised audio inline; click **↓ Download** to save the file.
+- Preview the synthesised audio inline; click **↓ Download** to save the `.wav` file.
 - No conversation is created — narration is stateless and session-only.
 
 ### Monologue mode
 
 - Click the **Monologue** tab to open the monologue panel.
 - Choose an input mode: **Text**, **Mic**, or **Upload**.
-  - Text: type or paste your input, then click **Analyse**.
-  - Mic: record using the microphone recorder, then click **Analyse**.
-  - Upload: select an audio file; click **Analyse** to submit.
+    - Text: type or paste your input, then click **Analyse**.
+    - Mic: record using the microphone recorder, then click **Analyse**.
+    - Upload: select an audio file; click **Analyse** to submit.
 - The pipeline runs: ASR (audio only) → corrections → summary. Progress is shown per stage.
 - Results are displayed in two sections:
-  - **Results**: transcript (audio only), errors, corrected sentence, native rewrite, explanation.
-  - **Summary**: improvement areas and overall assessment.
+    - **Results**: transcript (audio only), errors, corrected sentence, native rewrite, explanation.
+    - **Summary**: improvement areas and overall assessment.
 - Each result section has a copy button to copy the text to the clipboard.
 - Past sessions appear in the sidebar under the Monologue tab; clicking one shows the read-only results view.
 
@@ -292,7 +294,7 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 
 ### Downloading audio
 
-- Click **↓ Download** on any assistant bubble to save the TTS audio file.
+- Click **↓ Download** on any assistant bubble to save the TTS audio `.wav` file.
 - A download button is also available under the reference audio player in shadowing mode.
 
 ### Autoplay
@@ -388,7 +390,7 @@ poetry run python scripts/llm_smoke.py --language ja
 
 ## Evaluation
 
-The project currently provides evidence in three areas:
+The project currently provides evaluation in three areas:
 
 1. **Automated reliability checks**
 2. **Schema/repair robustness checks**
@@ -432,12 +434,6 @@ Instrumentation lives in:
 - Current scope is local Apple Silicon execution.
 - Browser microphone access requires a secure context (localhost or HTTPS).
 
-## Roadmap
-
-Current implementation status and post-MVP work are tracked in:
-
-- [docs/planning/KaiwaCoach_Implementation_Checklist_v1.1.md](docs/planning/KaiwaCoach_Implementation_Checklist_v1.1.md)
-
 ## Development Notes
 
 This repo is not currently accepting external contributions, but these notes document project conventions.
@@ -454,4 +450,4 @@ See [LICENSE](LICENSE).
 
 ## Acknowledgements
 
-KaiwaCoach is built on open-source tooling and local model ecosystems, including FastAPI, Svelte, WaveSurfer.js, SQLite, and local model runtimes.
+KaiwaCoach is built on open-source tooling and local model ecosystems, including FastAPI, Svelte, WaveSurfer.js, SQLite, Ollama, and local model runtimes.
