@@ -2,7 +2,7 @@
   import { uiStore } from '../lib/stores/ui'
 
   // Canonical display order — ASR only appears for audio turns.
-  const STAGE_ORDER = ['asr', 'llm', 'tts', 'corrections']
+  const STAGE_ORDER = ['asr', 'llm', 'corrections', 'tts']
   const STAGE_LABELS: Record<string, string> = {
     asr: 'Transcribing',
     llm: 'Generating reply',

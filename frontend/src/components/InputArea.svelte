@@ -78,7 +78,6 @@
                   ? { ...s.pendingTurn, assistant_audio_url: stage.audio_url!, has_assistant_audio: true }
                   : null,
               }))
-              uiStore.update((s) => ({ ...s, autoplayPending: true }))
             }
           }
         } else if (frame.event === 'complete') {
@@ -96,10 +95,10 @@
               has_assistant_audio: result.audio_url !== null,
               user_audio_url: p?.user_audio_url ?? null,
               assistant_audio_url: result.audio_url,
+              autoplay: result.audio_url !== null,
             }
             return { ...s, turns: [...s.turns, finalTurn], pendingTurn: null }
           })
-          uiStore.update((s) => ({ ...s, autoplayPending: false }))
           dispatch('turncomplete')
         } else if (frame.event === 'error') {
           submitError = (frame.data as SSEErrorEvent).message ?? 'Turn failed'
@@ -151,7 +150,7 @@
       )
     } finally {
       sessionStore.update((s) => ({ ...s, pendingTurn: null }))
-      uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {}, autoplayPending: false }))
+      uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
   }
 
@@ -201,7 +200,7 @@
       )
     } finally {
       sessionStore.update((s) => ({ ...s, pendingTurn: null }))
-      uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {}, autoplayPending: false }))
+      uiStore.update((s) => ({ ...s, isSubmitting: false, stageStatuses: {} }))
     }
   }
 

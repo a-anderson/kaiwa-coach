@@ -31,6 +31,8 @@ export interface TurnRecord {
   assistant_audio_url: string | null
   /** Set to 'pending' for in-flight turns only; absent on committed turns. */
   status?: 'pending'
+  /** True on the committed turn that should autoplay on mount; not persisted. */
+  autoplay?: boolean
 }
 
 export interface ConversationDetail {

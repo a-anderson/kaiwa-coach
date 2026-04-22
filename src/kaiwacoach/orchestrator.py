@@ -174,16 +174,6 @@ class ConversationOrchestrator:
         )
         if on_stage:
             on_stage("llm", "complete", {"reply": reply_text})
-        if on_stage:
-            on_stage("tts", "running", {})
-        tts_result = self.run_tts(
-            conversation_id=conversation_id,
-            assistant_turn_id=assistant_turn_id,
-            reply_text=reply_text,
-            timings=timings,
-        )
-        if on_stage:
-            on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
         if corrections_enabled:
             if on_stage:
                 on_stage("corrections", "running", {})
@@ -195,6 +185,16 @@ class ConversationOrchestrator:
             )
             if on_stage:
                 on_stage("corrections", "complete", {"data": corrections})
+        if on_stage:
+            on_stage("tts", "running", {})
+        tts_result = self.run_tts(
+            conversation_id=conversation_id,
+            assistant_turn_id=assistant_turn_id,
+            reply_text=reply_text,
+            timings=timings,
+        )
+        if on_stage:
+            on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
         self._finalize_timings(timings)
         self._log_timings("text_turn", timings)
 
@@ -334,16 +334,6 @@ class ConversationOrchestrator:
         )
         if on_stage:
             on_stage("llm", "complete", {"reply": reply_text})
-        if on_stage:
-            on_stage("tts", "running", {})
-        tts_result = self.run_tts(
-            conversation_id=conversation_id,
-            assistant_turn_id=assistant_turn_id,
-            reply_text=reply_text,
-            timings=timings,
-        )
-        if on_stage:
-            on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
         if corrections_enabled:
             if on_stage:
                 on_stage("corrections", "running", {})
@@ -355,6 +345,16 @@ class ConversationOrchestrator:
             )
             if on_stage:
                 on_stage("corrections", "complete", {"data": corrections})
+        if on_stage:
+            on_stage("tts", "running", {})
+        tts_result = self.run_tts(
+            conversation_id=conversation_id,
+            assistant_turn_id=assistant_turn_id,
+            reply_text=reply_text,
+            timings=timings,
+        )
+        if on_stage:
+            on_stage("tts", "complete", {"audio_path": tts_result.audio_path if tts_result else None})
         self._finalize_timings(timings)
         self._log_timings("audio_turn", timings)
 
