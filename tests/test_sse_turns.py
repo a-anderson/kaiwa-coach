@@ -312,6 +312,35 @@ def test_audio_turn_emits_asr_stage(client, mock_orchestrator, monkeypatch):
     stage_names = [(e["data"]["stage"], e["data"]["status"]) for e in events if e.get("event") == "stage"]
     assert ("asr", "running") in stage_names
     assert ("asr", "complete") in stage_names
+
+
+def test_audio_turn_emits_stage_events(client, mock_orchestrator, monkeypatch):
+    """SSE stream contains all expected stage events with corrections preceding TTS."""
+    from kaiwacoach.storage.blobs import AudioMeta
+
+    fake_pcm = b"\x00" * 320
+    fake_meta = AudioMeta(sample_rate=16000, channels=1, sample_width=2, num_frames=160)
+
+    import kaiwacoach.api.routes.turns as turns_module
+
+    monkeypatch.setattr(turns_module, "webm_to_pcm", lambda *_a, **_kw: (fake_pcm, fake_meta))
+
+    _configure_process_audio_turn(mock_orchestrator, _make_audio_result())
+
+    resp = client.post(
+        "/api/turns/audio",
+        files={"audio": ("rec.webm", b"fake-webm", "audio/webm")},
+        data={"language": "ja"},
+    )
+    events = parse_sse(resp.text)
+    stage_names = [(e["data"]["stage"], e["data"]["status"]) for e in events if e.get("event") == "stage"]
+    assert ("asr", "running") in stage_names
+    assert ("asr", "complete") in stage_names
+    assert ("llm", "running") in stage_names
+    assert ("llm", "complete") in stage_names
+    assert ("corrections", "running") in stage_names
+    assert ("tts", "running") in stage_names
+    assert ("tts", "complete") in stage_names
     assert stage_names.index(("corrections", "running")) < stage_names.index(("tts", "running"))
 
 
