@@ -401,9 +401,9 @@ The project currently provides evidence in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-04-21):
+Latest full local snapshot (2026-04-22):
 
-- `384 passed`
+- `385 passed`
 
 ### Schema and repair robustness
 
