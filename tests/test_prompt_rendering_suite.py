@@ -82,6 +82,7 @@ _CONVERSATION_BASE = {
     "language": "fr",
     "conversation_history": "",
     "user_text": "Bonjour",
+    "user_name": "",
     "user_level": "A1",
     "user_kanji_level": "",
 }
@@ -100,7 +101,8 @@ def test_conversation_prompt_shows_blank_name_when_unset() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "kaiwacoach" / "prompts"
     loader = PromptLoader(root)
     result = loader.render("conversation.md", {**_CONVERSATION_BASE, "user_name": ""})
-    assert "User name: ." in result.text
+    # The period is the sentence-ending punctuation from the template, not a name value.
+    assert "User name: . If the name above is not blank" in result.text
 
 
 def test_detect_correct_prompt_renders_with_empty_kanji_level() -> None:
