@@ -84,6 +84,10 @@ def extract_first_json_object(text: str) -> dict[str, Any]:
     ValueError
         If the parsed value is not a JSON object.
     """
+    # Ensure text is properly decoded as UTF-8 if it's bytes
+    if isinstance(text, bytes):
+        text = text.decode('utf-8')
+    
     cleaned = _THINK_TAG_RE.sub("", text)
     cleaned = _GEMMA_CHANNEL_RE.sub("", cleaned).strip()
     decoder = json.JSONDecoder()
