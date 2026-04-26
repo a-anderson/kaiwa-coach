@@ -10,7 +10,9 @@ I wanted to get better at:
 - using the assistant for debugging and iteration
 - treating the assistant like a collaborator that still needs review, tests, and clear constraints
 
-For this project, I used both Codex and Claude Code, and found a strong preference for Claude Code.
+For the bulk of this project, I used both Codex and Claude Code, and found a strong preference for Claude Code.
+
+Note 2026-04-26: with the recent reduction in the token allowance for Claude use, I have started exploring using a local instance of Qwen3 Coder (30B, Ollama backend) and the Pi coding agent. I have seen very promising results with small changes and bug-fixes to the repo, and may cancel my Anthropic subscription if my experience is consistent across different repos and tasks.
 
 ## What Worked Well
 
