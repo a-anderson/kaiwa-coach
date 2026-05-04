@@ -44,7 +44,7 @@
         </button>
       {/if}
       <button
-        class="action-btn"
+        class="action-btn regen-btn"
         on:click={() => dispatch('regen')}
         disabled={regenPending}
         title="Regenerate audio"
@@ -117,5 +117,9 @@
   .action-btn:disabled {
     cursor: default;
     opacity: 0.5;
+  }
+
+  .regen-btn {
+    font-size: 1rem;
   }
 </style>
