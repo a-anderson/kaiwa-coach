@@ -25,3 +25,27 @@ export const LANGUAGE_ENGLISH_NAMES: Record<string, string> = {
   it: 'Italian',
   'pt-br': 'Portuguese (Brazil)',
 }
+
+/**
+ * Translation target languages. `value` is the English name stored in the DB
+ * and passed directly to the LLM prompt. `label` is the native-script display
+ * name shown in the UI. Must stay in sync with SUPPORTED_TRANSLATION_LANGUAGES
+ * in constants.py.
+ */
+export const TRANSLATION_LANGUAGES = [
+  { value: 'English', label: 'English' },
+  { value: 'Spanish', label: 'Español' },
+  { value: 'French', label: 'Français' },
+  { value: 'German', label: 'Deutsch' },
+  { value: 'Italian', label: 'Italiano' },
+  { value: 'Brazilian Portuguese', label: 'Português (Brasil)' },
+  { value: 'Korean', label: '한국어' },
+  { value: 'Simplified Chinese', label: '中文（简体）' },
+  { value: 'Traditional Chinese', label: '中文（繁體）' },
+  { value: 'Hindi', label: 'हिन्दी' },
+  { value: 'Japanese', label: '日本語' },
+] as const
+
+export type TranslationLanguage = typeof TRANSLATION_LANGUAGES[number]['value']
+
+export const DEFAULT_TRANSLATION_LANGUAGE: TranslationLanguage = 'English'

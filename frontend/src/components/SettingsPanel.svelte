@@ -2,8 +2,14 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { fly } from 'svelte/transition'
   import { uiStore } from '../lib/stores/ui'
+  import { profileStore } from '../lib/stores/profile'
   import { getProfile, setProfile } from '../lib/api/settings'
-  import { SUPPORTED_LANGUAGES as LANGUAGE_CODES, LANGUAGE_NATIVE_NAMES } from '../lib/constants'
+  import {
+    SUPPORTED_LANGUAGES as LANGUAGE_CODES,
+    LANGUAGE_NATIVE_NAMES,
+    TRANSLATION_LANGUAGES,
+    DEFAULT_TRANSLATION_LANGUAGE,
+  } from '../lib/constants'
 
   const SUPPORTED_LANGUAGES = LANGUAGE_CODES.map((code) => ({
     code,
@@ -17,6 +23,7 @@
 
   let userName = ''
   let proficiency: Record<string, string> = {}
+  let translationLanguage = DEFAULT_TRANSLATION_LANGUAGE
   let loading = false
   let saving = false
   let error = ''
@@ -55,6 +62,7 @@
       const profile = await getProfile()
       userName = profile.user_name ?? ''
       proficiency = { ...profile.language_proficiency }
+      translationLanguage = profile.translation_language ?? DEFAULT_TRANSLATION_LANGUAGE
     } catch (e) {
       if (import.meta.env.DEV) console.warn('[SettingsPanel] load failed', e)
       error = 'Failed to load settings.'
@@ -70,7 +78,9 @@
       await setProfile({
         user_name: userName.trim() || null,
         language_proficiency: proficiency,
+        translation_language: translationLanguage,
       })
+      profileStore.update((s) => ({ ...s, translationLanguage }))
       close()
     } catch (e) {
       if (import.meta.env.DEV) console.warn('[SettingsPanel] save failed', e)
@@ -128,6 +138,19 @@
             placeholder="Leave blank to omit"
             bind:value={userName}
           />
+        </section>
+
+        <section class="field-group">
+          <label class="field-label" for="translation-language">Translation language</label>
+          <select
+            id="translation-language"
+            class="level-select"
+            bind:value={translationLanguage}
+          >
+            {#each TRANSLATION_LANGUAGES as lang}
+              <option value={lang.value}>{lang.label}</option>
+            {/each}
+          </select>
         </section>
 
         <section class="field-group">

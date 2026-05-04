@@ -15,7 +15,7 @@ from kaiwacoach.api.schemas.conversation import (
     CreateConversationRequest,
     TurnRecord,
 )
-from kaiwacoach.api.utils import _ML_EXECUTOR, audio_path_to_url
+from kaiwacoach.api.utils import ML_EXECUTOR, audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
@@ -130,7 +130,7 @@ async def summarise_conversation(
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
-        _ML_EXECUTOR, lambda: orc.summarise_conversation(conversation_id)
+        ML_EXECUTOR, lambda: orc.summarise_conversation(conversation_id)
     )
 
 

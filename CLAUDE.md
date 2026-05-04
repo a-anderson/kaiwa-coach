@@ -38,7 +38,6 @@ poetry run bash scripts/setup_macos.sh
 
 `pytest.ini` sets `pythonpath = src`, so tests can `import kaiwacoach` directly without a `src.` prefix — no `conftest.py` path manipulation is needed.
 
-`tools/export_conversation.py` — stub for a planned conversation export utility; not yet implemented.
 
 ## Runtime data (gitignored, never commit)
 
@@ -64,7 +63,7 @@ The Python environment is pre-created and owned by the maintainer.
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `frontend/`                          | Svelte + Vite SPA — all UI logic; communicates with backend via REST + SSE only                                                                                                             |
 | `src/kaiwacoach/api/server.py`       | FastAPI app factory, router registration, static file serving, lifespan                                                                                                                     |
-| `src/kaiwacoach/api/routes/`         | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py`                                                                                                                      |
+| `src/kaiwacoach/api/routes/`         | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py`, `monologue.py`, `narration.py`, `translate.py`, `settings.py`                                                        |
 | `src/kaiwacoach/orchestrator.py`     | Turn lifecycle: sequencing, timing, persistence; steps are pure functions                                                                                                                   |
 | `src/kaiwacoach/models/protocols.py` | Shared result types (`ASRResult`, `LLMResult`, `TTSResult`) and `@runtime_checkable` protocols (`ASRProtocol`, `LLMProtocol`, `TTSProtocol`) — concrete files import result types from here |
 | `src/kaiwacoach/models/factory.py`   | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here                                    |
@@ -84,7 +83,7 @@ The Python environment is pre-created and owned by the maintainer.
 5. Optional correction pipeline (2 combined LLM calls): `detect_and_correct` → `explain_and_native`
 6. Persist all artefacts to SQLite + blob storage
 
-**LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`). Each role has:
+**LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`, `monologue_summary`, `summarise_conversation`, `translate`). Each role has:
 
 - A Pydantic schema in `json_enforcement.py`
 - A markdown prompt in `src/kaiwacoach/prompts/`
@@ -113,7 +112,7 @@ The Python environment is pre-created and owned by the maintainer.
 - **All LLM outputs schema-validated**: one repair retry max, then fail safe.
 - **Japanese invariant**: TTS normalisation must not alter Japanese substrings (byte-identical, with fallback to original on violation).
 - **Narrow exception handling**: never use bare `except Exception` to swallow errors silently. Wrap only the specific operation that can fail (e.g. the ASR transcription call, not the entire turn pipeline). If a failure path must persist state before returning, re-raise after cleanup so the error reaches the appropriate handler (e.g. the SSE error event emitter).
-- **Bounded in-memory caches**: all caches backed by a plain `dict` must be bounded. Use `_BoundedDict` (in `orchestrator.py`) or equivalent, with a named max-size constant. An unbounded cache is a memory leak in a long-running process.
+- **Bounded in-memory caches**: all caches backed by a plain `dict` must be bounded. Use `BoundedDict` (in `kaiwacoach/utils.py`) or equivalent, with a named max-size constant. An unbounded cache is a memory leak in a long-running process.
 
 ## Performance
 
@@ -150,9 +149,14 @@ When modifying `src/kaiwacoach/storage/schema.sql`, also update:
 
 1. **`_ALLOWED_UPDATE_COLUMNS`** in `storage/db.py` — add/remove column names to match.
 2. **`_schema_needs_reset`** in `storage/db.py` — update the `required_columns` set if columns on `conversations` change.
-3. **`schema_version`** — bump the version integer in `schema.sql`.
+3. **`_apply_migrations`** in `storage/db.py` — add an idempotent `ALTER TABLE` step for any new column on a table other than `conversations`. Each step checks `PRAGMA table_info` before executing so it is safe to run on both fresh and existing databases.
+4. **`schema_version`** — bump the version integer in `schema.sql`.
 
 Prefer nullable columns or columns with defaults for additive changes. The current behaviour on a column-set mismatch is a full local DB reset (acceptable for single-user MVP — note this in any schema PR).
+
+**Which path to use for additive column changes:**
+- Column on `conversations` → update `_schema_needs_reset` (triggers reset on mismatch) and add an `_apply_migrations` step so existing DBs migrate without a reset.
+- Column on any other table (e.g. `user_profile`) → `_apply_migrations` step only; no reset is involved.
 
 **STOP AND ASK before triggering a DB reset.** If a schema change requires adding a column to `_schema_needs_reset` (which will delete all local data on next startup), you must explicitly warn the user and get their confirmation before proceeding. Provide the manual migration SQL (`ALTER TABLE ... ADD COLUMN ...`) as an alternative so they can preserve existing data. Never silently ship a change that will destroy the user's database.
 
@@ -170,6 +174,8 @@ Prefer nullable columns or columns with defaults for additive changes. The curre
 - **Dev-mode logging**: guard development-only diagnostics with `import.meta.env.DEV` so they are tree-shaken in production builds. Do not leave silent empty `catch {}` blocks where a `console.warn` would aid debugging.
 
 **Progressive rendering**: In-flight turns are tracked via `pendingTurn: TurnRecord | null` in `sessionStore`. `InputArea` populates it immediately on submit and patches it as each SSE stage completes (ASR transcript → LLM reply → TTS audio → corrections). On SSE `complete`, it is moved into `turns` with real IDs. `ChatThread` renders `pendingTurn` separately below committed turns. When a turn completes, `InputArea` dispatches a `turncomplete` event that `App.svelte` catches to trigger a sidebar refresh (picking up the auto-set conversation title).
+
+**Profile state**: User profile fields that must be accessible across components (not just inside `SettingsPanel`) live in `profileStore` (`frontend/src/lib/stores/profile.ts`). `App.svelte` seeds the store on mount via `getProfile()`; `SettingsPanel` updates it on save. Components that need a profile value (e.g. `TurnPair` reading `translationLanguage`) subscribe to `profileStore` directly — do not thread profile data through component props or re-fetch inside leaf components.
 
 ## Testing
 

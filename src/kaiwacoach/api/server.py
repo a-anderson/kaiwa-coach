@@ -17,6 +17,7 @@ from kaiwacoach.api.routes.monologue import router as monologue_router
 from kaiwacoach.api.routes.regen import router as regen_router
 from kaiwacoach.api.routes.narration import router as narration_router
 from kaiwacoach.api.routes.settings import router as settings_router
+from kaiwacoach.api.routes.translate import router as translate_router
 from kaiwacoach.api.routes.turns import router as turns_router
 from kaiwacoach.api.schemas.conversation import SetLanguageRequest
 from kaiwacoach.orchestrator import ConversationOrchestrator
@@ -66,6 +67,7 @@ def create_app(
     app.include_router(monologue_router, prefix="/api")
     app.include_router(regen_router, prefix="/api")
     app.include_router(narration_router, prefix="/api")
+    app.include_router(translate_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
 
     # ── Session / settings endpoints ─────────────────────────────────────

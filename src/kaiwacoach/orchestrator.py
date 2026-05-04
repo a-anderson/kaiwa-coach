@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from kaiwacoach.constants import SUPPORTED_LANGUAGES, VALID_PROFICIENCY_LEVELS
+from kaiwacoach.constants import LANGUAGE_CODE_TO_NAME, SUPPORTED_LANGUAGES, VALID_PROFICIENCY_LEVELS
 from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
@@ -871,6 +871,63 @@ class ConversationOrchestrator:
         )
         return result.audio_path
 
+    def translate_assistant_turn(
+        self,
+        assistant_turn_id: str,
+        target_language: str = "English",
+    ) -> str:
+        """Translate the reply text of an assistant turn and return the translation.
+
+        Parameters
+        ----------
+        assistant_turn_id : str
+            ID of the assistant turn whose reply_text should be translated.
+        target_language : str
+            Language to translate into. Defaults to English.
+
+        Returns
+        -------
+        str
+            Translated text.
+
+        Raises
+        ------
+        ValueError
+            If the assistant turn does not exist or has no reply text.
+        """
+        with self._db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT reply_text FROM assistant_turns WHERE id = ?",
+                (assistant_turn_id,),
+            ).fetchone()
+
+        if row is None:
+            raise ValueError(f"Unknown assistant_turn_id: {assistant_turn_id}")
+        reply_text: str | None = row[0]
+        if not reply_text:
+            raise ValueError(f"Assistant turn {assistant_turn_id} has no reply text to translate.")
+
+        source_language = LANGUAGE_CODE_TO_NAME.get(self._language, self._language)
+        prompt = self._prompt_loader.render(
+            "translate.md",
+            {
+                "source_language": source_language,
+                "target_language": target_language,
+                "text": reply_text,
+            },
+        )
+        result = self._safe_generate_json(prompt=prompt.text, role="translate")
+
+        if result.model is not None:
+            return result.model.translation
+
+        _logger.warning(
+            "translate.invalid assistant_turn_id=%s error=%s",
+            assistant_turn_id,
+            result.error,
+        )
+        raise ValueError(f"Translation failed: {result.error}")
+
     def create_monologue_conversation(self) -> str:
         """Create a conversation with conversation_type='monologue'.
 
@@ -1278,26 +1335,36 @@ class ConversationOrchestrator:
             return _fetch(conn)
 
     def get_user_profile(self) -> dict[str, Any]:
-        """Return {"user_name": str | None, "language_proficiency": dict[str, str]}."""
+        """Return user name, language proficiency, and translation language."""
         with self._db.read_connection() as conn:
             row = conn.execute(
-                "SELECT user_name, language_proficiency_json FROM user_profile WHERE id = 1"
+                "SELECT user_name, language_proficiency_json, translation_language FROM user_profile WHERE id = 1"
             ).fetchone()
         if row is None:
-            return {"user_name": None, "language_proficiency": {}}
+            return {"user_name": None, "language_proficiency": {}, "translation_language": "English"}
         try:
             proficiency = json.loads(row[1]) if row[1] else {}
         except (json.JSONDecodeError, TypeError):
             proficiency = {}
-        return {"user_name": row[0], "language_proficiency": proficiency}
+        return {
+            "user_name": row[0],
+            "language_proficiency": proficiency,
+            "translation_language": row[2] or "English",
+        }
 
-    def set_user_profile(self, user_name: str | None, language_proficiency: dict[str, str]) -> None:
-        """Persist user name and per-language proficiency levels."""
+    def set_user_profile(
+        self,
+        user_name: str | None,
+        language_proficiency: dict[str, str],
+        translation_language: str = "English",
+    ) -> None:
+        """Persist user name, per-language proficiency levels, and translation language."""
         self._db.execute_update(
             "user_profile",
             {
                 "user_name": user_name,
                 "language_proficiency_json": json.dumps(language_proficiency, ensure_ascii=False),
+                "translation_language": translation_language,
             },
             {"id": 1},
         )

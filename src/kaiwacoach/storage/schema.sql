@@ -1,4 +1,4 @@
--- KaiwaCoach SQLite schema (v3)
+-- KaiwaCoach SQLite schema (v4)
 -- Forward compatibility notes:
 -- - Schema changes should be handled with migrations; avoid in-place edits without a migration plan.
 -- - Prefer nullable columns or defaults for additive changes, then backfill if needed.
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 INSERT OR IGNORE INTO schema_version (id, version)
-VALUES (1, 3);
+VALUES (1, 4);
 
 CREATE TABLE IF NOT EXISTS conversations (
   id TEXT PRIMARY KEY,
@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   user_name TEXT,
   language_proficiency_json TEXT NOT NULL DEFAULT '{}',
+  translation_language TEXT NOT NULL DEFAULT 'English',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

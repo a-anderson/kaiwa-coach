@@ -24,6 +24,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
     - assistant reply generation
     - optional correction pipeline (detect errors + corrected sentence → explanation + native rewrite)
     - TTS synthesis of assistant reply
+    - on-demand translation of assistant replies into a configurable target language
 - **Narration**: paste text → TTS synthesis → preview and download (stateless, no conversation created)
 - **Monologue**: submit text/audio → corrections + improvement summary; persisted to SQLite
 - **Conversation Summary**: on-demand analysis of error patterns across a conversation; ephemeral, not persisted
@@ -48,7 +49,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - [frontend/](frontend/)
     - Svelte + Vite SPA; communicates with the backend via REST + SSE
 - [src/kaiwacoach/api/](src/kaiwacoach/api/)
-    - FastAPI server, route handlers (conversations, turns, regen, audio), and request schemas
+    - FastAPI server, route handlers (conversations, turns, regen, audio, monologue, narration, translate, settings), and request schemas
 - [src/kaiwacoach/orchestrator.py](src/kaiwacoach/orchestrator.py)
     - turn lifecycle, sequencing, and timing
 - [src/kaiwacoach/models/](src/kaiwacoach/models/)
@@ -247,10 +248,11 @@ The active ASR, LLM, and TTS model IDs are logged at startup so the configured v
 
 - Click the ⚙ gear icon in the top bar to open the settings panel.
 - Set an optional display name; the assistant will address you by name where natural. (Currently only works when the name is written with letters from the English alphabet)
+- Set a translation language: the language assistant replies will be translated into when the **Translation** toggle is clicked on a turn. Defaults to English; 11 languages available.
 - Set a proficiency level per language:
     - Japanese: two independent levels — grammar/vocabulary (N5–Native) and kanji reading (N5–Native)
     - All other languages: CEFR level (A1–Native)
-- Levels take effect on the next turn; no conversation restart is required.
+- Settings take effect immediately; no conversation restart is required.
 
 ### Narration
 
@@ -347,6 +349,7 @@ For changes that affect user-visible frontend behaviour, manual verification aga
 - Monologue audio input: ASR stage fires before corrections; results render on completion
 - Monologue sidebar: completed session appears under the Monologue tab; clicking it shows the read-only results view with no input form
 - Conversation summary: Summarise button generates a collapsible panel above the chat; panel collapses and re-generates correctly; conversations with no corrections show an informational message
+- Translation: clicking the Translation toggle on an assistant bubble fetches and displays a translation; re-clicking toggles visibility without re-fetching; changing the translation language in settings affects subsequent Translation clicks on new or not-yet-translated turns
 
 If the frontend acquires significant standalone logic in future — for example, client-side state machines, complex derived computations, or custom hooks — introducing Vitest at that point would be appropriate.
 
@@ -397,9 +400,9 @@ The project currently provides evaluation in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-04-26):
+Latest full local snapshot (2026-05-05):
 
-- `388 passed`
+- `404 passed`
 
 ### Schema and repair robustness
 

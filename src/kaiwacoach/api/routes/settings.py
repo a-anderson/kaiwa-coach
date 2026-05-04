@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from kaiwacoach.api.deps import get_orchestrator
-from kaiwacoach.constants import VALID_PROFICIENCY_LEVELS
+from kaiwacoach.constants import SUPPORTED_TRANSLATION_LANGUAGES, VALID_PROFICIENCY_LEVELS
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
@@ -15,11 +15,13 @@ router = APIRouter()
 class UserProfileRequest(BaseModel):
     user_name: str | None = None
     language_proficiency: dict[str, str] = {}
+    translation_language: str = "English"
 
 
 class UserProfileResponse(BaseModel):
     user_name: str | None
     language_proficiency: dict[str, str]
+    translation_language: str
 
 
 @router.get("/settings/profile")
@@ -46,10 +48,16 @@ async def set_profile(
                 status_code=422,
                 detail=f"Invalid proficiency level: {level}",
             )
+    if body.translation_language not in SUPPORTED_TRANSLATION_LANGUAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported translation language: {body.translation_language}",
+        )
     current = orc.get_user_profile()
     # Merge incoming keys — unmentioned languages are preserved.
     merged_proficiency = {**current["language_proficiency"], **body.language_proficiency}
     orc.set_user_profile(
         user_name=body.user_name,
         language_proficiency=merged_proficiency,
+        translation_language=body.translation_language,
     )

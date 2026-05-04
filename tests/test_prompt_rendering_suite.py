@@ -49,6 +49,11 @@ PROMPT_VARIABLES = {
         "corrections_text": "[1] Errors: Wrong particle  |  Corrected: 私は行きます",
         "user_level": "N3",
     },
+    "translate.md": {
+        "source_language": "Japanese",
+        "target_language": "English",
+        "text": "こんにちは、元気ですか？",
+    },
 }
 
 

@@ -18,7 +18,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from kaiwacoach.api.audio_conversion import webm_to_pcm
 from kaiwacoach.api.deps import get_orchestrator
-from kaiwacoach.api.utils import _ML_EXECUTOR
+from kaiwacoach.api.utils import ML_EXECUTOR
 from kaiwacoach.orchestrator import ConversationOrchestrator, MonologueTurnResult
 
 _logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def _build_monologue_sse_generator(orc: ConversationOrchestrator, run_fn):
                 {"_done": True, "error": str(exc), "request_id": request_id},
             )
 
-    loop.run_in_executor(_ML_EXECUTOR, run_sync)
+    loop.run_in_executor(ML_EXECUTOR, run_sync)
 
     async def event_generator():
         while True:

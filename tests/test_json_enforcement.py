@@ -159,6 +159,31 @@ def test_gemma_truncated_channel_tag_raises_decode_error() -> None:
         extract_first_json_object(truncated)
 
 
+def test_translation_result_valid() -> None:
+    result = parse_with_schema("translate", '{"translation": "Hello, world."}')
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.translation == "Hello, world."
+    assert result.repaired is False
+
+
+def test_translation_result_missing_field_fails() -> None:
+    result = parse_with_schema("translate", '{"output": "Hello."}')
+    assert result.model is None
+    assert result.error is not None
+
+
+def test_translation_result_repair_path() -> None:
+    def _repair(_: str) -> str:
+        return '{"translation": "Bonjour."}'
+
+    result = parse_with_schema("translate", "not json", repair_fn=_repair)
+    assert result.error is None
+    assert result.model is not None
+    assert result.model.translation == "Bonjour."
+    assert result.repaired is True
+
+
 def test_explain_and_native_repair_path() -> None:
     def _repair(_: str) -> str:
         return '{"explanation": "Fixed spelling.", "native": "Bonjour."}'

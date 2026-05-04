@@ -2,10 +2,12 @@
   import type { TurnRecord } from '../lib/types/api'
   import { sessionStore } from '../lib/stores/session'
   import { uiStore } from '../lib/stores/ui'
+  import { profileStore } from '../lib/stores/profile'
   import { regenTurnAudio } from '../lib/api/regen'
   import UserBubble from './UserBubble.svelte'
   import AssistantBubble from './AssistantBubble.svelte'
   import CorrectionCard from './CorrectionCard.svelte'
+  import TranslationCard from './TranslationCard.svelte'
 
   export let turn: TurnRecord
 
@@ -65,6 +67,12 @@
     />
     {#if regenError}
       <p class="regen-error">{regenError}</p>
+    {/if}
+    {#if turn.assistant_turn_id && turn.status !== 'pending' && $profileStore.profileReady}
+      <TranslationCard
+        assistantTurnId={turn.assistant_turn_id}
+        targetLanguage={$profileStore.translationLanguage}
+      />
     {/if}
   {/if}
 </div>

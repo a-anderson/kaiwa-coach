@@ -1,7 +1,39 @@
 """Shared constants for KaiwaCoach."""
 
 DEFAULT_LANGUAGE = "ja"
+
+# Maps the English name (stored in DB and passed to LLM prompts) to the
+# native-script display name shown in the UI.
+# TODO: expose this via a /api/settings/translation-languages endpoint so the
+# frontend can derive its dropdown from a single authoritative source instead of
+# duplicating the list in frontend/src/lib/constants.ts.
+SUPPORTED_TRANSLATION_LANGUAGES: dict[str, str] = {
+    "English": "English",
+    "Spanish": "Español",
+    "French": "Français",
+    "German": "Deutsch",
+    "Italian": "Italiano",
+    "Brazilian Portuguese": "Português (Brasil)",
+    "Korean": "한국어",
+    "Simplified Chinese": "中文（简体）",
+    "Traditional Chinese": "中文（繁體）",
+    "Hindi": "हिन्दी",
+    "Japanese": "日本語",
+}
+
+DEFAULT_TRANSLATION_LANGUAGE = "English"
 SUPPORTED_LANGUAGES = {"ja", "fr", "en", "es", "it", "pt-br"}
+
+# Maps BCP-47-style session language codes to the English display names used in
+# LLM prompts and as keys in SUPPORTED_TRANSLATION_LANGUAGES.
+LANGUAGE_CODE_TO_NAME: dict[str, str] = {
+    "ja": "Japanese",
+    "fr": "French",
+    "en": "English",
+    "es": "Spanish",
+    "it": "Italian",
+    "pt-br": "Brazilian Portuguese",
+}
 
 DEFAULT_VOICES = {
     "en": "bf_emma",
