@@ -56,6 +56,6 @@ async def translate_turn(
         msg = str(exc)
         if "Unknown assistant_turn_id" in msg:
             raise HTTPException(status_code=404, detail="Turn not found") from exc
-        raise HTTPException(status_code=422, detail=f"Translation failed: {exc}") from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return {"translation": translation}
