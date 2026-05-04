@@ -68,7 +68,7 @@
     {#if regenError}
       <p class="regen-error">{regenError}</p>
     {/if}
-    {#if turn.assistant_turn_id && turn.status !== 'pending'}
+    {#if turn.assistant_turn_id && turn.status !== 'pending' && $profileStore.profileReady}
       <TranslationCard
         assistantTurnId={turn.assistant_turn_id}
         targetLanguage={$profileStore.translationLanguage}

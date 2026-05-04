@@ -25,9 +25,10 @@
   onMount(async () => {
     try {
       const profile = await getProfile()
-      profileStore.update((s) => ({ ...s, translationLanguage: profile.translation_language }))
+      profileStore.update((s) => ({ ...s, translationLanguage: profile.translation_language, profileReady: true }))
     } catch (e) {
       if (import.meta.env.DEV) console.warn('[App] failed to load profile', e)
+      profileStore.update((s) => ({ ...s, profileReady: true }))
     }
   })
 
