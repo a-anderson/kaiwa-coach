@@ -11,7 +11,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from kaiwacoach.api.deps import get_orchestrator
-from kaiwacoach.api.utils import _ML_EXECUTOR
+from kaiwacoach.api.utils import ML_EXECUTOR
+from kaiwacoach.constants import SUPPORTED_TRANSLATION_LANGUAGES
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
@@ -34,6 +35,12 @@ async def translate_turn(
     Returns ``{"translation": "<translated text>"}`` on success.
     Raises 404 if the turn does not exist, 422 if translation fails.
     """
+    if body.target_language not in SUPPORTED_TRANSLATION_LANGUAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported translation language: {body.target_language!r}",
+        )
+
     orc: ConversationOrchestrator = get_orchestrator(request)
     loop = asyncio.get_running_loop()
 
@@ -44,7 +51,7 @@ async def translate_turn(
         )
 
     try:
-        translation = await loop.run_in_executor(_ML_EXECUTOR, run_sync)
+        translation = await loop.run_in_executor(ML_EXECUTOR, run_sync)
     except ValueError as exc:
         msg = str(exc)
         if "Unknown assistant_turn_id" in msg:

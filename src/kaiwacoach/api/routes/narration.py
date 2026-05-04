@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from kaiwacoach.api.deps import get_orchestrator
-from kaiwacoach.api.utils import _ML_EXECUTOR, audio_path_to_url
+from kaiwacoach.api.utils import ML_EXECUTOR, audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 router = APIRouter()
@@ -37,7 +37,7 @@ async def narrate(body: NarrationRequest, request: Request) -> dict:
     loop = asyncio.get_running_loop()
 
     try:
-        audio_path = await loop.run_in_executor(_ML_EXECUTOR, orc.generate_narration, body.text)
+        audio_path = await loop.run_in_executor(ML_EXECUTOR, orc.generate_narration, body.text)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="TTS not configured") from exc
 

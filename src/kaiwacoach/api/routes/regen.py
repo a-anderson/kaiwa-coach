@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
 from kaiwacoach.api.deps import get_orchestrator
-from kaiwacoach.api.utils import _ML_EXECUTOR, audio_path_to_url
+from kaiwacoach.api.utils import ML_EXECUTOR, audio_path_to_url
 from kaiwacoach.orchestrator import ConversationOrchestrator
 
 _logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def regen_turn_audio(assistant_turn_id: str, request: Request) -> dict:
         return orc.regenerate_turn_audio(assistant_turn_id)
 
     try:
-        result = await loop.run_in_executor(_ML_EXECUTOR, run_sync)
+        result = await loop.run_in_executor(ML_EXECUTOR, run_sync)
     except ValueError as exc:
         if "Unknown assistant_turn_id" in str(exc):
             raise HTTPException(status_code=404, detail="Turn not found") from exc
@@ -90,7 +90,7 @@ async def regen_conversation_audio(conversation_id: str, request: Request) -> Ev
                 {"_done": True, "error": str(exc)},
             )
 
-    loop.run_in_executor(_ML_EXECUTOR, run_sync)
+    loop.run_in_executor(ML_EXECUTOR, run_sync)
 
     async def event_generator():
         while True:

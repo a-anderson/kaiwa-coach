@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from kaiwacoach.models.json_enforcement import (
     ConversationSummaryResult,
     MonologueSummary,
+    TranslationResult,
     ROLE_SCHEMAS,
 )
 
@@ -80,3 +81,26 @@ def test_monologue_summary_rejects_empty_improvement_areas() -> None:
 def test_monologue_summary_registered_in_role_schemas() -> None:
     assert "monologue_summary" in ROLE_SCHEMAS
     assert ROLE_SCHEMAS["monologue_summary"] is MonologueSummary
+
+
+# ── TranslationResult ─────────────────────────────────────────────────────────
+
+
+def test_translation_result_validates_correct_payload() -> None:
+    model = TranslationResult.model_validate({"translation": "Bonjour, le monde."})
+    assert model.translation == "Bonjour, le monde."
+
+
+def test_translation_result_rejects_non_string_translation() -> None:
+    with pytest.raises(ValidationError):
+        TranslationResult.model_validate({"translation": 42})
+
+
+def test_translation_result_rejects_missing_translation() -> None:
+    with pytest.raises(ValidationError):
+        TranslationResult.model_validate({})
+
+
+def test_translation_result_registered_in_role_schemas() -> None:
+    assert "translate" in ROLE_SCHEMAS
+    assert ROLE_SCHEMAS["translate"] is TranslationResult

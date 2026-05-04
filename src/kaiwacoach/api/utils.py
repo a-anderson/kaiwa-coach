@@ -8,7 +8,7 @@ from pathlib import Path
 # One thread for all ML work. The orchestrator holds model state and is not
 # safe for concurrent processing — a single shared executor serialises all
 # turn and regen requests naturally.
-_ML_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+ML_EXECUTOR = ThreadPoolExecutor(max_workers=1)
 
 
 def audio_path_to_url(audio_path: str | None, cache_root: Path) -> str | None:

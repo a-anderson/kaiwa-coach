@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from kaiwacoach.constants import SUPPORTED_LANGUAGES, VALID_PROFICIENCY_LEVELS
+from kaiwacoach.constants import LANGUAGE_CODE_TO_NAME, SUPPORTED_LANGUAGES, VALID_PROFICIENCY_LEVELS
 from kaiwacoach.models.asr_whisper import ASRResult
 from kaiwacoach.models.json_enforcement import ParseResult, parse_with_schema
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
@@ -907,10 +907,11 @@ class ConversationOrchestrator:
         if not reply_text:
             raise ValueError(f"Assistant turn {assistant_turn_id} has no reply text to translate.")
 
+        source_language = LANGUAGE_CODE_TO_NAME.get(self._language, self._language)
         prompt = self._prompt_loader.render(
             "translate.md",
             {
-                "source_language": self._language,
+                "source_language": source_language,
                 "target_language": target_language,
                 "text": reply_text,
             },
