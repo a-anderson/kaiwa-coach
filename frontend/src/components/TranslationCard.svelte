@@ -7,9 +7,17 @@
   type State = 'idle' | 'loading' | 'loaded' | 'error'
 
   let state: State = 'idle'
+  let cachedForLanguage = ''
   let translation = ''
   let errorMessage = ''
   let open = false
+
+  // Reset when the target language changes so the next click re-fetches.
+  $: if (targetLanguage !== cachedForLanguage && state === 'loaded') {
+    state = 'idle'
+    open = false
+    translation = ''
+  }
 
   async function handleTranslate() {
     if (state === 'loading') return
@@ -20,6 +28,7 @@
     state = 'loading'
     try {
       translation = await translateTurn(assistantTurnId, targetLanguage)
+      cachedForLanguage = targetLanguage
       state = 'loaded'
       open = true
     } catch (e) {
