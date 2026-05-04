@@ -871,6 +871,62 @@ class ConversationOrchestrator:
         )
         return result.audio_path
 
+    def translate_assistant_turn(
+        self,
+        assistant_turn_id: str,
+        target_language: str = "English",
+    ) -> str:
+        """Translate the reply text of an assistant turn and return the translation.
+
+        Parameters
+        ----------
+        assistant_turn_id : str
+            ID of the assistant turn whose reply_text should be translated.
+        target_language : str
+            Language to translate into. Defaults to English.
+
+        Returns
+        -------
+        str
+            Translated text.
+
+        Raises
+        ------
+        ValueError
+            If the assistant turn does not exist or has no reply text.
+        """
+        with self._db.read_connection() as conn:
+            row = conn.execute(
+                "SELECT reply_text FROM assistant_turns WHERE id = ?",
+                (assistant_turn_id,),
+            ).fetchone()
+
+        if row is None:
+            raise ValueError(f"Unknown assistant_turn_id: {assistant_turn_id}")
+        reply_text: str | None = row[0]
+        if not reply_text:
+            raise ValueError(f"Assistant turn {assistant_turn_id} has no reply text to translate.")
+
+        prompt = self._prompt_loader.render(
+            "translate.md",
+            {
+                "source_language": self._language,
+                "target_language": target_language,
+                "text": reply_text,
+            },
+        )
+        result = self._safe_generate_json(prompt=prompt.text, role="translate")
+
+        if result.model is not None:
+            return result.model.translation
+
+        _logger.warning(
+            "translate.invalid assistant_turn_id=%s error=%s",
+            assistant_turn_id,
+            result.error,
+        )
+        raise ValueError(f"Translation failed: {result.error}")
+
     def create_monologue_conversation(self) -> str:
         """Create a conversation with conversation_type='monologue'.
 

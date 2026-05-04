@@ -6,6 +6,7 @@
   import UserBubble from './UserBubble.svelte'
   import AssistantBubble from './AssistantBubble.svelte'
   import CorrectionCard from './CorrectionCard.svelte'
+  import TranslationCard from './TranslationCard.svelte'
 
   export let turn: TurnRecord
 
@@ -65,6 +66,9 @@
     />
     {#if regenError}
       <p class="regen-error">{regenError}</p>
+    {/if}
+    {#if turn.assistant_turn_id && turn.status !== 'pending'}
+      <TranslationCard assistantTurnId={turn.assistant_turn_id} />
     {/if}
   {/if}
 </div>
