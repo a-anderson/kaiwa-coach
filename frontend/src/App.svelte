@@ -3,6 +3,9 @@
   import { themeStore } from './lib/stores/theme'
   import { sessionStore } from './lib/stores/session'
   import { uiStore } from './lib/stores/ui'
+  import { profileStore } from './lib/stores/profile'
+  import { getProfile } from './lib/api/settings'
+  import { onMount } from 'svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TabBar from './components/TabBar.svelte'
   import ConversationHeader from './components/ConversationHeader.svelte'
@@ -18,6 +21,15 @@
 
   // Consume the store so the import is not tree-shaken.
   $: _theme = $themeStore
+
+  onMount(async () => {
+    try {
+      const profile = await getProfile()
+      profileStore.update((s) => ({ ...s, translationLanguage: profile.translation_language }))
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn('[App] failed to load profile', e)
+    }
+  })
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {

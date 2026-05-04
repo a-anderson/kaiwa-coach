@@ -1334,26 +1334,36 @@ class ConversationOrchestrator:
             return _fetch(conn)
 
     def get_user_profile(self) -> dict[str, Any]:
-        """Return {"user_name": str | None, "language_proficiency": dict[str, str]}."""
+        """Return user name, language proficiency, and translation language."""
         with self._db.read_connection() as conn:
             row = conn.execute(
-                "SELECT user_name, language_proficiency_json FROM user_profile WHERE id = 1"
+                "SELECT user_name, language_proficiency_json, translation_language FROM user_profile WHERE id = 1"
             ).fetchone()
         if row is None:
-            return {"user_name": None, "language_proficiency": {}}
+            return {"user_name": None, "language_proficiency": {}, "translation_language": "English"}
         try:
             proficiency = json.loads(row[1]) if row[1] else {}
         except (json.JSONDecodeError, TypeError):
             proficiency = {}
-        return {"user_name": row[0], "language_proficiency": proficiency}
+        return {
+            "user_name": row[0],
+            "language_proficiency": proficiency,
+            "translation_language": row[2] or "English",
+        }
 
-    def set_user_profile(self, user_name: str | None, language_proficiency: dict[str, str]) -> None:
-        """Persist user name and per-language proficiency levels."""
+    def set_user_profile(
+        self,
+        user_name: str | None,
+        language_proficiency: dict[str, str],
+        translation_language: str = "English",
+    ) -> None:
+        """Persist user name, per-language proficiency levels, and translation language."""
         self._db.execute_update(
             "user_profile",
             {
                 "user_name": user_name,
                 "language_proficiency_json": json.dumps(language_proficiency, ensure_ascii=False),
+                "translation_language": translation_language,
             },
             {"id": 1},
         )

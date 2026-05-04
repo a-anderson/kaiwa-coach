@@ -1,6 +1,24 @@
 """Shared constants for KaiwaCoach."""
 
 DEFAULT_LANGUAGE = "ja"
+
+# Maps the English name (stored in DB and passed to LLM prompts) to the
+# native-script display name shown in the UI.
+SUPPORTED_TRANSLATION_LANGUAGES: dict[str, str] = {
+    "English": "English",
+    "Spanish": "Español",
+    "French": "Français",
+    "German": "Deutsch",
+    "Italian": "Italiano",
+    "Brazilian Portuguese": "Português (Brasil)",
+    "Korean": "한국어",
+    "Simplified Chinese": "中文（简体）",
+    "Traditional Chinese": "中文（繁體）",
+    "Hindi": "हिन्दी",
+    "Japanese": "日本語",
+}
+
+DEFAULT_TRANSLATION_LANGUAGE = "English"
 SUPPORTED_LANGUAGES = {"ja", "fr", "en", "es", "it", "pt-br"}
 
 DEFAULT_VOICES = {

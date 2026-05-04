@@ -60,7 +60,7 @@ def test_schema_version_row_exists() -> None:
 
     row = connection.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()
     assert row is not None
-    assert row[0] == 3
+    assert row[0] == 4
 
 
 def test_user_profile_table_exists() -> None:
@@ -75,6 +75,7 @@ def test_user_profile_table_exists() -> None:
     assert "id" in columns
     assert "user_name" in columns
     assert "language_proficiency_json" in columns
+    assert "translation_language" in columns
     assert "created_at" in columns
     assert "updated_at" in columns
 

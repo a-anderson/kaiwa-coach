@@ -19,6 +19,7 @@ def mock_orchestrator():
     orc.get_user_profile.return_value = {
         "user_name": None,
         "language_proficiency": {},
+        "translation_language": "English",
     }
     return orc
 
@@ -55,12 +56,14 @@ def test_get_profile_returns_defaults(client, mock_orchestrator) -> None:
     body = res.json()
     assert body["user_name"] is None
     assert body["language_proficiency"] == {}
+    assert body["translation_language"] == "English"
 
 
 def test_get_profile_reflects_set_value(client, mock_orchestrator) -> None:
     mock_orchestrator.get_user_profile.return_value = {
         "user_name": "Ashley",
         "language_proficiency": {"ja": "N3", "ja_kanji": "N1"},
+        "translation_language": "Japanese",
     }
     res = client.get("/api/settings/profile")
     assert res.status_code == 200
@@ -68,6 +71,7 @@ def test_get_profile_reflects_set_value(client, mock_orchestrator) -> None:
     assert body["user_name"] == "Ashley"
     assert body["language_proficiency"]["ja"] == "N3"
     assert body["language_proficiency"]["ja_kanji"] == "N1"
+    assert body["translation_language"] == "Japanese"
 
 
 def test_post_profile_calls_set_user_profile(client, mock_orchestrator) -> None:
@@ -79,6 +83,7 @@ def test_post_profile_calls_set_user_profile(client, mock_orchestrator) -> None:
     mock_orchestrator.set_user_profile.assert_called_once_with(
         user_name="Ashley",
         language_proficiency={"ja": "N3", "fr": "B1"},
+        translation_language="English",
     )
 
 
@@ -91,6 +96,7 @@ def test_post_profile_updates_ja_and_ja_kanji_independently(client, mock_orchest
     mock_orchestrator.set_user_profile.assert_called_once_with(
         user_name=None,
         language_proficiency={"ja": "N2", "ja_kanji": "Native"},
+        translation_language="English",
     )
 
 
@@ -98,6 +104,7 @@ def test_post_profile_merges_language_proficiency(client, mock_orchestrator) -> 
     mock_orchestrator.get_user_profile.return_value = {
         "user_name": None,
         "language_proficiency": {"fr": "B1"},
+        "translation_language": "English",
     }
     res = client.post(
         "/api/settings/profile",
@@ -107,6 +114,7 @@ def test_post_profile_merges_language_proficiency(client, mock_orchestrator) -> 
     mock_orchestrator.set_user_profile.assert_called_once_with(
         user_name=None,
         language_proficiency={"fr": "B1", "ja": "N3"},
+        translation_language="English",
     )
 
 
@@ -144,3 +152,26 @@ def test_post_profile_cefr_native_succeeds(client, mock_orchestrator) -> None:
         json={"language_proficiency": {"fr": "Native"}},
     )
     assert res.status_code == 204
+
+
+def test_post_profile_valid_translation_language_succeeds(client, mock_orchestrator) -> None:
+    res = client.post(
+        "/api/settings/profile",
+        json={"translation_language": "Japanese"},
+    )
+    assert res.status_code == 204
+    mock_orchestrator.set_user_profile.assert_called_once_with(
+        user_name=None,
+        language_proficiency={},
+        translation_language="Japanese",
+    )
+
+
+def test_post_profile_invalid_translation_language_returns_422(client, mock_orchestrator) -> None:
+    res = client.post(
+        "/api/settings/profile",
+        json={"translation_language": "Klingon"},
+    )
+    assert res.status_code == 422
+    assert "Unsupported translation language" in res.json()["detail"]
+    mock_orchestrator.set_user_profile.assert_not_called()

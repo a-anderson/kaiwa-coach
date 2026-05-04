@@ -3,6 +3,7 @@ import { checkOk } from './client'
 export interface UserProfile {
   user_name: string | null
   language_proficiency: Record<string, string>
+  translation_language: string
 }
 
 export async function getProfile(): Promise<UserProfile> {
