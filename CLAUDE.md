@@ -38,7 +38,6 @@ poetry run bash scripts/setup_macos.sh
 
 `pytest.ini` sets `pythonpath = src`, so tests can `import kaiwacoach` directly without a `src.` prefix — no `conftest.py` path manipulation is needed.
 
-`tools/export_conversation.py` — stub for a planned conversation export utility; not yet implemented.
 
 ## Runtime data (gitignored, never commit)
 
@@ -64,7 +63,7 @@ The Python environment is pre-created and owned by the maintainer.
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `frontend/`                          | Svelte + Vite SPA — all UI logic; communicates with backend via REST + SSE only                                                                                                             |
 | `src/kaiwacoach/api/server.py`       | FastAPI app factory, router registration, static file serving, lifespan                                                                                                                     |
-| `src/kaiwacoach/api/routes/`         | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py`                                                                                                                      |
+| `src/kaiwacoach/api/routes/`         | Route handlers: `conversations.py`, `turns.py`, `regen.py`, `audio.py`, `monologue.py`, `narration.py`, `settings.py`                                                                       |
 | `src/kaiwacoach/orchestrator.py`     | Turn lifecycle: sequencing, timing, persistence; steps are pure functions                                                                                                                   |
 | `src/kaiwacoach/models/protocols.py` | Shared result types (`ASRResult`, `LLMResult`, `TTSResult`) and `@runtime_checkable` protocols (`ASRProtocol`, `LLMProtocol`, `TTSProtocol`) — concrete files import result types from here |
 | `src/kaiwacoach/models/factory.py`   | `build_asr`, `build_llm`, `build_tts` — routes config model IDs to the correct backend and wrapper; returns protocol types; add new backend routing here                                    |
@@ -84,7 +83,7 @@ The Python environment is pre-created and owned by the maintainer.
 5. Optional correction pipeline (2 combined LLM calls): `detect_and_correct` → `explain_and_native`
 6. Persist all artefacts to SQLite + blob storage
 
-**LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`). Each role has:
+**LLM role system**: Each LLM call uses a named role (`conversation`, `detect_and_correct`, `explain_and_native`, `jp_tts_normalisation`, `monologue_summary`, `summarise_conversation`). Each role has:
 
 - A Pydantic schema in `json_enforcement.py`
 - A markdown prompt in `src/kaiwacoach/prompts/`
@@ -113,7 +112,7 @@ The Python environment is pre-created and owned by the maintainer.
 - **All LLM outputs schema-validated**: one repair retry max, then fail safe.
 - **Japanese invariant**: TTS normalisation must not alter Japanese substrings (byte-identical, with fallback to original on violation).
 - **Narrow exception handling**: never use bare `except Exception` to swallow errors silently. Wrap only the specific operation that can fail (e.g. the ASR transcription call, not the entire turn pipeline). If a failure path must persist state before returning, re-raise after cleanup so the error reaches the appropriate handler (e.g. the SSE error event emitter).
-- **Bounded in-memory caches**: all caches backed by a plain `dict` must be bounded. Use `_BoundedDict` (in `orchestrator.py`) or equivalent, with a named max-size constant. An unbounded cache is a memory leak in a long-running process.
+- **Bounded in-memory caches**: all caches backed by a plain `dict` must be bounded. Use `BoundedDict` (in `kaiwacoach/utils.py`) or equivalent, with a named max-size constant. An unbounded cache is a memory leak in a long-running process.
 
 ## Performance
 
