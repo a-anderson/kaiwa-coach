@@ -1,12 +1,4 @@
-"""
-Regression tests for the model import paths used by scripts/prefetch_models.py.
-
-These paths were previously stale (mlx_audio.stt, mlx_audio.tts) and would have
-silently broken fresh setups. This suite verifies the correct paths are importable
-so CI catches any future breakage before it reaches users.
-"""
-
-from __future__ import annotations
+"""Regression tests for model import paths fixed in the prefetch script (previously mlx_audio.stt, mlx_audio.tts)."""
 
 
 def test_asr_prefetch_import_path() -> None:
