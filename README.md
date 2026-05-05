@@ -127,9 +127,14 @@ More detailed notes:
 ### Install
 
 ```bash
-# Python backend
-poetry install
+# Python backend + models (MLX default)
 poetry run bash scripts/setup_macos.sh
+
+# Or with the Ollama backend
+poetry run bash scripts/setup_macos.sh --llm-backend ollama
+
+# To select a specific model
+poetry run bash scripts/setup_macos.sh --llm-backend mlx --model mlx-community/Qwen3-14B-4bit
 
 # Frontend
 cd frontend && npm install
