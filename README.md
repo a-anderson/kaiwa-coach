@@ -407,7 +407,7 @@ The project currently provides evaluation in three areas:
 
 Latest full local snapshot (2026-05-05):
 
-- `407 passed`
+- `404 passed`
 
 ### Schema and repair robustness
 
