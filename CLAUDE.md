@@ -33,7 +33,9 @@ poetry run python scripts/llm_smoke.py --language ja
 macOS setup (required once for local model dependencies):
 
 ```bash
-poetry run bash scripts/setup_macos.sh
+poetry run bash scripts/setup_macos.sh                                        # MLX default (Qwen3-14B-8bit)
+poetry run bash scripts/setup_macos.sh --llm-backend ollama                   # Ollama backend (gemma4:e4b)
+poetry run bash scripts/setup_macos.sh --llm-backend mlx --model mlx-community/Qwen3-14B-4bit  # specific model
 ```
 
 `pytest.ini` sets `pythonpath = src`, so tests can `import kaiwacoach` directly without a `src.` prefix — no `conftest.py` path manipulation is needed.

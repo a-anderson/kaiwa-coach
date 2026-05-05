@@ -19,6 +19,9 @@ GEMMA4_E4B_BF16 = "mlx-community/gemma-4-e4b-it-bf16"
 GEMMA4_26B_4BIT = "mlx-community/gemma-4-26b-a4b-it-4bit"
 GEMMA4_26B_8BIT = "mlx-community/gemma-4-26b-a4b-it-8bit"
 
+# Default Ollama model ID (passed through to 'ollama pull'; not an HF/MLX path).
+OLLAMA_DEFAULT_LLM_MODEL_ID = "gemma4:e4b"
+
 # Supported execution backends for the LLM.
 SUPPORTED_BACKENDS: frozenset[str] = frozenset({"mlx", "ollama"})
 
