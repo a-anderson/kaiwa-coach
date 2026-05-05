@@ -17,12 +17,13 @@ import sys
 from kaiwacoach.config.models import (
     ASR_MODEL_ID,
     LLM_MODEL_ID_8BIT,
+    OLLAMA_DEFAULT_LLM_MODEL_ID,
     SUPPORTED_LLM_MODELS,
     TTS_MODEL_ID,
 )
 
-_OLLAMA_DEFAULT = "gemma4:e4b"
-_MLX_MODEL_IDS = sorted(SUPPORTED_LLM_MODELS["mlx"])
+_mlx_allowed: frozenset[str] = SUPPORTED_LLM_MODELS.get("mlx") or frozenset()
+_MLX_MODEL_IDS: list[str] = sorted(_mlx_allowed)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -34,7 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:
 Available MLX LLM model IDs:
   {mlx_list}
 
-Ollama model IDs are passed through to 'ollama pull' (e.g. gemma4:e4b, qwen3:14b).
+Ollama model IDs are passed through to 'ollama pull' (e.g. {OLLAMA_DEFAULT_LLM_MODEL_ID}, qwen3:14b).
 The Ollama server must be running when using --backend ollama.
 """,
     )
@@ -49,7 +50,7 @@ The Ollama server must be running when using --backend ollama.
         default=None,
         help=(
             f"LLM model ID to prefetch. "
-            f"Defaults to '{LLM_MODEL_ID_8BIT}' for mlx or '{_OLLAMA_DEFAULT}' for ollama."
+            f"Defaults to '{LLM_MODEL_ID_8BIT}' for mlx or '{OLLAMA_DEFAULT_LLM_MODEL_ID}' for ollama."
         ),
     )
     return parser
@@ -70,8 +71,7 @@ def _prefetch_tts() -> None:
 
 
 def _prefetch_mlx_llm(model_id: str) -> None:
-    allowed = SUPPORTED_LLM_MODELS["mlx"]
-    if model_id not in allowed:
+    if model_id not in _mlx_allowed:
         valid = "\n  ".join(_MLX_MODEL_IDS)
         print(
             f"[prefetch] Error: '{model_id}' is not a supported MLX model ID.\n"
@@ -95,10 +95,20 @@ def _prefetch_ollama_llm(model_id: str) -> None:
         sys.exit(1)
 
     print(f"[prefetch] Checking Ollama for model '{model_id}'...")
-    check = subprocess.run(
-        ["ollama", "show", model_id],
-        capture_output=True,
-    )
+    try:
+        check = subprocess.run(
+            ["ollama", "show", model_id],
+            capture_output=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            "[prefetch] Error: 'ollama show' timed out. "
+            "Verify the Ollama server is running and reachable.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     if check.returncode == 0:
         print(f"[prefetch] Model '{model_id}' already available in Ollama.")
         return
@@ -118,7 +128,7 @@ def _prefetch_ollama_llm(model_id: str) -> None:
 def main() -> None:
     args = _build_parser().parse_args()
     backend: str = args.backend
-    model_id: str = args.model or (LLM_MODEL_ID_8BIT if backend == "mlx" else _OLLAMA_DEFAULT)
+    model_id: str = args.model or (LLM_MODEL_ID_8BIT if backend == "mlx" else OLLAMA_DEFAULT_LLM_MODEL_ID)
 
     _prefetch_asr()
 

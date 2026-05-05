@@ -11,6 +11,11 @@ Options:
 
 Run 'poetry run python scripts/prefetch_models.py --help' for available model IDs.
 EOF
+}
+
+die_usage() {
+    echo "Error: $1" >&2
+    usage >&2
     exit 1
 }
 
@@ -29,21 +34,20 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             usage
+            exit 0
             ;;
         *)
-            echo "Unknown argument: $1" >&2
-            usage
+            die_usage "Unknown argument: $1"
             ;;
     esac
 done
 
 if [[ "$LLM_BACKEND" != "mlx" && "$LLM_BACKEND" != "ollama" ]]; then
-    echo "Error: --llm-backend must be 'mlx' or 'ollama'" >&2
-    exit 1
+    die_usage "--llm-backend must be 'mlx' or 'ollama'"
 fi
 
 echo "[setup] Installing Python dependencies..."
-poetry install
+poetry install --sync
 
 echo "[setup] Installing Japanese tokeniser dependencies..."
 poetry run python -m unidic download
