@@ -148,6 +148,7 @@ def test_stale_flat_tts_key_emits_warning(
     with caplog.at_level(logging.WARNING, logger="kaiwacoach.settings"):
         load_config(config_path=cfg_file)
     assert stale_key in caplog.text
+    assert "tts.kokoro" in caplog.text
 
 
 def test_stale_flat_tts_voice_key_does_not_override_kokoro_voice(tmp_path: Path) -> None:
