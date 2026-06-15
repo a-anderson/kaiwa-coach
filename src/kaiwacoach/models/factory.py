@@ -12,6 +12,7 @@ LLM routing is two-step:
 from __future__ import annotations
 
 import dataclasses
+import logging
 
 from kaiwacoach.models.asr_whisper import WhisperASR
 from kaiwacoach.models.llm_backends import MlxLmBackend, OllamaBackend
@@ -19,8 +20,11 @@ from kaiwacoach.models.llm_gemma import GemmaLLM
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
+from kaiwacoach.models.tts_voicevox import LanguageDispatchTTS, VoiceVoxBackend, VoiceVoxTTS
 from kaiwacoach.settings import AppConfig
 from kaiwacoach.storage.blobs import SessionAudioCache
+
+_log = logging.getLogger(__name__)
 
 # Maps llm_id prefixes to model family names. First matching prefix wins.
 # Extend this list when adding new model families (e.g. Gemma 4 in PR 2).
@@ -108,10 +112,22 @@ def build_llm(config: AppConfig) -> LLMProtocol:
 def build_tts(config: AppConfig, cache: SessionAudioCache) -> TTSProtocol:
     """Return a TTS wrapper configured from config.
 
-    All TTS models currently use the MLX Audio (Kokoro) backend.
-    Add routing branches here as new TTS backends are integrated.
+    If VoiceVox is available at startup, Japanese synthesis is routed through
+    VoiceVoxTTS via LanguageDispatchTTS; all other languages use KokoroTTS.
+    When VoiceVox is not running, KokoroTTS handles all languages.
     """
-    return KokoroTTS(
-        model_id=config.models.tts_id,
-        cache=cache,
-    )
+    kokoro = KokoroTTS(model_id=config.models.tts_id, cache=cache)
+    if VoiceVoxBackend.check_available(config.tts.voicevox.url):
+        _log.info(
+            "VoiceVox available — Japanese TTS will use speaker %d",
+            config.tts.voicevox.speaker_id,
+        )
+        voicevox = VoiceVoxTTS(
+            speaker_id=config.tts.voicevox.speaker_id,
+            url=config.tts.voicevox.url,
+            speed=config.tts.voicevox.speed,
+            cache=cache,
+        )
+        return LanguageDispatchTTS(japanese_tts=voicevox, default_tts=kokoro)
+    _log.info("VoiceVox not available — using Kokoro for all languages")
+    return kokoro

@@ -39,8 +39,16 @@ storage:
   expected_sample_rate: 16000  # set null to disable validation
 
 tts:
-  voice: "default"
-  speed: 1.0
+  # Migration note: tts.voice and tts.speed were renamed to tts.kokoro.voice
+  # and tts.kokoro.speed when VoiceVox support was added. Old flat keys are
+  # ignored with a startup warning.
+  kokoro:
+    voice: "default"
+    speed: 1.0
+  voicevox:
+    url: "http://localhost:50021"
+    speaker_id: 74  # 琴詠ニヤ — see voicevox.hiroshiba.jp for full speaker list
+    speed: 1.0      # maps to VoiceVox speedScale
 
 logging:
   timing_logs: true

@@ -101,7 +101,7 @@ def test_tts_integration_real_model(tmp_path: Path) -> None:
             turn_id="turn",
             text="Test",
             voice=None,
-            speed=config.tts.speed,
+            speed=config.tts.kokoro.speed,
             language=config.session.language,
         )
         assert Path(result.audio_path).exists()

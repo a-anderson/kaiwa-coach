@@ -227,6 +227,52 @@ KAIWACOACH_MODELS_LLM_BACKEND=mlx KAIWACOACH_MODELS_LLM_ID=mlx-community/gemma-4
 
 The active ASR, LLM, and TTS model IDs are logged at startup so the configured variant is always visible.
 
+### VoiceVox TTS (optional, Japanese only)
+
+[VoiceVox](https://github.com/VOICEVOX/voicevox/releases/latest) is a local Japanese TTS engine that produces higher-quality voices for Japanese sessions. It runs as a separate app alongside KaiwaCoach and is entirely optional — if it is not running, Kokoro handles all languages as usual.
+
+**Install:**
+
+1. Download `VOICEVOX.<version>-arm64.dmg` from the [latest release](https://github.com/VOICEVOX/voicevox/releases/latest) (arm64 for Apple Silicon).
+2. Open the DMG and drag VOICEVOX to your Applications folder.
+3. If macOS blocks the app on first launch with "cannot be opened because the developer cannot be verified":
+   - Go to **System Settings → Privacy & Security**, scroll to the blocked app notice, and click **Open Anyway**
+   - Or: right-click the app in Finder → **Open** → **Open** in the confirmation dialog
+
+**Usage:**
+
+Start VoiceVox before launching KaiwaCoach. When it is running, KaiwaCoach detects it automatically at startup and routes all Japanese TTS through it — you will see this in the log:
+
+```
+VoiceVox available — Japanese TTS will use speaker 74
+```
+
+If VoiceVox is not running at startup, the log will show:
+
+```
+VoiceVox not available — using Kokoro for all languages
+```
+
+If VoiceVox closes mid-session, each affected synthesis call falls back to Kokoro automatically with a warning logged — no restart required.
+
+**Configuration:**
+
+The default speaker is 琴詠ニヤ (speaker ID 74). To change it, add to `config.yaml`:
+
+```yaml
+tts:
+  voicevox:
+    speaker_id: 74    # see https://voicevox.hiroshiba.jp for the full speaker list
+    speed: 1.0
+    url: "http://localhost:50021"
+```
+
+Or via environment variables:
+
+```bash
+KAIWACOACH_TTS_VOICEVOX_SPEAKER_ID=3 poetry run python -m kaiwacoach.app
+```
+
 ## Usage
 
 ### Text turn
@@ -405,9 +451,9 @@ The project currently provides evaluation in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-05-05):
+Latest full local snapshot (2026-06-15):
 
-- `404 passed`
+- `459 passed`
 
 ### Schema and repair robustness
 
