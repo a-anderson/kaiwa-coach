@@ -418,6 +418,25 @@ def test_build_llm_ollama_unknown_prefix_raises_at_build_time(monkeypatch: pytes
 # --- build_tts: VoiceVox routing (non-slow) ---
 
 
+class _NoopKokoroTTS(KokoroTTS):
+    """KokoroTTS stub that skips the mlx-audio dependency check.
+
+    CI does not have mlx-audio installed. build_tts always constructs KokoroTTS
+    as the fallback even when VoiceVox is available, so all non-slow build_tts
+    tests must patch factory_module.KokoroTTS with this stub.
+
+    Sets self._model_id so the inherited model_id property remains functional.
+    """
+
+    def __init__(self, model_id: str = TTS_MODEL_ID, **kw: object) -> None:
+        self._model_id = model_id
+
+
+@pytest.fixture
+def _stub_kokoro_tts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(factory_module, "KokoroTTS", _NoopKokoroTTS)
+
+
 def _tts_appconfig(
     tmp_path: Path,
     *,
@@ -443,7 +462,7 @@ def _tts_cache(tmp_path: Path) -> SessionAudioCache:
 
 
 def test_build_tts_returns_language_dispatch_when_voicevox_available(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
@@ -453,7 +472,7 @@ def test_build_tts_returns_language_dispatch_when_voicevox_available(
 
 
 def test_build_tts_returns_kokoro_when_voicevox_unavailable(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False):
@@ -463,7 +482,7 @@ def test_build_tts_returns_kokoro_when_voicevox_unavailable(
 
 
 def test_build_tts_wires_voicevox_speaker_id(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path, voicevox_speaker_id=3)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
@@ -473,7 +492,7 @@ def test_build_tts_wires_voicevox_speaker_id(
 
 
 def test_build_tts_wires_voicevox_url(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path, voicevox_url="http://localhost:9999")
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
@@ -483,7 +502,7 @@ def test_build_tts_wires_voicevox_url(
 
 
 def test_build_tts_wires_voicevox_speed(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path, voicevox_speed=0.8)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
@@ -493,7 +512,7 @@ def test_build_tts_wires_voicevox_speed(
 
 
 def test_build_tts_passes_configured_url_to_check_available(
-    tmp_path: Path, _tts_cache: SessionAudioCache,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None,
 ) -> None:
     config = _tts_appconfig(tmp_path, voicevox_url="http://localhost:9999")
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False) as mock_check:
@@ -502,7 +521,7 @@ def test_build_tts_passes_configured_url_to_check_available(
 
 
 def test_build_tts_logs_available_message(
-    tmp_path: Path, _tts_cache: SessionAudioCache, caplog: pytest.LogCaptureFixture,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None, caplog: pytest.LogCaptureFixture,
 ) -> None:
     config = _tts_appconfig(tmp_path, voicevox_speaker_id=74)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
@@ -513,7 +532,7 @@ def test_build_tts_logs_available_message(
 
 
 def test_build_tts_logs_unavailable_message(
-    tmp_path: Path, _tts_cache: SessionAudioCache, caplog: pytest.LogCaptureFixture,
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts: None, caplog: pytest.LogCaptureFixture,
 ) -> None:
     config = _tts_appconfig(tmp_path)
     with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False):
