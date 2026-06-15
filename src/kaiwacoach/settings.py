@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from kaiwacoach.config.models import VOICEVOX_DEFAULT_SPEAKER_ID, VOICEVOX_DEFAULT_URL
 from kaiwacoach.constants import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES
+
+_log = logging.getLogger(__name__)
 
 
 def _load_model_defaults() -> dict[str, str]:
@@ -95,9 +99,22 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
-class TTSConfig:
+class KokoroConfig:
     voice: str = "default"
     speed: float = 1.0
+
+
+@dataclass(frozen=True)
+class VoiceVoxConfig:
+    url: str = VOICEVOX_DEFAULT_URL
+    speaker_id: int = VOICEVOX_DEFAULT_SPEAKER_ID
+    speed: float = 1.0
+
+
+@dataclass(frozen=True)
+class TTSConfig:
+    kokoro: KokoroConfig = field(default_factory=KokoroConfig)
+    voicevox: VoiceVoxConfig = field(default_factory=VoiceVoxConfig)
 
 
 @dataclass(frozen=True)
@@ -146,7 +163,14 @@ class AppConfig:
                 "root_dir": self.storage.root_dir,
                 "expected_sample_rate": self.storage.expected_sample_rate,
             },
-            "tts": {"voice": self.tts.voice, "speed": self.tts.speed},
+            "tts": {
+                "kokoro": {"voice": self.tts.kokoro.voice, "speed": self.tts.kokoro.speed},
+                "voicevox": {
+                    "url": self.tts.voicevox.url,
+                    "speaker_id": self.tts.voicevox.speaker_id,
+                    "speed": self.tts.voicevox.speed,
+                },
+            },
             "logging": {"timing_logs": self.logging.timing_logs},
             "ui": {"logo_dir": self.ui.logo_dir},
         }
@@ -298,8 +322,11 @@ def _apply_env_overrides(config: dict[str, Any], env: Mapping[str, str]) -> dict
             ("storage", "expected_sample_rate"),
             _to_optional_int,
         ),
-        "KAIWACOACH_TTS_VOICE": (("tts", "voice"), _to_str),
-        "KAIWACOACH_TTS_SPEED": (("tts", "speed"), _to_float),
+        "KAIWACOACH_TTS_KOKORO_VOICE": (("tts", "kokoro", "voice"), _to_str),
+        "KAIWACOACH_TTS_KOKORO_SPEED": (("tts", "kokoro", "speed"), _to_float),
+        "KAIWACOACH_TTS_VOICEVOX_URL": (("tts", "voicevox", "url"), _to_str),
+        "KAIWACOACH_TTS_VOICEVOX_SPEAKER_ID": (("tts", "voicevox", "speaker_id"), _to_int),
+        "KAIWACOACH_TTS_VOICEVOX_SPEED": (("tts", "voicevox", "speed"), _to_float),
         "KAIWACOACH_LOGGING_TIMING_LOGS": (("logging", "timing_logs"), _to_bool),
         "KAIWACOACH_UI_LOGO_DIR": (("ui", "logo_dir"), _to_str),
     }
@@ -396,6 +423,34 @@ def _coerce_optional_int(value: Any, field: str) -> int | None:
     return _coerce_int(value, field)
 
 
+_STALE_TTS_FLAT_KEYS = frozenset({"voice", "speed"})
+_STALE_TTS_ENV_VARS = frozenset({"KAIWACOACH_TTS_VOICE", "KAIWACOACH_TTS_SPEED"})
+
+
+def _warn_stale_tts_keys(merged: dict[str, Any], config_path: Path) -> None:
+    stale = _STALE_TTS_FLAT_KEYS & set(merged.get("tts", {}).keys())
+    if stale:
+        _log.warning(
+            "Deprecated TTS config keys in %s: %s. "
+            "These were renamed in the tts config restructure — "
+            "move them under tts.kokoro (e.g. tts.kokoro.voice, tts.kokoro.speed). "
+            "See config.example.yaml for the new structure. Your settings are being ignored.",
+            config_path,
+            sorted(stale),
+        )
+
+
+def _warn_stale_tts_env_vars(env: Mapping[str, str]) -> None:
+    stale = _STALE_TTS_ENV_VARS & set(env.keys())
+    if stale:
+        _log.warning(
+            "Deprecated TTS environment variables detected: %s. "
+            "Renamed to KAIWACOACH_TTS_KOKORO_VOICE / KAIWACOACH_TTS_KOKORO_SPEED. "
+            "Your settings are being ignored.",
+            sorted(stale),
+        )
+
+
 def load_config(config_path: str | Path | None = None) -> AppConfig:
     """Load configuration from defaults, optional file, and environment overrides.
 
@@ -433,13 +488,19 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
             "role_max_new_tokens": dataclasses.asdict(LLMRoleCaps()),
         },
         "storage": {"root_dir": str(repo_root / "storage"), "expected_sample_rate": 16000},
-        "tts": {"voice": "default", "speed": 1.0},
+        "tts": {
+            "kokoro": {"voice": "default", "speed": 1.0},
+            "voicevox": {"url": VOICEVOX_DEFAULT_URL, "speaker_id": VOICEVOX_DEFAULT_SPEAKER_ID, "speed": 1.0},
+        },
         "logging": {"timing_logs": True},
         "ui": {"logo_dir": str(repo_root / "assets" / "logo")},
     }
     file_data = _parse_config_file(resolved_path)
     merged = _deep_merge(defaults, file_data)
     merged = _apply_env_overrides(merged, os.environ)
+
+    _warn_stale_tts_keys(merged, resolved_path)
+    _warn_stale_tts_env_vars(os.environ)
 
     language = str(merged["session"]["language"]).strip().lower()
     if language not in SUPPORTED_LANGUAGES:
@@ -493,8 +554,15 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
             ),
         ),
         tts=TTSConfig(
-            voice=str(merged["tts"]["voice"]),
-            speed=_coerce_float(merged["tts"]["speed"], "tts.speed"),
+            kokoro=KokoroConfig(
+                voice=str(merged["tts"]["kokoro"]["voice"]),
+                speed=_coerce_float(merged["tts"]["kokoro"]["speed"], "tts.kokoro.speed"),
+            ),
+            voicevox=VoiceVoxConfig(
+                url=str(merged["tts"]["voicevox"]["url"]),
+                speaker_id=_coerce_int(merged["tts"]["voicevox"]["speaker_id"], "tts.voicevox.speaker_id"),
+                speed=_coerce_float(merged["tts"]["voicevox"]["speed"], "tts.voicevox.speed"),
+            ),
         ),
         logging=LoggingConfig(
             timing_logs=bool(merged.get("logging", {}).get("timing_logs", True)),
@@ -563,8 +631,10 @@ def _validate_config(config: AppConfig) -> None:
         )
     if config.llm.max_context_tokens <= 0:
         raise ValueError("llm.max_context_tokens must be > 0")
-    if config.tts.speed <= 0:
-        raise ValueError("tts.speed must be > 0")
+    if config.tts.kokoro.speed <= 0:
+        raise ValueError("tts.kokoro.speed must be > 0")
+    if config.tts.voicevox.speed <= 0:
+        raise ValueError("tts.voicevox.speed must be > 0")
     if not config.storage.root_dir:
         raise ValueError("storage.root_dir must be set")
     if config.storage.expected_sample_rate is not None and config.storage.expected_sample_rate <= 0:

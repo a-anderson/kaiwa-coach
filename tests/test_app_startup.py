@@ -9,7 +9,9 @@ from types import SimpleNamespace
 import pytest
 
 import kaiwacoach.app as app_module
+import kaiwacoach.models.factory as factory_module
 from kaiwacoach.config.models import ASR_MODEL_ID, LLM_MODEL_ID_4BIT, LLM_MODEL_ID_8BIT, LLM_MODEL_ID_BF16, TTS_MODEL_ID
+from kaiwacoach.models.tts_voicevox import VoiceVoxBackend
 from kaiwacoach.settings import AppConfig, load_config
 
 
@@ -23,7 +25,10 @@ def test_app_main_wires_components(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
             session=SimpleNamespace(language="ja"),
             llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
             storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
-            tts=SimpleNamespace(voice="default", speed=1.0),
+            tts=SimpleNamespace(
+                kokoro=SimpleNamespace(voice="default", speed=1.0),
+                voicevox=SimpleNamespace(url="http://localhost:50021", speaker_id=74, speed=1.0),
+            ),
             logging=SimpleNamespace(timing_logs=True),
         )
 
@@ -105,25 +110,21 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
             session=SimpleNamespace(language="ja"),
             llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
             storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
-            tts=SimpleNamespace(voice="default", speed=1.0),
+            tts=SimpleNamespace(
+                kokoro=SimpleNamespace(voice="default", speed=1.0),
+                voicevox=SimpleNamespace(url="http://localhost:50021", speaker_id=74, speed=1.0),
+            ),
             logging=SimpleNamespace(timing_logs=True),
         )
 
-    class _Noop:
-        """Minimal stub satisfying the interface of any component main() constructs."""
-        def __init__(self, *_args: object, **_kw: object) -> None: pass
-        def start(self) -> None: pass
-        def close(self) -> None: pass
-        def cleanup(self) -> None: pass
-
     monkeypatch.setattr(app_module, "load_config", _load_config)
-    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _Noop())
-    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _Noop())
-    monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _Noop())
-    monkeypatch.setattr(app_module, "SessionAudioCache", _Noop)
-    monkeypatch.setattr(app_module, "SQLiteWriter", _Noop)
-    monkeypatch.setattr(app_module, "PromptLoader", _Noop)
-    monkeypatch.setattr(app_module, "ConversationOrchestrator", _Noop)
+    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _StartupNoop())
+    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _StartupNoop())
+    monkeypatch.setattr(app_module, "build_tts", lambda cfg, cache: _StartupNoop())
+    monkeypatch.setattr(app_module, "SessionAudioCache", _StartupNoop)
+    monkeypatch.setattr(app_module, "SQLiteWriter", _StartupNoop)
+    monkeypatch.setattr(app_module, "PromptLoader", _StartupNoop)
+    monkeypatch.setattr(app_module, "ConversationOrchestrator", _StartupNoop)
 
     with caplog.at_level(logging.INFO, logger="kaiwacoach.app"):
         app_module.main(launch=False, configure_logging=False)
@@ -131,6 +132,76 @@ def test_main_logs_model_ids_at_startup(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert "mlx-community/whisper-large-v3-mlx" in caplog.text
     assert "mlx-community/Qwen3-14B-bf16" in caplog.text
     assert "mlx-community/Kokoro-82M-bf16" in caplog.text
+
+
+# --- VoiceVox startup availability logging ---
+
+def _voicevox_startup_config(tmp_path: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        models=SimpleNamespace(asr_id="asr", llm_id="llm", tts_id="tts"),
+        session=SimpleNamespace(language="ja"),
+        llm=SimpleNamespace(max_context_tokens=10, role_max_new_tokens=SimpleNamespace(**{"role": 3})),
+        storage=SimpleNamespace(root_dir=str(tmp_path / "storage"), expected_sample_rate=16000),
+        tts=SimpleNamespace(
+            kokoro=SimpleNamespace(voice="default", speed=1.0),
+            voicevox=SimpleNamespace(url="http://localhost:50021", speaker_id=74, speed=1.0),
+        ),
+        logging=SimpleNamespace(timing_logs=False),
+    )
+
+
+class _StartupNoop:
+    """Stub for any component constructed during main() — accepts any args/kwargs."""
+    model_id = "stub"
+    def __init__(self, *args: object, **kw: object) -> None: pass
+    def start(self) -> None: pass
+    def close(self) -> None: pass
+    def cleanup(self) -> None: pass
+
+
+def test_main_logs_voicevox_available_when_server_reachable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """main should log VoiceVox availability and speaker ID when VoiceVox is reachable."""
+    monkeypatch.setattr(app_module, "load_config", lambda: _voicevox_startup_config(tmp_path))
+    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _StartupNoop())
+    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _StartupNoop())
+    # build_tts runs for real so the factory log message is emitted; stub model constructors only
+    monkeypatch.setattr(factory_module, "KokoroTTS", _StartupNoop)
+    monkeypatch.setattr(factory_module, "VoiceVoxTTS", _StartupNoop)
+    monkeypatch.setattr(factory_module, "LanguageDispatchTTS", _StartupNoop)
+    monkeypatch.setattr(VoiceVoxBackend, "check_available", lambda url: True)
+    monkeypatch.setattr(app_module, "SessionAudioCache", _StartupNoop)
+    monkeypatch.setattr(app_module, "SQLiteWriter", _StartupNoop)
+    monkeypatch.setattr(app_module, "PromptLoader", _StartupNoop)
+    monkeypatch.setattr(app_module, "ConversationOrchestrator", _StartupNoop)
+
+    with caplog.at_level(logging.INFO, logger="kaiwacoach.models.factory"):
+        app_module.main(launch=False, configure_logging=False)
+
+    assert "VoiceVox available" in caplog.text
+    assert "speaker 74" in caplog.text
+
+
+def test_main_logs_voicevox_unavailable_when_server_not_reachable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """main should log that VoiceVox is not available when it is not reachable at startup."""
+    monkeypatch.setattr(app_module, "load_config", lambda: _voicevox_startup_config(tmp_path))
+    monkeypatch.setattr(app_module, "build_asr", lambda cfg: _StartupNoop())
+    monkeypatch.setattr(app_module, "build_llm", lambda cfg: _StartupNoop())
+    monkeypatch.setattr(factory_module, "KokoroTTS", _StartupNoop)
+    monkeypatch.setattr(VoiceVoxBackend, "check_available", lambda url: False)
+    # VoiceVoxTTS and LanguageDispatchTTS are not constructed on the unavailable path
+    monkeypatch.setattr(app_module, "SessionAudioCache", _StartupNoop)
+    monkeypatch.setattr(app_module, "SQLiteWriter", _StartupNoop)
+    monkeypatch.setattr(app_module, "PromptLoader", _StartupNoop)
+    monkeypatch.setattr(app_module, "ConversationOrchestrator", _StartupNoop)
+
+    with caplog.at_level(logging.INFO, logger="kaiwacoach.models.factory"):
+        app_module.main(launch=False, configure_logging=False)
+
+    assert "VoiceVox not available" in caplog.text
 
 
 # --- load_config: LLM model ID overrides ---

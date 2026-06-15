@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import gc
+import logging
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +17,8 @@ from kaiwacoach.models.factory import _detect_family, build_asr, build_llm, buil
 from kaiwacoach.models.llm_qwen import QwenLLM
 from kaiwacoach.models.protocols import ASRProtocol, LLMProtocol, TTSProtocol
 from kaiwacoach.models.tts_kokoro import KokoroTTS
-from kaiwacoach.settings import AppConfig, LLMConfig, LLMRoleCaps, LoggingConfig, ModelsConfig, SessionConfig, StorageConfig, TTSConfig, UIConfig
+from kaiwacoach.models.tts_voicevox import LanguageDispatchTTS
+from kaiwacoach.settings import AppConfig, LLMConfig, LLMRoleCaps, LoggingConfig, ModelsConfig, SessionConfig, StorageConfig, TTSConfig, UIConfig, VoiceVoxConfig
 from kaiwacoach.storage.blobs import SessionAudioCache
 
 
@@ -412,18 +415,138 @@ def test_build_llm_ollama_unknown_prefix_raises_at_build_time(monkeypatch: pytes
         build_llm(config)
 
 
+# --- build_tts: VoiceVox routing (non-slow) ---
+
+
+class _NoopKokoroTTS(KokoroTTS):
+    """KokoroTTS subclass that skips mlx-audio init for CI."""
+
+    def __init__(self, model_id: str = TTS_MODEL_ID, cache: object = None) -> None:
+        self._model_id = model_id
+
+
+@pytest.fixture
+def _stub_kokoro_tts(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(factory_module, "KokoroTTS", _NoopKokoroTTS)
+
+
+def _tts_appconfig(
+    tmp_path: Path,
+    *,
+    voicevox_url: str = "http://localhost:50021",
+    voicevox_speaker_id: int = 74,
+    voicevox_speed: float = 1.0,
+) -> AppConfig:
+    """Minimal AppConfig for build_tts with configurable VoiceVox settings."""
+    return AppConfig(
+        session=SessionConfig(language="ja"),
+        models=ModelsConfig(asr_id=ASR_MODEL_ID, llm_id=LLM_MODEL_ID_8BIT, tts_id=TTS_MODEL_ID),
+        llm=LLMConfig(),
+        storage=StorageConfig(root_dir=str(tmp_path / "storage")),
+        tts=TTSConfig(voicevox=VoiceVoxConfig(url=voicevox_url, speaker_id=voicevox_speaker_id, speed=voicevox_speed)),
+        logging=LoggingConfig(),
+        ui=UIConfig(logo_dir=str(tmp_path / "logo")),
+    )
+
+
+@pytest.fixture
+def _tts_cache(tmp_path: Path) -> SessionAudioCache:
+    return SessionAudioCache(root_dir=tmp_path / "audio", expected_sample_rate=None)
+
+
+def test_build_tts_returns_language_dispatch_when_voicevox_available(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
+        result = build_tts(config, _tts_cache)
+    assert isinstance(result, LanguageDispatchTTS)
+    assert isinstance(result, TTSProtocol)
+
+
+def test_build_tts_returns_kokoro_when_voicevox_unavailable(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False):
+        result = build_tts(config, _tts_cache)
+    assert isinstance(result, KokoroTTS)
+    assert isinstance(result, TTSProtocol)
+
+
+def test_build_tts_wires_voicevox_speaker_id(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path, voicevox_speaker_id=3)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
+        result = build_tts(config, _tts_cache)
+    assert isinstance(result, LanguageDispatchTTS)
+    assert result._japanese_tts.model_id == "voicevox:speaker=3"
+
+
+def test_build_tts_wires_voicevox_url(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path, voicevox_url="http://localhost:9999")
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
+        result = build_tts(config, _tts_cache)
+    assert isinstance(result, LanguageDispatchTTS)
+    assert result._japanese_tts._url == "http://localhost:9999"
+
+
+def test_build_tts_wires_voicevox_speed(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path, voicevox_speed=0.8)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
+        result = build_tts(config, _tts_cache)
+    assert isinstance(result, LanguageDispatchTTS)
+    assert result._japanese_tts._speed == pytest.approx(0.8)
+
+
+def test_build_tts_passes_configured_url_to_check_available(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts,
+) -> None:
+    config = _tts_appconfig(tmp_path, voicevox_url="http://localhost:9999")
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False) as mock_check:
+        build_tts(config, _tts_cache)
+    mock_check.assert_called_once_with("http://localhost:9999")
+
+
+def test_build_tts_logs_available_message(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts, caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = _tts_appconfig(tmp_path, voicevox_speaker_id=74)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=True):
+        with caplog.at_level(logging.INFO, logger="kaiwacoach.models.factory"):
+            build_tts(config, _tts_cache)
+    assert "VoiceVox available" in caplog.text
+    assert "speaker 74" in caplog.text
+
+
+def test_build_tts_logs_unavailable_message(
+    tmp_path: Path, _tts_cache: SessionAudioCache, _stub_kokoro_tts, caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = _tts_appconfig(tmp_path)
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False):
+        with caplog.at_level(logging.INFO, logger="kaiwacoach.models.factory"):
+            build_tts(config, _tts_cache)
+    assert "VoiceVox not available" in caplog.text
+
+
 # --- build_tts (slow: MlxAudioBackend loads the model on init) ---
 
 @pytest.mark.slow
 def test_build_tts_routes_to_kokoro_tts(tmp_path: Path) -> None:
-    """build_tts should route to KokoroTTS for the current default config."""
+    """build_tts should load KokoroTTS when VoiceVox is not available."""
     from kaiwacoach.settings import load_config
     config = load_config()
     cache = SessionAudioCache(root_dir=tmp_path)
-    try:
-        tts = build_tts(config, cache)
-    except RuntimeError as exc:
-        pytest.skip(f"TTS backend unavailable: {exc}")
+    with patch("kaiwacoach.models.tts_voicevox.VoiceVoxBackend.check_available", return_value=False):
+        try:
+            tts = build_tts(config, cache)
+        except RuntimeError as exc:
+            pytest.skip(f"TTS backend unavailable: {exc}")
     try:
         assert isinstance(tts, KokoroTTS)
         assert tts.model_id == config.models.tts_id

@@ -22,6 +22,10 @@ GEMMA4_26B_8BIT = "mlx-community/gemma-4-26b-a4b-it-8bit"
 # Default Ollama model ID (passed through to 'ollama pull'; not an HF/MLX path).
 OLLAMA_DEFAULT_LLM_MODEL_ID = "gemma4:e4b"
 
+# VoiceVox local HTTP server defaults.
+VOICEVOX_DEFAULT_URL = "http://localhost:50021"
+VOICEVOX_DEFAULT_SPEAKER_ID = 74  # 琴詠ニヤ
+
 # Supported execution backends for the LLM.
 SUPPORTED_BACKENDS: frozenset[str] = frozenset({"mlx", "ollama"})
 
