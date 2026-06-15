@@ -27,8 +27,13 @@ Implementation reference: `src/kaiwacoach/settings.py`.
   - `root_dir`
   - `expected_sample_rate`
 - `tts`
-  - `voice`
-  - `speed`
+  - `kokoro`
+    - `voice`
+    - `speed`
+  - `voicevox`
+    - `url`
+    - `speaker_id`
+    - `speed`
 - `logging`
   - `timing_logs`
 
@@ -61,8 +66,11 @@ Implementation reference: `src/kaiwacoach/settings.py`.
 
 ### TTS
 
-- `KAIWACOACH_TTS_VOICE`
-- `KAIWACOACH_TTS_SPEED`
+- `KAIWACOACH_TTS_KOKORO_VOICE`
+- `KAIWACOACH_TTS_KOKORO_SPEED`
+- `KAIWACOACH_TTS_VOICEVOX_URL`
+- `KAIWACOACH_TTS_VOICEVOX_SPEAKER_ID`
+- `KAIWACOACH_TTS_VOICEVOX_SPEED`
 
 ## File-Based Configuration
 

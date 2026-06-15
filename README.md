@@ -55,7 +55,7 @@ All product demos can be viewed in the [Feature Demos](docs/feature_demos.md) fi
 - [src/kaiwacoach/models/](src/kaiwacoach/models/)
     - `protocols.py`: shared result types and runtime-checkable protocols for ASR/LLM/TTS
     - `factory.py`: config-driven routing to the correct backend wrapper
-    - concrete wrappers (`asr_whisper.py`, `llm_qwen.py`, `tts_kokoro.py`) and JSON enforcement
+    - concrete wrappers (`asr_whisper.py`, `llm_qwen.py`, `tts_kokoro.py`, `tts_voicevox.py`) and JSON enforcement
 - [src/kaiwacoach/textnorm/](src/kaiwacoach/textnorm/)
     - normalisation and language invariants
 - [src/kaiwacoach/storage/](src/kaiwacoach/storage/)
