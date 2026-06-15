@@ -13,28 +13,12 @@ from kaiwacoach.settings import load_config
 # --- defaults ---
 
 
-def test_tts_kokoro_voice_default(tmp_path: Path) -> None:
+def test_tts_config_defaults(tmp_path: Path) -> None:
     config = load_config(config_path=tmp_path / "nonexistent.yaml")
     assert config.tts.kokoro.voice == "default"
-
-
-def test_tts_kokoro_speed_default(tmp_path: Path) -> None:
-    config = load_config(config_path=tmp_path / "nonexistent.yaml")
     assert config.tts.kokoro.speed == 1.0
-
-
-def test_tts_voicevox_url_default(tmp_path: Path) -> None:
-    config = load_config(config_path=tmp_path / "nonexistent.yaml")
     assert config.tts.voicevox.url == "http://localhost:50021"
-
-
-def test_tts_voicevox_speaker_id_default(tmp_path: Path) -> None:
-    config = load_config(config_path=tmp_path / "nonexistent.yaml")
     assert config.tts.voicevox.speaker_id == 74
-
-
-def test_tts_voicevox_speed_default(tmp_path: Path) -> None:
-    config = load_config(config_path=tmp_path / "nonexistent.yaml")
     assert config.tts.voicevox.speed == 1.0
 
 
@@ -154,23 +138,16 @@ def test_tts_yaml_partial_override_preserves_other_defaults(tmp_path: Path) -> N
 # --- stale key warnings ---
 
 
-def test_stale_flat_tts_voice_key_emits_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    """Old flat tts.voice key in config.yaml should emit a deprecation warning."""
+@pytest.mark.parametrize("stale_key", ["voice", "speed"])
+def test_stale_flat_tts_key_emits_warning(
+    stale_key: str, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Old flat tts.voice / tts.speed key in config.yaml should emit a deprecation warning."""
     cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text('tts:\n  voice: "jf_alpha"\n', encoding="utf-8")
+    cfg_file.write_text(f"tts:\n  {stale_key}: value\n", encoding="utf-8")
     with caplog.at_level(logging.WARNING, logger="kaiwacoach.settings"):
         load_config(config_path=cfg_file)
-    assert "voice" in caplog.text
-    assert "tts.kokoro" in caplog.text
-
-
-def test_stale_flat_tts_speed_key_emits_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    """Old flat tts.speed key in config.yaml should emit a deprecation warning."""
-    cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text("tts:\n  speed: 1.5\n", encoding="utf-8")
-    with caplog.at_level(logging.WARNING, logger="kaiwacoach.settings"):
-        load_config(config_path=cfg_file)
-    assert "speed" in caplog.text
+    assert stale_key in caplog.text
 
 
 def test_stale_flat_tts_voice_key_does_not_override_kokoro_voice(tmp_path: Path) -> None:
@@ -181,18 +158,22 @@ def test_stale_flat_tts_voice_key_does_not_override_kokoro_voice(tmp_path: Path)
     assert config.tts.kokoro.voice == "default"
 
 
-def test_stale_tts_voice_env_var_emits_warning(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """Old KAIWACOACH_TTS_VOICE env var should emit a deprecation warning."""
-    monkeypatch.setenv("KAIWACOACH_TTS_VOICE", "jf_alpha")
+@pytest.mark.parametrize(
+    "stale_var,replacement",
+    [
+        ("KAIWACOACH_TTS_VOICE", "KAIWACOACH_TTS_KOKORO_VOICE"),
+        ("KAIWACOACH_TTS_SPEED", "KAIWACOACH_TTS_KOKORO_SPEED"),
+    ],
+)
+def test_stale_tts_env_var_emits_warning(
+    stale_var: str,
+    replacement: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Old KAIWACOACH_TTS_VOICE / _TTS_SPEED env vars should emit a deprecation warning."""
+    monkeypatch.setenv(stale_var, "value")
     with caplog.at_level(logging.WARNING, logger="kaiwacoach.settings"):
         load_config()
-    assert "KAIWACOACH_TTS_VOICE" in caplog.text
-    assert "KAIWACOACH_TTS_KOKORO_VOICE" in caplog.text
-
-
-def test_stale_tts_speed_env_var_emits_warning(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """Old KAIWACOACH_TTS_SPEED env var should emit a deprecation warning."""
-    monkeypatch.setenv("KAIWACOACH_TTS_SPEED", "1.5")
-    with caplog.at_level(logging.WARNING, logger="kaiwacoach.settings"):
-        load_config()
-    assert "KAIWACOACH_TTS_SPEED" in caplog.text
+    assert stale_var in caplog.text
+    assert replacement in caplog.text

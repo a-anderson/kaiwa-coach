@@ -451,9 +451,9 @@ The project currently provides evaluation in three areas:
 - Full local suite (including slow tests) is available with:
     - `poetry run pytest -q`
 
-Latest full local snapshot (2026-06-15):
+Latest full local snapshot (2026-06-16):
 
-- `458 passed`
+- `455 passed`
 
 ### Schema and repair robustness
 

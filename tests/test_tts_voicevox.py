@@ -244,26 +244,16 @@ def test_dispatch_routes_japanese_to_japanese_tts() -> None:
     assert len(other_tts.calls) == 0
 
 
-def test_dispatch_routes_french_to_default_tts() -> None:
+@pytest.mark.parametrize("language", ["fr", "es", None])
+def test_dispatch_routes_non_japanese_to_default_tts(language: str | None) -> None:
     ja_tts = _StubTTS("voicevox")
     other_tts = _StubTTS("kokoro")
     dispatch = LanguageDispatchTTS(japanese_tts=ja_tts, default_tts=other_tts)
 
-    dispatch.synthesize("conv", "turn", "Bonjour", voice=None, speed=1.0, language="fr")
+    dispatch.synthesize("conv", "turn", "hello", voice=None, speed=1.0, language=language)
 
     assert len(ja_tts.calls) == 0
     assert len(other_tts.calls) == 1
-
-
-def test_dispatch_routes_none_language_to_default_tts() -> None:
-    ja_tts = _StubTTS("voicevox")
-    other_tts = _StubTTS("kokoro")
-    dispatch = LanguageDispatchTTS(japanese_tts=ja_tts, default_tts=other_tts)
-
-    dispatch.synthesize("conv", "turn", "hello", voice=None, speed=1.0, language=None)
-
-    assert len(other_tts.calls) == 1
-    assert len(ja_tts.calls) == 0
 
 
 def test_dispatch_falls_back_to_default_on_oserror() -> None:
@@ -287,7 +277,7 @@ def test_dispatch_logs_warning_on_fallback(caplog: pytest.LogCaptureFixture) -> 
 
     assert caplog.records, "expected at least one warning"
     warning_text = " ".join(r.message for r in caplog.records)
-    assert "ja" in warning_text or "VoiceVox" in warning_text
+    assert "VoiceVox" in warning_text
 
 
 def test_dispatch_model_id_includes_both_backend_ids() -> None:
