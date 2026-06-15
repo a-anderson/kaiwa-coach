@@ -453,7 +453,7 @@ The project currently provides evaluation in three areas:
 
 Latest full local snapshot (2026-06-15):
 
-- `459 passed`
+- `458 passed`
 
 ### Schema and repair robustness
 

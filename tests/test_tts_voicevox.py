@@ -79,14 +79,13 @@ def test_check_available_hits_version_endpoint() -> None:
     with patch("urllib.request.urlopen", side_effect=_fake):
         VoiceVoxBackend.check_available("http://localhost:50021")
 
-    assert "50021" in str(captured["url"])
-    assert "version" in str(captured["url"])
+    assert captured["url"] == "http://localhost:50021/version"
 
 
 # --- VoiceVoxBackend.synthesize ---
 
 
-def test_synthesize_posts_to_audio_query_endpoint() -> None:
+def test_synthesize_hits_both_endpoints_with_correct_speaker() -> None:
     captured = []
 
     def _fake(req, timeout=None):
@@ -98,24 +97,8 @@ def test_synthesize_posts_to_audio_query_endpoint() -> None:
     with patch("urllib.request.urlopen", side_effect=_fake):
         VoiceVoxBackend.synthesize("こんにちは", speaker_id=74, speed=1.0, url="http://localhost:50021")
 
-    audio_query_url = next(u for u in captured if "audio_query" in u)
-    assert "speaker=74" in audio_query_url
-
-
-def test_synthesize_posts_to_synthesis_endpoint() -> None:
-    captured = []
-
-    def _fake(req, timeout=None):
-        captured.append(req.full_url)
-        if "audio_query" in req.full_url:
-            return _make_urlopen_ctx(json.dumps({"speedScale": 1.0}).encode())
-        return _make_urlopen_ctx(_make_wav_bytes())
-
-    with patch("urllib.request.urlopen", side_effect=_fake):
-        VoiceVoxBackend.synthesize("hello", speaker_id=3, speed=1.0, url="http://localhost:50021")
-
-    synthesis_url = next(u for u in captured if "synthesis" in u)
-    assert "speaker=3" in synthesis_url
+    assert any("audio_query" in u and "speaker=74" in u for u in captured)
+    assert any("synthesis" in u and "speaker=74" in u for u in captured)
 
 
 def test_synthesize_sets_speed_scale_in_audio_query_body() -> None:
@@ -150,16 +133,11 @@ def test_synthesize_parses_wav_using_wave_module() -> None:
 # --- VoiceVoxTTS ---
 
 
-def test_voicevox_tts_model_id_includes_speaker(tmp_path: Path) -> None:
+@pytest.mark.parametrize("speaker_id,expected", [(74, "voicevox:speaker=74"), (3, "voicevox:speaker=3")])
+def test_voicevox_tts_model_id_format(speaker_id: int, expected: str, tmp_path: Path) -> None:
     cache = SessionAudioCache(root_dir=tmp_path, expected_sample_rate=None)
-    tts = VoiceVoxTTS(speaker_id=74, url="http://localhost:50021", speed=1.0, cache=cache)
-    assert tts.model_id == "voicevox:speaker=74"
-
-
-def test_voicevox_tts_model_id_reflects_configured_speaker(tmp_path: Path) -> None:
-    cache = SessionAudioCache(root_dir=tmp_path, expected_sample_rate=None)
-    tts = VoiceVoxTTS(speaker_id=3, url="http://localhost:50021", speed=1.0, cache=cache)
-    assert tts.model_id == "voicevox:speaker=3"
+    tts = VoiceVoxTTS(speaker_id=speaker_id, url="http://localhost:50021", speed=1.0, cache=cache)
+    assert tts.model_id == expected
 
 
 def test_voicevox_tts_cache_miss_calls_backend_and_stores_result(tmp_path: Path) -> None:

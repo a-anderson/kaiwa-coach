@@ -109,10 +109,11 @@ class VoiceVoxTTS:
         lang_code: str | None = None,
         language: str | None = None,
     ) -> TTSResult:
-        """Synthesize via VoiceVox. voice, speed, and lang_code params are ignored.
+        """Synthesize via VoiceVox. voice, speed, lang_code, and language params are ignored.
 
         voice and lang_code are not used by VoiceVox (speaker_id selects the voice).
         speed is set at construction time from config.tts.voicevox.speed.
+        language is handled by LanguageDispatchTTS before this method is called.
         """
         cache_key = self._hash_key(text)
         cached_path = self._cache_index.get(cache_key)
